@@ -97,7 +97,7 @@ func newResponsesStreamRuntime(
 
 func (s *responsesStreamRuntime) finalize() {
 	finalThinking := s.thinking.String()
-	finalText := sanitizeLeakedToolHistory(s.text.String())
+	finalText := sanitizeLeakedOutput(s.text.String())
 
 	if s.bufferToolContent {
 		s.processToolStreamEvents(flushToolSieve(&s.sieve, s.toolNames), true)
@@ -194,7 +194,7 @@ func (s *responsesStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Pa
 			continue
 		}
 
-		cleanedText := sanitizeLeakedToolHistory(p.Text)
+		cleanedText := sanitizeLeakedOutput(p.Text)
 		if cleanedText == "" {
 			continue
 		}

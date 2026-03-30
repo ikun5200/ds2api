@@ -98,10 +98,8 @@ test('parseToolCalls ignores tool_call payloads that exist only inside fenced co
 
 test('parseToolCalls parses text-kv fallback payload', () => {
   const text = [
-    '[TOOL_CALL_HISTORY]',
     'function.name: execute_command',
     'function.arguments: {"command":"cd scripts && python check_syntax.py example.py","cwd":null,"timeout":30}',
-    '[/TOOL_CALL_HISTORY]',
     'Some other text thinking...',
   ].join('\n');
   const calls = parseToolCalls(text, ['execute_command']);
@@ -252,56 +250,6 @@ test('sieve keeps plain text intact in tool mode when no tool call appears', () 
   const hasToolCall = events.some((evt) => evt.type === 'tool_calls');
   assert.equal(hasToolCall, false);
   assert.equal(leakedText, '你好，这是普通文本回复。请继续。');
-});
-
-test('sieve swallows leaked TOOL_CALL_HISTORY marker blocks', () => {
-  const events = runSieve(
-    [
-      '前置文本。',
-      '[TOOL_CALL_HISTORY]\nstatus: already_called\nfunction.name: exec\nfunction.arguments: {}\n[/TOOL_CALL_HISTORY]',
-      '后置文本。',
-    ],
-    ['exec'],
-  );
-  const leakedText = collectText(events);
-  const hasToolCall = events.some((evt) => evt.type === 'tool_calls');
-  assert.equal(hasToolCall, false);
-  assert.equal(leakedText.includes('前置文本。'), true);
-  assert.equal(leakedText.includes('后置文本。'), true);
-  assert.equal(leakedText.includes('[TOOL_CALL_HISTORY]'), false);
-});
-
-test('sieve swallows leaked TOOL_RESULT_HISTORY marker blocks', () => {
-  const events = runSieve(
-    [
-      '前置文本。',
-      '[TOOL_RESULT_HISTORY]\nstatus: already_called\nfunction.name: exec\nfunction.arguments: {}\n[/TOOL_RESULT_HISTORY]',
-      '后置文本。',
-    ],
-    ['exec'],
-  );
-  const leakedText = collectText(events);
-  const hasToolCall = events.some((evt) => evt.type === 'tool_calls');
-  assert.equal(hasToolCall, false);
-  assert.equal(leakedText.includes('前置文本。'), true);
-  assert.equal(leakedText.includes('后置文本。'), true);
-  assert.equal(leakedText.includes('[TOOL_RESULT_HISTORY]'), false);
-});
-
-test('sieve preserves text spacing when TOOL_RESULT_HISTORY spans chunks', () => {
-  const events = runSieve(
-    [
-      'Hello ',
-      '[TOOL_RESULT_HISTORY]\nstatus: already_called\n',
-      'function.name: exec\nfunction.arguments: {}\n[/TOOL_RESULT_HISTORY]',
-      'world',
-    ],
-    ['exec'],
-  );
-  const leakedText = collectText(events);
-  const hasToolCall = events.some((evt) => evt.type === 'tool_calls' && evt.calls?.length > 0);
-  assert.equal(hasToolCall, false);
-  assert.equal(leakedText, 'Hello world');
 });
 
 test('sieve emits unknown tool payload (no args) as executable tool call', () => {

@@ -113,7 +113,7 @@ func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Res
 		return
 	}
 	result := sse.CollectStream(resp, thinkingEnabled, true)
-	sanitizedText := sanitizeLeakedToolHistory(result.Text)
+	sanitizedText := sanitizeLeakedOutput(result.Text)
 	textParsed := util.ParseStandaloneToolCallsDetailed(sanitizedText, toolNames)
 	logResponsesToolPolicyRejection(traceID, toolChoice, textParsed, "text")
 

@@ -8,7 +8,7 @@
 ![Stars](https://img.shields.io/github/stars/CJackHwang/ds2api.svg)
 ![Forks](https://img.shields.io/github/forks/CJackHwang/ds2api.svg)
 [![Release](https://img.shields.io/github/v/release/CJackHwang/ds2api?display_name=tag)](https://github.com/CJackHwang/ds2api/releases)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](DEPLOY.en.md)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docs/DEPLOY.en.md)
 [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/L4CFHP)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/CJackHwang/ds2api)
 
@@ -213,7 +213,7 @@ base64 < config.json | tr -d '\n'
 
 > **Streaming note**: `/v1/chat/completions` on Vercel is routed to `api/chat-stream.js` (Node Runtime) for real-time SSE. Auth, account selection, and session/PoW preparation are still handled by the Go internal prepare endpoint; streaming output (including `tools`) is assembled on Node with Go-aligned anti-leak handling.
 
-For detailed deployment instructions, see the [Deployment Guide](DEPLOY.en.md).
+For detailed deployment instructions, see the [Deployment Guide](docs/DEPLOY.en.md).
 
 ### Option 4: Download Release Binaries
 
@@ -270,10 +270,6 @@ cp opencode.json.example opencode.json
   "compat": {
     "wide_input_strict_output": true
   },
-  "toolcall": {
-    "mode": "feature_match",
-    "early_emit_confidence": "high"
-  },
   "responses": {
     "store_ttl_seconds": 900
   },
@@ -290,7 +286,8 @@ cp opencode.json.example opencode.json
   "runtime": {
     "account_max_inflight": 2,
     "account_max_queue": 0,
-    "global_max_inflight": 0
+    "global_max_inflight": 0,
+    "token_refresh_interval_hours": 6
   },
   "auto_delete": {
     "sessions": false
@@ -303,12 +300,12 @@ cp opencode.json.example opencode.json
 - `token`: Even if set in `config.json`, it is cleared during load (DS2API does not read persisted tokens from config); runtime tokens are maintained/refreshed in memory only
 - `model_aliases`: Map common model names (GPT/Codex/Claude) to DeepSeek models
 - `compat.wide_input_strict_output`: Keep `true` (current default policy)
-- `toolcall`: Fixed to feature matching + high-confidence early emit
+- `toolcall`: Fixed to feature matching + high-confidence early emit, no longer configurable
 - `responses.store_ttl_seconds`: In-memory TTL for `/v1/responses/{id}`
 - `embeddings.provider`: Embeddings provider (`deterministic/mock/builtin` built-in)
 - `claude_mapping`: Maps `fast`/`slow` suffixes to corresponding DeepSeek models (still compatible with `claude_model_mapping`)
 - `admin`: Admin panel settings (JWT expiry, password hash, etc.), hot-reloadable via Admin Settings API
-- `runtime`: Runtime parameters (concurrency limits, queue sizes), hot-reloadable via Admin Settings API; `account_max_queue=0`/`global_max_inflight=0` means auto-calculate from recommended values
+- `runtime`: Runtime parameters (concurrency limits, queue sizes, managed token refresh interval), hot-reloadable via Admin Settings API; `account_max_queue=0`/`global_max_inflight=0` means auto-calculate from recommended values, `token_refresh_interval_hours=6` is the default forced re-login interval
 - `auto_delete.sessions`: Whether to auto-delete DeepSeek sessions after request completion (default `false`, hot-reloadable via Settings)
 
 ### Environment Variables
@@ -444,6 +441,7 @@ ds2api/
 ├── tests/
 │   ├── compat/              # Compatibility fixtures and expected outputs
 │   └── scripts/             # Unified test script entrypoints (unit/e2e)
+├── docs/                    # Deployment / contributing / testing docs
 ├── static/admin/            # WebUI build output (not committed to Git)
 ├── .github/
 │   ├── workflows/           # GitHub Actions (quality gates + release automation)
@@ -463,9 +461,9 @@ ds2api/
 | Document | Description |
 | --- | --- |
 | [API.md](API.md) / [API.en.md](API.en.md) | API reference with request/response examples |
-| [DEPLOY.md](DEPLOY.md) / [DEPLOY.en.md](DEPLOY.en.md) | Deployment guide (local/Docker/Vercel/systemd) |
-| [CONTRIBUTING.md](CONTRIBUTING.md) / [CONTRIBUTING.en.md](CONTRIBUTING.en.md) | Contributing guide |
-| [TESTING.md](TESTING.md) | Testsuite guide |
+| [DEPLOY.md](docs/DEPLOY.md) / [DEPLOY.en.md](docs/DEPLOY.en.md) | Deployment guide (local/Docker/Vercel/systemd) |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md) / [CONTRIBUTING.en.md](docs/CONTRIBUTING.en.md) | Contributing guide |
+| [TESTING.md](docs/TESTING.md) | Testsuite guide |
 
 ## Testing
 

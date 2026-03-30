@@ -183,7 +183,7 @@ func findToolSegmentStart(s string) int {
 		return -1
 	}
 	lower := strings.ToLower(s)
-	keywords := []string{"tool_calls", "\"function\"", "function.name:", "[tool_call_history]", "[tool_result_history]"}
+	keywords := []string{"tool_calls", "\"function\"", "function.name:"}
 	bestKeyIdx := -1
 	for _, kw := range keywords {
 		idx := strings.Index(lower, kw)
@@ -240,7 +240,7 @@ func consumeToolCapture(state *toolStreamSieveState, toolNames []string) (prefix
 
 	lower := strings.ToLower(captured)
 	keyIdx := -1
-	keywords := []string{"tool_calls", "\"function\"", "function.name:", "[tool_call_history]", "[tool_result_history]"}
+	keywords := []string{"tool_calls", "\"function\"", "function.name:"}
 	for _, kw := range keywords {
 		idx := strings.Index(lower, kw)
 		if idx >= 0 && (keyIdx < 0 || idx < keyIdx) {
@@ -253,9 +253,6 @@ func consumeToolCapture(state *toolStreamSieveState, toolNames []string) (prefix
 	}
 	start := strings.LastIndex(captured[:keyIdx], "{")
 	if start < 0 {
-		if blockStart, blockEnd, ok := extractToolHistoryBlock(captured, keyIdx); ok {
-			return captured[:blockStart], nil, captured[blockEnd:], true
-		}
 		start = keyIdx
 	}
 	obj, end, ok := extractJSONObjectFrom(captured, start)

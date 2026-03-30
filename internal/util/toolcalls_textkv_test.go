@@ -6,14 +6,12 @@ import (
 
 func TestParseTextKVToolCalls_Basic(t *testing.T) {
 	text := `
-[TOOL_CALL_HISTORY]
 status: already_called
 origin: assistant
 not_user_input: true
 tool_call_id: call_3fcd15235eb94f7eae3a8de5a9cfa36b
 function.name: execute_command
 function.arguments: {"command":"cd scripts && python check_syntax.py example.py","cwd":null,"timeout":30}
-[/TOOL_CALL_HISTORY]
 
 Some other text thinking...
 `

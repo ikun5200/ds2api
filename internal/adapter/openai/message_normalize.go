@@ -1,7 +1,6 @@
 package openai
 
 import (
-	"encoding/json"
 	"strings"
 
 	"ds2api/internal/prompt"
@@ -55,7 +54,18 @@ func normalizeOpenAIMessagesForPrompt(raw []any, traceID string) []map[string]an
 }
 
 func buildAssistantContentForPrompt(msg map[string]any) string {
-	return strings.TrimSpace(normalizeOpenAIContentForPrompt(msg["content"]))
+	content := strings.TrimSpace(normalizeOpenAIContentForPrompt(msg["content"]))
+	toolHistory := prompt.FormatToolCallsForPrompt(msg["tool_calls"])
+	switch {
+	case content == "" && toolHistory == "":
+		return ""
+	case content == "":
+		return toolHistory
+	case toolHistory == "":
+		return content
+	default:
+		return content + "\n\n" + toolHistory
+	}
 }
 
 func buildToolContentForPrompt(msg map[string]any) string {
@@ -68,18 +78,6 @@ func buildToolContentForPrompt(msg map[string]any) string {
 
 func normalizeOpenAIContentForPrompt(v any) string {
 	return prompt.NormalizeContent(v)
-}
-
-func normalizeToolArgumentString(raw string) string {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return ""
-	}
-	if looksLikeConcatenatedJSON(trimmed) {
-		// Keep original payload to avoid silent argument rewrites.
-		return raw
-	}
-	return trimmed
 }
 
 func normalizeOpenAIRoleForPrompt(role string) string {
@@ -95,21 +93,4 @@ func asString(v any) string {
 		return s
 	}
 	return ""
-}
-
-func looksLikeConcatenatedJSON(raw string) bool {
-	trimmed := strings.TrimSpace(raw)
-	if trimmed == "" {
-		return false
-	}
-	if strings.Contains(trimmed, "}{") || strings.Contains(trimmed, "][") {
-		return true
-	}
-	dec := json.NewDecoder(strings.NewReader(trimmed))
-	var first any
-	if err := dec.Decode(&first); err != nil {
-		return false
-	}
-	var second any
-	return dec.Decode(&second) == nil
 }

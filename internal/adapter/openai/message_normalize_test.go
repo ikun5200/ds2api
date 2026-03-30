@@ -34,20 +34,23 @@ func TestNormalizeOpenAIMessagesForPrompt_AssistantToolCallsAndToolResult(t *tes
 	}
 
 	normalized := normalizeOpenAIMessagesForPrompt(raw, "")
-	if len(normalized) != 3 {
-		t.Fatalf("expected 3 normalized messages with tool-call-only assistant turn omitted, got %d", len(normalized))
+	if len(normalized) != 4 {
+		t.Fatalf("expected 4 normalized messages with assistant tool history preserved, got %d", len(normalized))
 	}
-	toolContent, _ := normalized[2]["content"].(string)
-	if !strings.Contains(toolContent, `"temp":18`) {
-		t.Fatalf("tool result should be transparently forwarded, got %q", toolContent)
+	assistantContent, _ := normalized[2]["content"].(string)
+	if !strings.Contains(assistantContent, "<tool_calls>") {
+		t.Fatalf("assistant tool history should be preserved in XML form, got %q", assistantContent)
 	}
-	if strings.Contains(toolContent, "[TOOL_RESULT_HISTORY]") {
-		t.Fatalf("tool history marker should not be injected: %q", toolContent)
+	if !strings.Contains(assistantContent, "<tool_name>get_weather</tool_name>") {
+		t.Fatalf("expected tool name in preserved history, got %q", assistantContent)
+	}
+	if !strings.Contains(normalized[3]["content"].(string), `"temp":18`) {
+		t.Fatalf("tool result should be transparently forwarded, got %#v", normalized[3]["content"])
 	}
 
 	prompt := util.MessagesPrepare(normalized)
-	if strings.Contains(prompt, "[TOOL_CALL_HISTORY]") || strings.Contains(prompt, "[TOOL_RESULT_HISTORY]") {
-		t.Fatalf("expected no synthetic history markers in prompt: %q", prompt)
+	if !strings.Contains(prompt, "<tool_calls>") {
+		t.Fatalf("expected preserved assistant tool history in prompt: %q", prompt)
 	}
 }
 
@@ -170,8 +173,15 @@ func TestNormalizeOpenAIMessagesForPrompt_AssistantMultipleToolCallsRemainSepara
 	}
 
 	normalized := normalizeOpenAIMessagesForPrompt(raw, "")
-	if len(normalized) != 0 {
-		t.Fatalf("expected assistant tool_call-only message omitted, got %#v", normalized)
+	if len(normalized) != 1 {
+		t.Fatalf("expected assistant tool_call-only message preserved, got %#v", normalized)
+	}
+	content, _ := normalized[0]["content"].(string)
+	if strings.Count(content, "<tool_call>") != 2 {
+		t.Fatalf("expected two preserved tool call blocks, got %q", content)
+	}
+	if !strings.Contains(content, "<tool_name>search_web</tool_name>") || !strings.Contains(content, "<tool_name>eval_javascript</tool_name>") {
+		t.Fatalf("expected both tool names in preserved history, got %q", content)
 	}
 }
 
@@ -192,8 +202,12 @@ func TestNormalizeOpenAIMessagesForPrompt_PreservesConcatenatedToolArguments(t *
 	}
 
 	normalized := normalizeOpenAIMessagesForPrompt(raw, "")
-	if len(normalized) != 0 {
-		t.Fatalf("expected assistant tool_call-only content omitted, got %#v", normalized)
+	if len(normalized) != 1 {
+		t.Fatalf("expected assistant tool_call-only content preserved, got %#v", normalized)
+	}
+	content, _ := normalized[0]["content"].(string)
+	if !strings.Contains(content, `{}{"query":"测试工具调用"}`) {
+		t.Fatalf("expected concatenated tool arguments preserved, got %q", content)
 	}
 }
 
@@ -215,7 +229,7 @@ func TestNormalizeOpenAIMessagesForPrompt_AssistantToolCallsMissingNameAreDroppe
 
 	normalized := normalizeOpenAIMessagesForPrompt(raw, "")
 	if len(normalized) != 0 {
-		t.Fatalf("expected assistant tool_calls without text omitted, got %#v", normalized)
+		t.Fatalf("expected assistant tool_calls without text to be dropped when name is missing, got %#v", normalized)
 	}
 }
 
@@ -237,8 +251,15 @@ func TestNormalizeOpenAIMessagesForPrompt_AssistantNilContentDoesNotInjectNullLi
 	}
 
 	normalized := normalizeOpenAIMessagesForPrompt(raw, "")
-	if len(normalized) != 0 {
-		t.Fatalf("expected nil-content assistant tool_call-only message omitted, got %#v", normalized)
+	if len(normalized) != 1 {
+		t.Fatalf("expected nil-content assistant tool_call-only message preserved, got %#v", normalized)
+	}
+	content, _ := normalized[0]["content"].(string)
+	if strings.Contains(content, "null") {
+		t.Fatalf("expected no null literal injection, got %q", content)
+	}
+	if !strings.Contains(content, "<tool_calls>") {
+		t.Fatalf("expected assistant tool history in normalized content, got %q", content)
 	}
 }
 

@@ -4,7 +4,7 @@
   "outputDirectory": "static",
   "functions": {
     "api/chat-stream.js": {
-      "includeFiles": "**/sha3_wasm_bg.7b9ca65ddd.wasm",
+      "includeFiles": "internal/deepseek/assets/sha3_wasm_bg.7b9ca65ddd.wasm",
       "maxDuration": 300
     },
     "api/index.go": {

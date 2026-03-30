@@ -32,14 +32,11 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	if strings.TrimSpace(c.Admin.PasswordHash) != "" || c.Admin.JWTExpireHours > 0 || c.Admin.JWTValidAfterUnix > 0 {
 		m["admin"] = c.Admin
 	}
-	if c.Runtime.AccountMaxInflight > 0 || c.Runtime.AccountMaxQueue > 0 || c.Runtime.GlobalMaxInflight > 0 {
+	if c.Runtime.AccountMaxInflight > 0 || c.Runtime.AccountMaxQueue > 0 || c.Runtime.GlobalMaxInflight > 0 || c.Runtime.TokenRefreshIntervalHours > 0 {
 		m["runtime"] = c.Runtime
 	}
 	if c.Compat.WideInputStrictOutput != nil {
 		m["compat"] = c.Compat
-	}
-	if strings.TrimSpace(c.Toolcall.Mode) != "" || strings.TrimSpace(c.Toolcall.EarlyEmitConfidence) != "" {
-		m["toolcall"] = c.Toolcall
 	}
 	if c.Responses.StoreTTLSeconds > 0 {
 		m["responses"] = c.Responses
@@ -98,9 +95,7 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 				return fmt.Errorf("invalid field %q: %w", k, err)
 			}
 		case "toolcall":
-			if err := json.Unmarshal(v, &c.Toolcall); err != nil {
-				return fmt.Errorf("invalid field %q: %w", k, err)
-			}
+			// Legacy field ignored. Toolcall policy is fixed and no longer configurable.
 		case "responses":
 			if err := json.Unmarshal(v, &c.Responses); err != nil {
 				return fmt.Errorf("invalid field %q: %w", k, err)
@@ -143,7 +138,6 @@ func (c Config) Clone() Config {
 		Compat: CompatConfig{
 			WideInputStrictOutput: cloneBoolPtr(c.Compat.WideInputStrictOutput),
 		},
-		Toolcall:         c.Toolcall,
 		Responses:        c.Responses,
 		Embeddings:       c.Embeddings,
 		AutoDelete:       c.AutoDelete,

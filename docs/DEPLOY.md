@@ -456,8 +456,8 @@ server {
 # 将编译好的二进制文件和相关文件复制到目标目录
 sudo mkdir -p /opt/ds2api
 sudo cp ds2api config.json /opt/ds2api/
-# 可选：若你希望使用外置 WASM 文件（覆盖内置版本）
-# sudo cp sha3_wasm_bg.7b9ca65ddd.wasm /opt/ds2api/
+# 可选：若你希望使用外置 WASM 文件（覆盖内置版本，来自 release 包或构建产物）
+# sudo cp /path/to/sha3_wasm_bg.7b9ca65ddd.wasm /opt/ds2api/
 sudo cp -r static/admin /opt/ds2api/static/admin
 ```
 

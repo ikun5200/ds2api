@@ -5,7 +5,7 @@ const {
   insideCodeFenceWithState,
 } = require('./state');
 const { parseStandaloneToolCallsDetailed } = require('./parse');
-const { extractJSONObjectFrom, extractToolHistoryBlock, trimWrappingJSONFence } = require('./jsonscan');
+const { extractJSONObjectFrom, trimWrappingJSONFence } = require('./jsonscan');
 const {
   TOOL_SEGMENT_KEYWORDS,
   XML_TOOL_SEGMENT_TAGS,
@@ -233,17 +233,6 @@ function consumeToolCapture(state, toolNames) {
   }
   const start = captured.slice(0, keyIdx).lastIndexOf('{');
   const actualStart = start >= 0 ? start : keyIdx;
-  if (start < 0) {
-    const history = extractToolHistoryBlock(captured, keyIdx);
-    if (history.ok) {
-      return {
-        ready: true,
-        prefix: captured.slice(0, history.start),
-        calls: [],
-        suffix: captured.slice(history.end),
-      };
-    }
-  }
   const obj = extractJSONObjectFrom(captured, actualStart);
   if (!obj.ok) {
     return { ready: false, prefix: '', calls: [], suffix: '' };

@@ -14,6 +14,9 @@ func validateMergedRuntimeSettings(current config.RuntimeConfig, incoming *confi
 		if incoming.GlobalMaxInflight > 0 {
 			merged.GlobalMaxInflight = incoming.GlobalMaxInflight
 		}
+		if incoming.TokenRefreshIntervalHours > 0 {
+			merged.TokenRefreshIntervalHours = incoming.TokenRefreshIntervalHours
+		}
 	}
 	return validateRuntimeSettings(merged)
 }

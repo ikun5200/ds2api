@@ -93,8 +93,11 @@ func TestNormalizeClaudeMessagesToolUseToAssistantToolCalls(t *testing.T) {
 		t.Fatalf("expected call id preserved, got %#v", call)
 	}
 	content, _ := m["content"].(string)
-	if !containsStr(content, "search_web") || !containsStr(content, `"arguments":"{\"query\":\"latest\"}"`) {
-		t.Fatalf("expected assistant content to include serialized tool call for prompt roundtrip, got %q", content)
+	if !containsStr(content, "<tool_calls>") || !containsStr(content, "<tool_name>search_web</tool_name>") {
+		t.Fatalf("expected assistant content to include XML tool call history, got %q", content)
+	}
+	if !containsStr(content, `<parameters>{"query":"latest"}</parameters>`) {
+		t.Fatalf("expected assistant content to include serialized parameters, got %q", content)
 	}
 }
 
@@ -250,9 +253,6 @@ func TestBuildClaudeToolPromptSingleTool(t *testing.T) {
 	}
 	if !containsStr(prompt, "<tool_calls>") {
 		t.Fatalf("expected XML tool_calls format in prompt")
-	}
-	if containsStr(prompt, "TOOL_CALL_HISTORY") || containsStr(prompt, "TOOL_RESULT_HISTORY") {
-		t.Fatalf("expected legacy tool history markers removed from prompt")
 	}
 	if !containsStr(prompt, "TOOL CALL FORMAT") {
 		t.Fatalf("expected tool call format header in prompt")

@@ -64,7 +64,7 @@ func extractToolCallObjects(text string) []string {
 	lower := strings.ToLower(text)
 	out := []string{}
 	offset := 0
-	keywords := []string{"tool_calls", "\"function\"", "function.name:", "[tool_call_history]"}
+	keywords := []string{"tool_calls", "\"function\"", "function.name:"}
 	for {
 		bestIdx := -1
 		matchedKeyword := ""

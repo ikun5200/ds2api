@@ -8,7 +8,7 @@
 ![Stars](https://img.shields.io/github/stars/CJackHwang/ds2api.svg)
 ![Forks](https://img.shields.io/github/forks/CJackHwang/ds2api.svg)
 [![Release](https://img.shields.io/github/v/release/CJackHwang/ds2api?display_name=tag)](https://github.com/CJackHwang/ds2api/releases)
-[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](DEPLOY.md)
+[![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docs/DEPLOY.md)
 [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/L4CFHP)
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/CJackHwang/ds2api)
 
@@ -213,7 +213,7 @@ base64 < config.json | tr -d '\n'
 
 > **流式说明**：`/v1/chat/completions` 在 Vercel 上默认走 `api/chat-stream.js`（Node Runtime）以保证实时 SSE。鉴权、账号选择、会话/PoW 准备仍由 Go 内部 prepare 接口完成；流式响应（含 `tools`）在 Node 侧执行与 Go 对齐的输出组装与防泄漏处理。
 
-详细部署说明请参阅 [部署指南](DEPLOY.md)。
+详细部署说明请参阅 [部署指南](docs/DEPLOY.md)。
 
 ### 方式四：下载 Release 构建包
 
@@ -270,10 +270,6 @@ cp opencode.json.example opencode.json
   "compat": {
     "wide_input_strict_output": true
   },
-  "toolcall": {
-    "mode": "feature_match",
-    "early_emit_confidence": "high"
-  },
   "responses": {
     "store_ttl_seconds": 900
   },
@@ -290,7 +286,8 @@ cp opencode.json.example opencode.json
   "runtime": {
     "account_max_inflight": 2,
     "account_max_queue": 0,
-    "global_max_inflight": 0
+    "global_max_inflight": 0,
+    "token_refresh_interval_hours": 6
   },
   "auto_delete": {
     "sessions": false
@@ -303,12 +300,12 @@ cp opencode.json.example opencode.json
 - `token`：配置文件中即使填写也会在加载时被清空（不会从 `config.json` 读取 token）；实际 token 仅在运行时内存中维护并自动刷新
 - `model_aliases`：常见模型名（如 GPT/Codex/Claude）到 DeepSeek 模型的映射
 - `compat.wide_input_strict_output`：建议保持 `true`（当前实现默认宽进严出）
-- `toolcall`：固定采用特征匹配 + 高置信早发策略
+- `toolcall`：策略已固定为特征匹配 + 高置信早发，不再作为可配置项
 - `responses.store_ttl_seconds`：`/v1/responses/{id}` 的内存缓存 TTL
 - `embeddings.provider`：embedding 提供方（当前内置 `deterministic/mock/builtin`）
 - `claude_mapping`：字典中 `fast`/`slow` 后缀映射到对应 DeepSeek 模型（兼容读取 `claude_model_mapping`）
 - `admin`：管理后台设置（JWT 过期时间、密码哈希等），可通过 Admin Settings API 热更新
-- `runtime`：运行时参数（并发限制、队列大小），可通过 Admin Settings API 热更新；`account_max_queue=0`/`global_max_inflight=0` 表示按推荐值自动计算
+- `runtime`：运行时参数（并发限制、队列大小、托管账号 token 刷新间隔），可通过 Admin Settings API 热更新；`account_max_queue=0`/`global_max_inflight=0` 表示按推荐值自动计算，`token_refresh_interval_hours=6` 为默认强制重登间隔
 - `auto_delete.sessions`：是否在请求结束后自动清理 DeepSeek 会话（默认 `false`，可在 Settings 热更新）
 
 ### 环境变量
@@ -450,6 +447,7 @@ ds2api/
 ├── tests/
 │   ├── compat/              # 兼容性测试夹具与期望输出
 │   └── scripts/             # 统一测试脚本入口（unit/e2e）
+├── docs/                    # 部署 / 贡献 / 测试等辅助文档
 ├── static/admin/            # WebUI 构建产物（不提交到 Git）
 ├── .github/
 │   ├── workflows/           # GitHub Actions（质量门禁 + Release 自动构建）
@@ -469,9 +467,9 @@ ds2api/
 | 文档 | 说明 |
 | --- | --- |
 | [API.md](API.md) / [API.en.md](API.en.md) | API 接口文档（含请求/响应示例） |
-| [DEPLOY.md](DEPLOY.md) / [DEPLOY.en.md](DEPLOY.en.md) | 部署指南（本地/Docker/Vercel/systemd） |
-| [CONTRIBUTING.md](CONTRIBUTING.md) / [CONTRIBUTING.en.md](CONTRIBUTING.en.md) | 贡献指南 |
-| [TESTING.md](TESTING.md) | 测试集使用指南 |
+| [DEPLOY.md](docs/DEPLOY.md) / [DEPLOY.en.md](docs/DEPLOY.en.md) | 部署指南（本地/Docker/Vercel/systemd） |
+| [CONTRIBUTING.md](docs/CONTRIBUTING.md) / [CONTRIBUTING.en.md](docs/CONTRIBUTING.en.md) | 贡献指南 |
+| [TESTING.md](docs/TESTING.md) | 测试集使用指南 |
 
 ## 测试
 
@@ -501,7 +499,7 @@ npm ci --prefix webui && npm run build --prefix webui
 
 ## 测试
 
-详细测试指南请参阅 [TESTING.md](TESTING.md)。
+详细测试指南请参阅 [docs/TESTING.md](docs/TESTING.md)。
 
 ### 快速测试命令
 

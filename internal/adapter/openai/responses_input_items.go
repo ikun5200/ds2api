@@ -1,11 +1,11 @@
 package openai
 
 import (
-	"encoding/json"
 	"fmt"
 	"strings"
 
 	"ds2api/internal/config"
+	"ds2api/internal/prompt"
 )
 
 func normalizeResponsesInputItem(m map[string]any) map[string]any {
@@ -148,7 +148,7 @@ func normalizeResponsesInputItemWithState(m map[string]any, callNameByID map[str
 
 		functionPayload := map[string]any{
 			"name":      name,
-			"arguments": stringifyToolCallArguments(argsRaw),
+			"arguments": prompt.StringifyToolCallArguments(argsRaw),
 		}
 		call := map[string]any{
 			"type":     "function",
@@ -210,27 +210,4 @@ func normalizeResponsesFallbackPart(m map[string]any) string {
 		}
 	}
 	return strings.TrimSpace(fmt.Sprintf("%v", m))
-}
-
-func stringifyToolCallArguments(v any) string {
-	switch x := v.(type) {
-	case nil:
-		return "{}"
-	case string:
-		s := strings.TrimSpace(x)
-		if s == "" {
-			return "{}"
-		}
-		s = normalizeToolArgumentString(s)
-		if s == "" {
-			return "{}"
-		}
-		return s
-	default:
-		b, err := json.Marshal(x)
-		if err != nil || len(b) == 0 {
-			return "{}"
-		}
-		return string(b)
-	}
 }

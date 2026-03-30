@@ -9,7 +9,6 @@ type Config struct {
 	Admin            AdminConfig       `json:"admin,omitempty"`
 	Runtime          RuntimeConfig     `json:"runtime,omitempty"`
 	Compat           CompatConfig      `json:"compat,omitempty"`
-	Toolcall         ToolcallConfig    `json:"toolcall,omitempty"`
 	Responses        ResponsesConfig   `json:"responses,omitempty"`
 	Embeddings       EmbeddingsConfig  `json:"embeddings,omitempty"`
 	AutoDelete       AutoDeleteConfig  `json:"auto_delete"`
@@ -62,14 +61,10 @@ type AdminConfig struct {
 }
 
 type RuntimeConfig struct {
-	AccountMaxInflight int `json:"account_max_inflight,omitempty"`
-	AccountMaxQueue    int `json:"account_max_queue,omitempty"`
-	GlobalMaxInflight  int `json:"global_max_inflight,omitempty"`
-}
-
-type ToolcallConfig struct {
-	Mode                string `json:"mode,omitempty"`
-	EarlyEmitConfidence string `json:"early_emit_confidence,omitempty"`
+	AccountMaxInflight        int `json:"account_max_inflight,omitempty"`
+	AccountMaxQueue           int `json:"account_max_queue,omitempty"`
+	GlobalMaxInflight         int `json:"global_max_inflight,omitempty"`
+	TokenRefreshIntervalHours int `json:"token_refresh_interval_hours,omitempty"`
 }
 
 type ResponsesConfig struct {

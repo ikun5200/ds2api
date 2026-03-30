@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"ds2api/internal/prompt"
 	"ds2api/internal/util"
 )
 
@@ -153,7 +154,7 @@ func normalizeClaudeToolUseToAssistant(block map[string]any) map[string]any {
 	}
 	return map[string]any{
 		"role":       "assistant",
-		"content":    marshalCompactJSON(toolCalls),
+		"content":    prompt.FormatToolCallsForPrompt(toolCalls),
 		"tool_calls": toolCalls,
 	}
 }

@@ -456,8 +456,8 @@ server {
 # Copy compiled binary and related files to target directory
 sudo mkdir -p /opt/ds2api
 sudo cp ds2api config.json /opt/ds2api/
-# Optional: if you want to use an external WASM file (override embedded one)
-# sudo cp sha3_wasm_bg.7b9ca65ddd.wasm /opt/ds2api/
+# Optional: if you want to use an external WASM file (override the embedded one, from a release package or build output)
+# sudo cp /path/to/sha3_wasm_bg.7b9ca65ddd.wasm /opt/ds2api/
 sudo cp -r static/admin /opt/ds2api/static/admin
 ```
 

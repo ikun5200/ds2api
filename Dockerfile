@@ -34,7 +34,7 @@ CMD ["/usr/local/bin/ds2api"]
 
 FROM runtime-base AS runtime-from-source
 COPY --from=go-builder /out/ds2api /usr/local/bin/ds2api
-COPY --from=go-builder /app/sha3_wasm_bg.7b9ca65ddd.wasm /app/sha3_wasm_bg.7b9ca65ddd.wasm
+COPY --from=go-builder /app/internal/deepseek/assets/sha3_wasm_bg.7b9ca65ddd.wasm /app/sha3_wasm_bg.7b9ca65ddd.wasm
 COPY --from=go-builder /app/config.example.json /app/config.example.json
 COPY --from=webui-builder /app/static/admin /app/static/admin
 

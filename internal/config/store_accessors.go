@@ -43,23 +43,11 @@ func (s *Store) CompatWideInputStrictOutput() bool {
 }
 
 func (s *Store) ToolcallMode() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	mode := strings.TrimSpace(strings.ToLower(s.cfg.Toolcall.Mode))
-	if mode == "" {
-		return "feature_match"
-	}
-	return mode
+	return "feature_match"
 }
 
 func (s *Store) ToolcallEarlyEmitConfidence() string {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-	level := strings.TrimSpace(strings.ToLower(s.cfg.Toolcall.EarlyEmitConfidence))
-	if level == "" {
-		return "high"
-	}
-	return level
+	return "high"
 }
 
 func (s *Store) ResponsesStoreTTLSeconds() int {
@@ -164,6 +152,15 @@ func (s *Store) RuntimeGlobalMaxInflight(defaultSize int) int {
 		return 0
 	}
 	return defaultSize
+}
+
+func (s *Store) RuntimeTokenRefreshIntervalHours() int {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.Runtime.TokenRefreshIntervalHours > 0 {
+		return s.cfg.Runtime.TokenRefreshIntervalHours
+	}
+	return 6
 }
 
 func (s *Store) AutoDeleteSessions() bool {

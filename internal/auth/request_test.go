@@ -244,3 +244,60 @@ func TestDetermineManagedAccountForcesRefreshEverySixHours(t *testing.T) {
 		t.Fatalf("expected exactly one forced refresh login, got %d", got)
 	}
 }
+
+func TestDetermineManagedAccountUsesUpdatedRefreshInterval(t *testing.T) {
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["managed-key"],
+		"accounts":[{"email":"acc@example.com","password":"pwd","token":"seed-token"}],
+		"runtime":{"token_refresh_interval_hours":6}
+	}`)
+	store := config.LoadStore()
+	if err := store.UpdateAccountToken("acc@example.com", "seed-token"); err != nil {
+		t.Fatalf("update token failed: %v", err)
+	}
+	pool := account.NewPool(store)
+
+	var loginCount int32
+	resolver := NewResolver(store, pool, func(_ context.Context, _ config.Account) (string, error) {
+		n := atomic.AddInt32(&loginCount, 1)
+		return "fresh-token-" + string(rune('0'+n)), nil
+	})
+
+	req, _ := http.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
+	req.Header.Set("x-api-key", "managed-key")
+
+	a1, err := resolver.Determine(req)
+	if err != nil {
+		t.Fatalf("determine failed: %v", err)
+	}
+	if a1.DeepSeekToken != "seed-token" {
+		t.Fatalf("expected initial token without forced refresh, got %q", a1.DeepSeekToken)
+	}
+	resolver.Release(a1)
+	if got := atomic.LoadInt32(&loginCount); got != 0 {
+		t.Fatalf("expected no login before runtime update, got %d", got)
+	}
+
+	if err := store.Update(func(c *config.Config) error {
+		c.Runtime.TokenRefreshIntervalHours = 1
+		return nil
+	}); err != nil {
+		t.Fatalf("update runtime failed: %v", err)
+	}
+
+	resolver.mu.Lock()
+	resolver.tokenRefreshedAt["acc@example.com"] = time.Now().Add(-2 * time.Hour)
+	resolver.mu.Unlock()
+
+	a2, err := resolver.Determine(req)
+	if err != nil {
+		t.Fatalf("determine after runtime update failed: %v", err)
+	}
+	defer resolver.Release(a2)
+	if a2.DeepSeekToken != "fresh-token-1" {
+		t.Fatalf("expected refreshed token after runtime update, got %q", a2.DeepSeekToken)
+	}
+	if got := atomic.LoadInt32(&loginCount); got != 1 {
+		t.Fatalf("expected exactly one login after runtime update, got %d", got)
+	}
+}

@@ -44,31 +44,6 @@ func extractJSONObjectFrom(text string, start int) (string, int, bool) {
 	return "", 0, false
 }
 
-func extractToolHistoryBlock(captured string, keyIdx int) (start int, end int, ok bool) {
-	if keyIdx < 0 || keyIdx >= len(captured) {
-		return 0, 0, false
-	}
-	rest := strings.ToLower(captured[keyIdx:])
-	switch {
-	case strings.HasPrefix(rest, "[tool_call_history]"):
-		closeTag := "[/tool_call_history]"
-		closeIdx := strings.Index(rest, closeTag)
-		if closeIdx < 0 {
-			return 0, 0, false
-		}
-		return keyIdx, keyIdx + closeIdx + len(closeTag), true
-	case strings.HasPrefix(rest, "[tool_result_history]"):
-		closeTag := "[/tool_result_history]"
-		closeIdx := strings.Index(rest, closeTag)
-		if closeIdx < 0 {
-			return 0, 0, false
-		}
-		return keyIdx, keyIdx + closeIdx + len(closeTag), true
-	default:
-		return 0, 0, false
-	}
-}
-
 func trimWrappingJSONFence(prefix, suffix string) (string, string) {
 	trimmedPrefix := strings.TrimRight(prefix, " \t\r\n")
 	fenceIdx := strings.LastIndex(trimmedPrefix, "```")

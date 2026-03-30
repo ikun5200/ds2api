@@ -97,7 +97,7 @@ func (s *chatStreamRuntime) sendDone() {
 
 func (s *chatStreamRuntime) finalize(finishReason string) {
 	finalThinking := s.thinking.String()
-	finalText := sanitizeLeakedToolHistory(s.text.String())
+	finalText := sanitizeLeakedOutput(s.text.String())
 	detected := util.ParseStandaloneToolCallsDetailed(finalText, s.toolNames)
 	if len(detected.Calls) > 0 && !s.toolCallsDoneEmitted {
 		finishReason = "tool_calls"
@@ -141,7 +141,7 @@ func (s *chatStreamRuntime) finalize(finishReason string) {
 			if evt.Content == "" {
 				continue
 			}
-			cleaned := sanitizeLeakedToolHistory(evt.Content)
+			cleaned := sanitizeLeakedOutput(evt.Content)
 			if cleaned == "" {
 				continue
 			}
@@ -250,7 +250,7 @@ func (s *chatStreamRuntime) onParsed(parsed sse.LineResult) streamengine.ParsedD
 						continue
 					}
 					if evt.Content != "" {
-						cleaned := sanitizeLeakedToolHistory(evt.Content)
+						cleaned := sanitizeLeakedOutput(evt.Content)
 						if cleaned == "" {
 							continue
 						}

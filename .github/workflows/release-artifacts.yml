@@ -79,7 +79,7 @@ jobs:
             CGO_ENABLED=0 GOOS="${GOOS}" GOARCH="${GOARCH}" \
               go build -trimpath -ldflags="-s -w -X ds2api/internal/version.BuildVersion=${BUILD_VERSION}" -o "${STAGE}/${BIN}" ./cmd/ds2api
 
-            cp config.example.json .env.example sha3_wasm_bg.7b9ca65ddd.wasm LICENSE README.MD README.en.md "${STAGE}/"
+            cp config.example.json .env.example internal/deepseek/assets/sha3_wasm_bg.7b9ca65ddd.wasm LICENSE README.MD README.en.md "${STAGE}/"
             cp -R static/admin "${STAGE}/static/admin"
 
             if [ "${GOOS}" = "windows" ]; then

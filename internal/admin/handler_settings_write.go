@@ -17,7 +17,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adminCfg, runtimeCfg, toolcallCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, claudeMap, aliasMap, err := parseSettingsUpdateRequest(req)
+	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, claudeMap, aliasMap, err := parseSettingsUpdateRequest(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
@@ -45,13 +45,8 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 			if runtimeCfg.GlobalMaxInflight > 0 {
 				c.Runtime.GlobalMaxInflight = runtimeCfg.GlobalMaxInflight
 			}
-		}
-		if toolcallCfg != nil {
-			if strings.TrimSpace(toolcallCfg.Mode) != "" {
-				c.Toolcall.Mode = strings.TrimSpace(toolcallCfg.Mode)
-			}
-			if strings.TrimSpace(toolcallCfg.EarlyEmitConfidence) != "" {
-				c.Toolcall.EarlyEmitConfidence = strings.TrimSpace(toolcallCfg.EarlyEmitConfidence)
+			if runtimeCfg.TokenRefreshIntervalHours > 0 {
+				c.Runtime.TokenRefreshIntervalHours = runtimeCfg.TokenRefreshIntervalHours
 			}
 		}
 		if responsesCfg != nil && responsesCfg.StoreTTLSeconds > 0 {

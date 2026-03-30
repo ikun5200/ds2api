@@ -12,12 +12,10 @@ function resolveToolcallPolicy(prepBody, payloadTools) {
   if (toolNames.length === 0 && Array.isArray(payloadTools) && payloadTools.length > 0) {
     toolNames = ['__any_tool__'];
   }
-  const featureMatchEnabled = boolDefaultTrue(prepBody && prepBody.toolcall_feature_match);
-  const emitEarlyToolDeltas = featureMatchEnabled && boolDefaultTrue(prepBody && prepBody.toolcall_early_emit_high);
   return {
     toolNames,
     toolSieveEnabled: toolNames.length > 0,
-    emitEarlyToolDeltas,
+    emitEarlyToolDeltas: true,
   };
 }
 

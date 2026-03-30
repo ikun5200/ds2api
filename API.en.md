@@ -629,24 +629,25 @@ Reads runtime settings and status, including:
 
 - `success`
 - `admin` (`has_password_hash`, `jwt_expire_hours`, `jwt_valid_after_unix`, `default_password_warning`)
-- `runtime` (`account_max_inflight`, `account_max_queue`, `global_max_inflight`)
-- `toolcall` / `responses` / `embeddings`
+- `runtime` (`account_max_inflight`, `account_max_queue`, `global_max_inflight`, `token_refresh_interval_hours`)
+- `responses` / `embeddings`
 - `auto_delete` (`sessions`)
 - `claude_mapping` / `model_aliases`
 - `env_backed`, `needs_vercel_sync`
+- `toolcall` policy is fixed to `feature_match + high` and is no longer returned or editable via settings
 
 ### `PUT /admin/settings`
 
 Hot-updates runtime settings. Supported fields:
 
 - `admin.jwt_expire_hours`
-- `runtime.account_max_inflight` / `runtime.account_max_queue` / `runtime.global_max_inflight`
-- `toolcall.mode` / `toolcall.early_emit_confidence`
+- `runtime.account_max_inflight` / `runtime.account_max_queue` / `runtime.global_max_inflight` / `runtime.token_refresh_interval_hours`
 - `responses.store_ttl_seconds`
 - `embeddings.provider`
 - `auto_delete.sessions`
 - `claude_mapping`
 - `model_aliases`
+- `toolcall` policy is fixed and is no longer writable through settings
 
 ### `POST /admin/settings/password`
 
@@ -669,7 +670,7 @@ Imports full config with:
 
 The request can send config directly, or wrapped as `{"config": {...}, "mode":"merge"}`.
 Query params `?mode=merge` / `?mode=replace` are also supported.
-Import accepts `keys`, `accounts`, `claude_mapping` / `claude_model_mapping`, `model_aliases`, `admin`, `runtime`, `toolcall`, `responses`, `embeddings`, and `auto_delete`.
+Import accepts `keys`, `accounts`, `claude_mapping` / `claude_model_mapping`, `model_aliases`, `admin`, `runtime`, `responses`, `embeddings`, and `auto_delete`; legacy `toolcall` fields are ignored.
 
 ### `GET /admin/config/export`
 

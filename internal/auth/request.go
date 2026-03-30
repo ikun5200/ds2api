@@ -40,18 +40,16 @@ type Resolver struct {
 	Pool  *account.Pool
 	Login LoginFunc
 
-	mu                   sync.Mutex
-	tokenRefreshedAt     map[string]time.Time
-	tokenRefreshInterval time.Duration
+	mu               sync.Mutex
+	tokenRefreshedAt map[string]time.Time
 }
 
 func NewResolver(store *config.Store, pool *account.Pool, login LoginFunc) *Resolver {
 	return &Resolver{
-		Store:                store,
-		Pool:                 pool,
-		Login:                login,
-		tokenRefreshedAt:     map[string]time.Time{},
-		tokenRefreshInterval: 6 * time.Hour,
+		Store:            store,
+		Pool:             pool,
+		Login:            login,
+		tokenRefreshedAt: map[string]time.Time{},
 	}
 }
 
@@ -232,10 +230,14 @@ func (r *Resolver) ensureManagedToken(ctx context.Context, a *RequestAuth) error
 }
 
 func (r *Resolver) shouldForceRefresh(accountID string) bool {
+	if r == nil || r.Store == nil {
+		return false
+	}
 	if strings.TrimSpace(accountID) == "" {
 		return false
 	}
-	if r.tokenRefreshInterval <= 0 {
+	intervalHours := r.Store.RuntimeTokenRefreshIntervalHours()
+	if intervalHours <= 0 {
 		return false
 	}
 	now := time.Now()
@@ -246,7 +248,7 @@ func (r *Resolver) shouldForceRefresh(accountID string) bool {
 		r.tokenRefreshedAt[accountID] = now
 		return false
 	}
-	return now.Sub(last) >= r.tokenRefreshInterval
+	return now.Sub(last) >= time.Duration(intervalHours)*time.Hour
 }
 
 func (r *Resolver) markTokenRefreshedNow(accountID string) {

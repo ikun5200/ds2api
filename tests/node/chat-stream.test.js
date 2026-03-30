@@ -34,7 +34,7 @@ test('resolveToolcallPolicy defaults to feature-match + early emit when prepare 
   assert.equal(policy.emitEarlyToolDeltas, true);
 });
 
-test('resolveToolcallPolicy respects prepare flags and prepared tool names', () => {
+test('resolveToolcallPolicy ignores prepare flags and keeps early emit enabled', () => {
   const policy = resolveToolcallPolicy(
     {
       tool_names: [' prepped_tool ', '', null],
@@ -45,7 +45,7 @@ test('resolveToolcallPolicy respects prepare flags and prepared tool names', () 
   );
   assert.deepEqual(policy.toolNames, ['prepped_tool']);
   assert.equal(policy.toolSieveEnabled, true);
-  assert.equal(policy.emitEarlyToolDeltas, false);
+  assert.equal(policy.emitEarlyToolDeltas, true);
 });
 
 test('normalizePreparedToolNames filters empty values', () => {

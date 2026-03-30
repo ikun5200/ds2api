@@ -104,6 +104,9 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 			"fast": "deepseek-chat",
 			"slow": "deepseek-reasoner",
 		},
+		Runtime: RuntimeConfig{
+			TokenRefreshIntervalHours: 12,
+		},
 		VercelSyncHash: "hash123",
 		VercelSyncTime: 1234567890,
 		AdditionalFields: map[string]any{
@@ -129,6 +132,9 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 	}
 	if decoded.ClaudeMapping["fast"] != "deepseek-chat" {
 		t.Fatalf("unexpected claude mapping: %#v", decoded.ClaudeMapping)
+	}
+	if decoded.Runtime.TokenRefreshIntervalHours != 12 {
+		t.Fatalf("unexpected runtime refresh interval: %#v", decoded.Runtime.TokenRefreshIntervalHours)
 	}
 	if decoded.VercelSyncHash != "hash123" {
 		t.Fatalf("unexpected vercel sync hash: %q", decoded.VercelSyncHash)

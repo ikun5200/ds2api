@@ -140,30 +140,6 @@ function extractJSONObjectFrom(text, start) {
   return { ok: false, end: 0 };
 }
 
-function extractToolHistoryBlock(captured, keyIdx) {
-  if (typeof captured !== 'string' || keyIdx < 0 || keyIdx >= captured.length) {
-    return { ok: false, start: 0, end: 0 };
-  }
-  const rest = captured.slice(keyIdx).toLowerCase();
-  if (rest.startsWith('[tool_call_history]')) {
-    const closeTag = '[/tool_call_history]';
-    const closeIdx = rest.indexOf(closeTag);
-    if (closeIdx < 0) {
-      return { ok: false, start: 0, end: 0 };
-    }
-    return { ok: true, start: keyIdx, end: keyIdx + closeIdx + closeTag.length };
-  }
-  if (rest.startsWith('[tool_result_history]')) {
-    const closeTag = '[/tool_result_history]';
-    const closeIdx = rest.indexOf(closeTag);
-    if (closeIdx < 0) {
-      return { ok: false, start: 0, end: 0 };
-    }
-    return { ok: true, start: keyIdx, end: keyIdx + closeIdx + closeTag.length };
-  }
-  return { ok: false, start: 0, end: 0 };
-}
-
 function trimWrappingJSONFence(prefix, suffix) {
   const rightTrimmedPrefix = (prefix || '').replace(/[ \t\r\n]+$/g, '');
   const fenceIdx = rightTrimmedPrefix.lastIndexOf('```');
@@ -192,6 +168,5 @@ module.exports = {
   parseJSONStringLiteral,
   skipSpaces,
   extractJSONObjectFrom,
-  extractToolHistoryBlock,
   trimWrappingJSONFence,
 };

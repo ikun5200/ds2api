@@ -79,6 +79,31 @@ func TestLoadStorePreservesFileBackedTokensForRuntime(t *testing.T) {
 	}
 }
 
+func TestRuntimeTokenRefreshIntervalHoursDefaultsToSix(t *testing.T) {
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["k1"],
+		"accounts":[{"email":"u@example.com","password":"p"}]
+	}`)
+
+	store := LoadStore()
+	if got := store.RuntimeTokenRefreshIntervalHours(); got != 6 {
+		t.Fatalf("expected default refresh interval 6, got %d", got)
+	}
+}
+
+func TestRuntimeTokenRefreshIntervalHoursUsesConfigValue(t *testing.T) {
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["k1"],
+		"accounts":[{"email":"u@example.com","password":"p"}],
+		"runtime":{"token_refresh_interval_hours":9}
+	}`)
+
+	store := LoadStore()
+	if got := store.RuntimeTokenRefreshIntervalHours(); got != 9 {
+		t.Fatalf("expected configured refresh interval 9, got %d", got)
+	}
+}
+
 func TestStoreUpdateAccountTokenKeepsIdentifierResolvable(t *testing.T) {
 	t.Setenv("DS2API_CONFIG_JSON", `{
 		"accounts":[{"email":"user@example.com","password":"p"}]
