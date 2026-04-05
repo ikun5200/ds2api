@@ -29,13 +29,8 @@ func (p *Pool) ApplyRuntimeLimits(maxInflightPerAccount, maxQueueSize, globalMax
 }
 
 func maxInflightFromEnv() int {
-	for _, key := range []string{"DS2API_ACCOUNT_MAX_INFLIGHT", "DS2API_ACCOUNT_CONCURRENCY"} {
-		raw := strings.TrimSpace(os.Getenv(key))
-		if raw == "" {
-			continue
-		}
-		n, err := strconv.Atoi(raw)
-		if err == nil && n > 0 {
+	if raw := strings.TrimSpace(os.Getenv("DS2API_ACCOUNT_MAX_INFLIGHT")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n > 0 {
 			return n
 		}
 	}
@@ -53,13 +48,8 @@ func defaultRecommendedConcurrency(accountCount, maxInflightPerAccount int) int 
 }
 
 func maxQueueFromEnv(defaultSize int) int {
-	for _, key := range []string{"DS2API_ACCOUNT_MAX_QUEUE", "DS2API_ACCOUNT_QUEUE_SIZE"} {
-		raw := strings.TrimSpace(os.Getenv(key))
-		if raw == "" {
-			continue
-		}
-		n, err := strconv.Atoi(raw)
-		if err == nil && n >= 0 {
+	if raw := strings.TrimSpace(os.Getenv("DS2API_ACCOUNT_MAX_QUEUE")); raw != "" {
+		if n, err := strconv.Atoi(raw); err == nil && n >= 0 {
 			return n
 		}
 	}

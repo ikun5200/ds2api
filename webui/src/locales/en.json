@@ -141,7 +141,7 @@
         "deleteAllSessionsConfirm": "Are you sure you want to delete all sessions for this account? This action cannot be undone.",
         "deleteAllSessionsSuccess": "Successfully deleted all sessions",
         "envModeRiskTitle": "Environment-variable config mode detected (persistence risk)",
-        "envModeRiskDesc": "Detected DS2API_CONFIG_JSON/CONFIG_JSON. If DS2API_ENV_WRITEBACK is not enabled, Admin UI edits are in-memory only and may be lost after restart.",
+        "envModeRiskDesc": "Detected DS2API_CONFIG_JSON. If DS2API_ENV_WRITEBACK is not enabled, Admin UI edits are in-memory only and may be lost after restart.",
         "envModeWritebackPendingTitle": "Env mode + auto-persistence enabled (pending file handoff)",
         "envModeWritebackActiveTitle": "Env mode + auto-persistence active",
         "envModeWritebackDesc": "The app will auto-create/write the config file and transition to file-backed mode. Current persistence path: {path}"

@@ -141,7 +141,7 @@
         "deleteAllSessionsConfirm": "确定要删除该账号的所有会话吗？此操作不可恢复。",
         "deleteAllSessionsSuccess": "删除成功",
         "envModeRiskTitle": "当前为环境变量配置模式（有持久化风险）",
-        "envModeRiskDesc": "检测到 DS2API_CONFIG_JSON/CONFIG_JSON。若未开启 DS2API_ENV_WRITEBACK，管理台改动仅在内存生效，重启可能丢失。",
+        "envModeRiskDesc": "检测到 DS2API_CONFIG_JSON。若未开启 DS2API_ENV_WRITEBACK，管理台改动仅在内存生效，重启可能丢失。",
         "envModeWritebackPendingTitle": "环境变量模式 + 自动持久化已开启（等待落盘）",
         "envModeWritebackActiveTitle": "环境变量模式 + 自动持久化已生效",
         "envModeWritebackDesc": "程序会自动创建/写入配置文件并在后续切换为文件模式。当前持久化路径：{path}"

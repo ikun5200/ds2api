@@ -12,9 +12,7 @@ import (
 func newPoolForTest(t *testing.T, maxInflight string) *Pool {
 	t.Helper()
 	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", maxInflight)
-	t.Setenv("DS2API_ACCOUNT_CONCURRENCY", "")
 	t.Setenv("DS2API_ACCOUNT_MAX_QUEUE", "")
-	t.Setenv("DS2API_ACCOUNT_QUEUE_SIZE", "")
 	t.Setenv("DS2API_CONFIG_JSON", `{
 		"keys":["k1"],
 		"accounts":[
@@ -29,9 +27,7 @@ func newPoolForTest(t *testing.T, maxInflight string) *Pool {
 func newSingleAccountPoolForTest(t *testing.T, maxInflight string) *Pool {
 	t.Helper()
 	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", maxInflight)
-	t.Setenv("DS2API_ACCOUNT_CONCURRENCY", "")
 	t.Setenv("DS2API_ACCOUNT_MAX_QUEUE", "")
-	t.Setenv("DS2API_ACCOUNT_QUEUE_SIZE", "")
 	t.Setenv("DS2API_CONFIG_JSON", `{
 		"keys":["k1"],
 		"accounts":[{"email":"acc1@example.com","token":"token1"}]
@@ -170,9 +166,9 @@ func TestPoolStatusRecommendedConcurrencyRespectsOverride(t *testing.T) {
 	}
 }
 
-func TestPoolAccountConcurrencyAliasEnv(t *testing.T) {
-	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", "")
-	t.Setenv("DS2API_ACCOUNT_CONCURRENCY", "4")
+func TestPoolGlobalMaxInflightEnv(t *testing.T) {
+	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", "1")
+	t.Setenv("DS2API_GLOBAL_MAX_INFLIGHT", "4")
 	t.Setenv("DS2API_CONFIG_JSON", `{
 		"keys":["k1"],
 		"accounts":[
@@ -183,14 +179,14 @@ func TestPoolAccountConcurrencyAliasEnv(t *testing.T) {
 
 	pool := NewPool(config.LoadStore())
 	status := pool.Status()
-	if got, ok := status["max_inflight_per_account"].(int); !ok || got != 4 {
+	if got, ok := status["global_max_inflight"].(int); !ok || got != 4 {
+		t.Fatalf("unexpected global_max_inflight: %#v", status["global_max_inflight"])
+	}
+	if got, ok := status["max_inflight_per_account"].(int); !ok || got != 1 {
 		t.Fatalf("unexpected max_inflight_per_account: %#v", status["max_inflight_per_account"])
 	}
-	if got, ok := status["recommended_concurrency"].(int); !ok || got != 8 {
+	if got, ok := status["recommended_concurrency"].(int); !ok || got != 2 {
 		t.Fatalf("unexpected recommended_concurrency: %#v", status["recommended_concurrency"])
-	}
-	if got, ok := status["max_queue_size"].(int); !ok || got != 8 {
-		t.Fatalf("unexpected max_queue_size: %#v", status["max_queue_size"])
 	}
 }
 
@@ -217,9 +213,7 @@ func TestPoolDropsLegacyTokenOnlyAccountOnLoad(t *testing.T) {
 
 func TestPoolAcquireRotatesIntoTokenlessAccounts(t *testing.T) {
 	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", "1")
-	t.Setenv("DS2API_ACCOUNT_CONCURRENCY", "")
 	t.Setenv("DS2API_ACCOUNT_MAX_QUEUE", "")
-	t.Setenv("DS2API_ACCOUNT_QUEUE_SIZE", "")
 	t.Setenv("DS2API_CONFIG_JSON", `{
 		"keys":["k1"],
 		"accounts":[

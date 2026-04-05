@@ -13,9 +13,7 @@ import (
 
 func TestPoolEmptyNoAccounts(t *testing.T) {
 	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", "2")
-	t.Setenv("DS2API_ACCOUNT_CONCURRENCY", "")
 	t.Setenv("DS2API_ACCOUNT_MAX_QUEUE", "")
-	t.Setenv("DS2API_ACCOUNT_QUEUE_SIZE", "")
 	t.Setenv("DS2API_CONFIG_JSON", `{"keys":["k1"],"accounts":[]}`)
 	pool := NewPool(config.LoadStore())
 	if _, ok := pool.Acquire("", nil); ok {
@@ -165,27 +163,12 @@ func TestPoolAcquireWaitTargetAccount(t *testing.T) {
 
 func TestPoolMaxQueueSizeOverride(t *testing.T) {
 	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", "1")
-	t.Setenv("DS2API_ACCOUNT_CONCURRENCY", "")
 	t.Setenv("DS2API_ACCOUNT_MAX_QUEUE", "5")
-	t.Setenv("DS2API_ACCOUNT_QUEUE_SIZE", "")
 	t.Setenv("DS2API_CONFIG_JSON", `{"keys":["k1"],"accounts":[{"email":"acc1@example.com","token":"t1"}]}`)
 	pool := NewPool(config.LoadStore())
 	status := pool.Status()
 	if got, ok := status["max_queue_size"].(int); !ok || got != 5 {
 		t.Fatalf("expected max_queue_size=5, got %#v", status["max_queue_size"])
-	}
-}
-
-func TestPoolQueueSizeAliasEnv(t *testing.T) {
-	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", "1")
-	t.Setenv("DS2API_ACCOUNT_CONCURRENCY", "")
-	t.Setenv("DS2API_ACCOUNT_MAX_QUEUE", "")
-	t.Setenv("DS2API_ACCOUNT_QUEUE_SIZE", "7")
-	t.Setenv("DS2API_CONFIG_JSON", `{"keys":["k1"],"accounts":[{"email":"acc1@example.com","token":"t1"}]}`)
-	pool := NewPool(config.LoadStore())
-	status := pool.Status()
-	if got, ok := status["max_queue_size"].(int); !ok || got != 7 {
-		t.Fatalf("expected max_queue_size=7, got %#v", status["max_queue_size"])
 	}
 }
 

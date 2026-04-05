@@ -31,8 +31,7 @@
 配置来源（任选其一）：
 
 - **文件方式**：`config.json`（推荐本地/Docker 使用）
-- **环境变量方式**：`DS2API_CONFIG_JSON`（推荐 Vercel 使用，支持 JSON 字符串或 Base64 编码）
-- 兼容写法：`CONFIG_JSON` 是旧版回退变量；`DS2API_CONFIG_JSON` 也可以直接写原始 JSON
+- **环境变量方式**：`DS2API_CONFIG_JSON`（推荐 Vercel 使用，支持 JSON 字符串或 Base64 编码，也可以直接写原始 JSON）
 
 统一建议（最优实践）：
 
@@ -200,10 +199,10 @@ healthcheck:
 2. **在 Vercel 上导入项目**
 3. **配置环境变量**（最少只需设置以下一项）：
 
-   | 变量 | 说明 |
-   | --- | --- |
-   | `DS2API_ADMIN_KEY` | 管理密钥（必填） |
-   | `DS2API_CONFIG_JSON` | 配置内容，JSON 字符串或 Base64 编码（可选，建议） |
+| 变量 | 说明 |
+| --- | --- |
+| `DS2API_ADMIN_KEY` | 管理密钥（必填） |
+| `DS2API_CONFIG_JSON` | 配置内容，JSON 字符串或 Base64 编码（可选，建议） |
 
 4. **部署**
 
@@ -246,11 +245,8 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # 个人账号可留空
 | 变量 | 说明 | 默认值 |
 | --- | --- | --- |
 | `DS2API_ACCOUNT_MAX_INFLIGHT` | 每账号并发上限 | `2` |
-| `DS2API_ACCOUNT_CONCURRENCY` | 同上（兼容别名） | — |
 | `DS2API_ACCOUNT_MAX_QUEUE` | 等待队列上限 | `recommended_concurrency` |
-| `DS2API_ACCOUNT_QUEUE_SIZE` | 同上（兼容别名） | — |
 | `DS2API_GLOBAL_MAX_INFLIGHT` | 全局并发上限 | `recommended_concurrency` |
-| `DS2API_MAX_INFLIGHT` | 同上（兼容别名） | — |
 | `DS2API_ENV_WRITEBACK` | 检测到 `DS2API_CONFIG_JSON` 时自动写入 `DS2API_CONFIG_PATH`，并在成功后转为文件模式（`1/true/yes/on`） | 关闭 |
 | `DS2API_VERCEL_INTERNAL_SECRET` | 混合流式内部鉴权 | 回退用 `DS2API_ADMIN_KEY` |
 | `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | 流式 lease TTL | `900` |

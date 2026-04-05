@@ -172,7 +172,6 @@ func (r *Runner) startServer(ctx context.Context) error {
 		"DS2API_CONFIG_PATH":      r.configCopyPath,
 		"DS2API_AUTO_BUILD_WEBUI": "false",
 		"DS2API_CONFIG_JSON":      "",
-		"CONFIG_JSON":             "",
 	})
 	if err := cmd.Start(); err != nil {
 		_ = logFd.Close()

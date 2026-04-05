@@ -19,9 +19,6 @@ func (s *Store) IsEnvWritebackEnabled() bool {
 
 func (s *Store) HasEnvConfigSource() bool {
 	rawCfg := strings.TrimSpace(os.Getenv("DS2API_CONFIG_JSON"))
-	if rawCfg == "" {
-		rawCfg = strings.TrimSpace(os.Getenv("CONFIG_JSON"))
-	}
 	return rawCfg != ""
 }
 

@@ -35,9 +35,6 @@ func LoadStore() *Store {
 
 func loadConfig() (Config, bool, error) {
 	rawCfg := strings.TrimSpace(os.Getenv("DS2API_CONFIG_JSON"))
-	if rawCfg == "" {
-		rawCfg = strings.TrimSpace(os.Getenv("CONFIG_JSON"))
-	}
 	if rawCfg != "" {
 		cfg, err := parseConfigString(rawCfg)
 		if err != nil {
