@@ -130,12 +130,17 @@ func (h *Handler) handleResponsesNonStream(w http.ResponseWriter, resp *http.Res
 	}
 
 	responseObj := openaifmt.BuildResponseObject(responseID, model, finalPrompt, sanitizedThinking, sanitizedText, toolNames)
-	if result.OutputTokens > 0 {
+	if result.PromptTokens > 0 || result.OutputTokens > 0 {
 		if usage, ok := responseObj["usage"].(map[string]any); ok {
-			usage["output_tokens"] = result.OutputTokens
-			if input, ok := usage["input_tokens"].(int); ok {
-				usage["total_tokens"] = input + result.OutputTokens
+			if result.PromptTokens > 0 {
+				usage["input_tokens"] = result.PromptTokens
 			}
+			if result.OutputTokens > 0 {
+				usage["output_tokens"] = result.OutputTokens
+			}
+			input, _ := usage["input_tokens"].(int)
+			output, _ := usage["output_tokens"].(int)
+			usage["total_tokens"] = input + output
 		}
 	}
 	h.getResponseStore().put(owner, responseID, responseObj)

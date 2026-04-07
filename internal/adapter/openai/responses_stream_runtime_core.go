@@ -51,6 +51,7 @@ type responsesStreamRuntime struct {
 	messagePartAdded  bool
 	sequence          int
 	failed            bool
+	promptTokens      int
 	outputTokens      int
 
 	persistResponse func(obj map[string]any)
@@ -152,9 +153,19 @@ func (s *responsesStreamRuntime) finalize() {
 	if s.outputTokens > 0 {
 		if usage, ok := obj["usage"].(map[string]any); ok {
 			usage["output_tokens"] = s.outputTokens
-			if input, ok := usage["input_tokens"].(int); ok {
-				usage["total_tokens"] = input + s.outputTokens
+		}
+	}
+	if s.promptTokens > 0 || s.outputTokens > 0 {
+		if usage, ok := obj["usage"].(map[string]any); ok {
+			if s.promptTokens > 0 {
+				usage["input_tokens"] = s.promptTokens
 			}
+			if s.outputTokens > 0 {
+				usage["output_tokens"] = s.outputTokens
+			}
+			input, _ := usage["input_tokens"].(int)
+			output, _ := usage["output_tokens"].(int)
+			usage["total_tokens"] = input + output
 		}
 	}
 	if s.persistResponse != nil {
@@ -184,6 +195,9 @@ func (s *responsesStreamRuntime) logToolPolicyRejections(textParsed toolcall.Too
 func (s *responsesStreamRuntime) onParsed(parsed sse.LineResult) streamengine.ParsedDecision {
 	if !parsed.Parsed {
 		return streamengine.ParsedDecision{}
+	}
+	if parsed.PromptTokens > 0 {
+		s.promptTokens = parsed.PromptTokens
 	}
 	if parsed.OutputTokens > 0 {
 		s.outputTokens = parsed.OutputTokens

@@ -74,16 +74,13 @@ func TestBuildOpenAIFinalPrompt_VercelPreparePathKeepsFinalAnswerInstruction(t *
 	}
 
 	finalPrompt, _ := buildOpenAIFinalPrompt(messages, tools, "")
-	if !strings.Contains(finalPrompt, "After receiving a tool result, use it directly.") {
-		t.Fatalf("vercel prepare finalPrompt missing final-answer instruction: %q", finalPrompt)
-	}
-	if !strings.Contains(finalPrompt, "Only call another tool if the result is insufficient.") {
-		t.Fatalf("vercel prepare finalPrompt missing retry guard instruction: %q", finalPrompt)
+	if !strings.Contains(finalPrompt, "Remember: Output ONLY the <tool_calls>...</tool_calls> XML block when calling tools.") {
+		t.Fatalf("vercel prepare finalPrompt missing final tool-call anchor instruction: %q", finalPrompt)
 	}
 	if !strings.Contains(finalPrompt, "TOOL CALL FORMAT") {
 		t.Fatalf("vercel prepare finalPrompt missing xml format instruction: %q", finalPrompt)
 	}
-	if !strings.Contains(finalPrompt, "Do NOT wrap the XML in markdown code fences") {
+	if !strings.Contains(finalPrompt, "Do NOT wrap XML in markdown fences") {
 		t.Fatalf("vercel prepare finalPrompt missing no-fence xml instruction: %q", finalPrompt)
 	}
 	if strings.Contains(finalPrompt, "```json") {

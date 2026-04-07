@@ -275,7 +275,7 @@ test('parseChunkForContent keeps error branches distinct from content_filter sta
   assert.equal(parsed.finished, true);
   assert.equal(parsed.contentFilter, false);
   assert.equal(parsed.errorMessage.length > 0, true);
-  assert.equal(parsed.outputTokens, 0);
+  assert.equal(parsed.outputTokens, 88);
   assert.deepEqual(parsed.parts, []);
 });
 
@@ -287,6 +287,26 @@ test('parseChunkForContent preserves output tokens on FINISHED lines', () => {
   );
   assert.equal(parsed.parsed, true);
   assert.equal(parsed.finished, true);
+  assert.equal(parsed.contentFilter, false);
+  assert.equal(parsed.outputTokens, 190);
+  assert.deepEqual(parsed.parts, []);
+});
+
+test('parseChunkForContent captures output tokens from response BATCH status snapshots', () => {
+  const parsed = parseChunkForContent(
+    {
+      p: 'response',
+      o: 'BATCH',
+      v: [
+        { p: 'accumulated_token_usage', v: 190 },
+        { p: 'quasi_status', v: 'FINISHED' },
+      ],
+    },
+    false,
+    'text',
+  );
+  assert.equal(parsed.parsed, true);
+  assert.equal(parsed.finished, false);
   assert.equal(parsed.contentFilter, false);
   assert.equal(parsed.outputTokens, 190);
   assert.deepEqual(parsed.parts, []);

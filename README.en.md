@@ -344,7 +344,6 @@ cp opencode.json.example opencode.json
 | `DS2API_CONFIG_PATH` | Config file path | `config.json` |
 | `DS2API_CONFIG_JSON` | Inline config (JSON or Base64) | — |
 | `DS2API_ENV_WRITEBACK` | Auto-write env-backed config to file and transition to file mode (`1/true/yes/on`) | Disabled |
-| `DS2API_POW_CONCURRENCY` | PoW parallel solver goroutine count (optional) | Default CPU core count |
 | `DS2API_STATIC_ADMIN_DIR` | Admin static assets dir | `static/admin` |
 | `DS2API_AUTO_BUILD_WEBUI` | Auto-build WebUI on startup | Enabled locally, disabled on Vercel |
 | `DS2API_ACCOUNT_MAX_INFLIGHT` | Max in-flight requests per account | `2` |
