@@ -34,6 +34,7 @@ type Account struct {
 	Password string `json:"password,omitempty"`
 	Token    string `json:"token,omitempty"`
 	ProxyID  string `json:"proxy_id,omitempty"`
+	Disabled bool   `json:"disabled,omitempty"`
 }
 
 type APIKey struct {

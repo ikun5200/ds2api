@@ -87,6 +87,42 @@ func TestUpdateAccountMetadataPreservesCredentials(t *testing.T) {
 	}
 }
 
+func TestUpdateAccountDisabledState(t *testing.T) {
+	h := newAdminTestHandler(t, `{
+		"accounts":[{"email":"u@example.com","password":"secret"}]
+	}`)
+
+	r := chi.NewRouter()
+	r.Put("/admin/accounts/{identifier}", h.updateAccount)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/accounts/u@example.com", strings.NewReader(`{"disabled":true}`))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	snap := h.Store.Snapshot()
+	if len(snap.Accounts) != 1 || !snap.Accounts[0].Disabled {
+		t.Fatalf("expected disabled account, got %#v", snap.Accounts)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/admin/accounts?page=1&page_size=10", nil)
+	rec = httptest.NewRecorder()
+	h.listAccounts(rec, req)
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	items, _ := payload["items"].([]any)
+	first, _ := items[0].(map[string]any)
+	if disabled, _ := first["disabled"].(bool); !disabled {
+		t.Fatalf("expected disabled flag in list response, got %#v", first)
+	}
+}
+
 func TestListAccountsMasksTokenPreview(t *testing.T) {
 	h := newAdminTestHandler(t, `{
 		"accounts":[{"email":"u@example.com","password":"pwd"}]

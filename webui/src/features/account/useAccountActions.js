@@ -8,8 +8,8 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const [editingAccount, setEditingAccount] = useState(null)
     const [newKey, setNewKey] = useState({ key: '', name: '', remark: '' })
     const [copiedKey, setCopiedKey] = useState(null)
-    const [newAccount, setNewAccount] = useState({ name: '', remark: '', email: '', mobile: '', password: '' })
-    const [editAccount, setEditAccount] = useState({ name: '', remark: '' })
+    const [newAccount, setNewAccount] = useState({ name: '', remark: '', email: '', mobile: '', password: '', disabled: false })
+    const [editAccount, setEditAccount] = useState({ name: '', remark: '', disabled: false })
     const [loading, setLoading] = useState(false)
     const [testing, setTesting] = useState({})
     const [testingAll, setTestingAll] = useState(false)
@@ -44,14 +44,14 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const openAddAccount = () => {
         setShowEditAccount(false)
         setEditingAccount(null)
-        setEditAccount({ name: '', remark: '' })
-        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '' })
+        setEditAccount({ name: '', remark: '', disabled: false })
+        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', disabled: false })
         setShowAddAccount(true)
     }
 
     const closeAddAccount = () => {
         setShowAddAccount(false)
-        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '' })
+        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', disabled: false })
     }
 
     const openEditAccount = (account) => {
@@ -67,6 +67,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         setEditAccount({
             name: account?.name || '',
             remark: account?.remark || '',
+            disabled: Boolean(account?.disabled),
         })
         setShowEditAccount(true)
     }
@@ -74,7 +75,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const closeEditAccount = () => {
         setShowEditAccount(false)
         setEditingAccount(null)
-        setEditAccount({ name: '', remark: '' })
+        setEditAccount({ name: '', remark: '', disabled: false })
     }
 
     const addKey = async () => {
@@ -186,6 +187,32 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         }
     }
 
+    const toggleAccountDisabled = async (account) => {
+        const identifier = resolveAccountIdentifier(account)
+        if (!identifier) {
+            onMessage('error', t('accountManager.invalidIdentifier'))
+            return
+        }
+        const nextDisabled = !account?.disabled
+        try {
+            const res = await apiFetch(`/admin/accounts/${encodeURIComponent(identifier)}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ disabled: nextDisabled }),
+            })
+            if (res.ok) {
+                onMessage('success', nextDisabled ? t('accountManager.disableAccountSuccess') : t('accountManager.enableAccountSuccess'))
+                fetchAccounts()
+                onRefresh()
+            } else {
+                const data = await res.json()
+                onMessage('error', data.detail || t('messages.requestFailed'))
+            }
+        } catch (_e) {
+            onMessage('error', t('messages.networkError'))
+        }
+    }
+
     const deleteAccount = async (id) => {
         const identifier = String(id || '').trim()
         if (!identifier) {
@@ -242,8 +269,11 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
 
     const testAllAccounts = async () => {
         if (!confirm(t('accountManager.testAllConfirm'))) return
-        const allAccounts = config.accounts || []
-        if (allAccounts.length === 0) return
+        const allAccounts = (config.accounts || []).filter(acc => !acc.disabled)
+        if (allAccounts.length === 0) {
+            onMessage('error', t('accountManager.noEnabledAccounts'))
+            return
+        }
 
         setTestingAll(true)
         setBatchProgress({ current: 0, total: allAccounts.length, results: [] })
@@ -377,6 +407,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         deleteKey,
         addAccount,
         updateAccount,
+        toggleAccountDisabled,
         deleteAccount,
         testAccount,
         testAllAccounts,

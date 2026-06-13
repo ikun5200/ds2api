@@ -196,7 +196,7 @@ export default function ChatPanel({
                         </button>
                     </div>
                     <textarea
-                        className="w-full bg-[#09090b] border border-border rounded-xl pl-12 pr-12 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none custom-scrollbar placeholder:text-muted-foreground/50 text-foreground shadow-inner disabled:opacity-60 disabled:cursor-not-allowed"
+                        className="w-full bg-card border border-border rounded-lg pl-12 pr-12 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all resize-none custom-scrollbar placeholder:text-muted-foreground/60 text-foreground shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
                         placeholder={hasAvailableModel ? t('apiTester.enterMessage') : t('apiTester.noModelsMessagePlaceholder')}
                         rows={1}
                         style={{ minHeight: '52px' }}

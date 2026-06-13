@@ -5,7 +5,12 @@ func (p *Pool) canQueueLocked(target string, exclude map[string]bool) bool {
 		if exclude[target] {
 			return false
 		}
-		if _, ok := p.store.FindAccount(target); !ok {
+		acc, ok := p.store.FindAccount(target)
+		if !ok || acc.Disabled {
+			return false
+		}
+		accountID := acc.Identifier()
+		if exclude[accountID] || !p.isQueuedLocked(accountID) {
 			return false
 		}
 	}

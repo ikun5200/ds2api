@@ -223,7 +223,7 @@ export function ConfirmClearDialog({ open, t, onCancel, onConfirm }) {
             <div className="w-full max-w-sm rounded-2xl border border-border bg-card shadow-2xl p-5 space-y-4">
                 <div className="flex items-start justify-between gap-3">
                     <div className="flex items-center gap-3">
-                        <div className="h-11 w-11 rounded-2xl bg-[#111214] text-muted-foreground flex items-center justify-center">
+                        <div className="h-11 w-11 rounded-lg bg-secondary text-muted-foreground flex items-center justify-center">
                             <Trash2 className="w-5 h-5" />
                         </div>
                         <div>

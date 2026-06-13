@@ -110,7 +110,7 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                     </div>
                 </div>
 
-                <div className="bg-linear-to-br from-primary/10 to-transparent border border-primary/20 rounded-xl p-5 shadow-sm">
+                <div className="bg-card border border-border rounded-lg p-5 shadow-sm">
                     <h3 className="font-semibold flex items-center gap-2 mb-2 text-primary">
                         <Download className="w-4 h-4" />
                         {t('batchImport.dataExport')}
@@ -150,10 +150,10 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
 
                 <div className="flex-1 relative min-h-[400px]">
                     <textarea
-                        className="absolute inset-0 w-full h-full p-4 font-mono text-sm bg-[#09090b] text-foreground resize-none focus:outline-none custom-scrollbar"
+                        className="absolute inset-0 w-full h-full p-4 font-mono text-sm bg-background text-foreground resize-none focus:outline-none custom-scrollbar"
                         value={jsonInput}
                         onChange={e => setJsonInput(e.target.value)}
-                        placeholder={'{\n  "keys": ["your-api-key"],\n  "accounts": [\n    {"email": "...", "password": "...", "token": ""}\n  ]\n}'}
+                        placeholder={'{\n  "keys": ["your-api-key"],\n  "accounts": [\n    {"email": "...", "password": "...", "disabled": false}\n  ]\n}'}
                         spellCheck={false}
                     />
                 </div>

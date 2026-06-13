@@ -51,6 +51,9 @@ func FieldString(m map[string]any, key string) string {
 func FieldStringOptional(m map[string]any, key string) (string, bool) {
 	return fieldStringOptional(m, key)
 }
+func FieldBoolOptional(m map[string]any, key string) (bool, bool) {
+	return fieldBoolOptional(m, key)
+}
 func StatusOr(v int, d int) int { return statusOr(v, d) }
 func AccountMatchesIdentifier(acc config.Account, identifier string) bool {
 	return accountMatchesIdentifier(acc, identifier)
@@ -168,6 +171,7 @@ func toAccount(m map[string]any) config.Account {
 		Mobile:   mobile,
 		Password: fieldString(m, "password"),
 		ProxyID:  fieldString(m, "proxy_id"),
+		Disabled: fieldBool(m, "disabled"),
 	}
 }
 
@@ -295,6 +299,26 @@ func fieldStringOptional(m map[string]any, key string) (string, bool) {
 		return "", false
 	}
 	return strings.TrimSpace(fmt.Sprintf("%v", v)), true
+}
+
+func fieldBool(m map[string]any, key string) bool {
+	v, ok := fieldBoolOptional(m, key)
+	return ok && v
+}
+
+func fieldBoolOptional(m map[string]any, key string) (bool, bool) {
+	v, ok := m[key]
+	if !ok || v == nil {
+		return false, false
+	}
+	switch x := v.(type) {
+	case bool:
+		return x, true
+	case string:
+		return strings.EqualFold(strings.TrimSpace(x), "true"), true
+	default:
+		return false, true
+	}
 }
 
 func statusOr(v int, d int) int {

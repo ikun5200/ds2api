@@ -47,6 +47,41 @@ func TestPoolAcquireTargetNotFound(t *testing.T) {
 	}
 }
 
+func TestPoolSkipsDisabledAccounts(t *testing.T) {
+	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", "2")
+	t.Setenv("DS2API_ACCOUNT_MAX_QUEUE", "")
+	t.Setenv("DS2API_CONFIG_JSON", `{
+		"keys":["k1"],
+		"accounts":[
+			{"email":"disabled@example.com","token":"token1","disabled":true},
+			{"email":"enabled@example.com","token":"token2"}
+		]
+	}`)
+	pool := NewPool(config.LoadStore())
+
+	if _, ok := pool.Acquire("disabled@example.com", nil); ok {
+		t.Fatal("expected target acquire to fail for disabled account")
+	}
+	acc, ok := pool.Acquire("", nil)
+	if !ok {
+		t.Fatal("expected acquire to find enabled account")
+	}
+	if acc.Identifier() != "enabled@example.com" {
+		t.Fatalf("expected enabled account, got %q", acc.Identifier())
+	}
+
+	status := pool.Status()
+	if total, _ := status["total"].(int); total != 1 {
+		t.Fatalf("expected active total=1, got %#v", status["total"])
+	}
+	if configured, _ := status["configured_total"].(int); configured != 2 {
+		t.Fatalf("expected configured_total=2, got %#v", status["configured_total"])
+	}
+	if disabled, _ := status["disabled"].(int); disabled != 1 {
+		t.Fatalf("expected disabled=1, got %#v", status["disabled"])
+	}
+}
+
 func TestPoolAcquireWithExclusionList(t *testing.T) {
 	pool := newPoolForTest(t, "2")
 	acc, ok := pool.Acquire("", map[string]bool{"acc1@example.com": true})

@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Key, ArrowRight, ShieldCheck, Lock, Check } from 'lucide-react'
-import clsx from 'clsx'
 import { useI18n } from '../i18n'
 import LanguageToggle from './LanguageToggle'
 
@@ -51,12 +50,12 @@ export default function Login({ onLogin, onMessage }) {
             </div>
 
             <div className="w-full max-w-[400px] relative z-10 animate-in fade-in zoom-in-95 duration-200">
-                <div className="w-full bg-card border border-border rounded-xl p-8 shadow-sm">
+                <div className="w-full bg-card border border-border rounded-lg p-8 shadow-sm">
                     <div className="text-center space-y-2 mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
-                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 text-primary mb-2">
+                        <div className="inline-flex items-center justify-center w-12 h-12 rounded-lg bg-primary/10 text-primary mb-2">
                             <Lock className="w-6 h-6" />
                         </div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">{t('login.welcome')}</h1>
+                        <h1 className="text-2xl font-semibold tracking-tight text-foreground">{t('login.welcome')}</h1>
                         <p className="text-sm text-muted-foreground/80">{t('login.subtitle')}</p>
                     </div>
 
@@ -69,7 +68,7 @@ export default function Login({ onLogin, onMessage }) {
                                 </div>
                                 <input
                                     type="password"
-                                    className="w-full bg-[#09090b] border border-border rounded-xl pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-muted-foreground/30 text-foreground"
+                                    className="w-full bg-card border border-border rounded-lg pl-10 pr-4 py-3 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all placeholder:text-muted-foreground/60 text-foreground"
                                     placeholder={t('login.adminKeyPlaceholder')}
                                     value={adminKey}
                                     onChange={e => setAdminKey(e.target.value)}
@@ -97,7 +96,7 @@ export default function Login({ onLogin, onMessage }) {
                         <button
                             type="submit"
                             disabled={loading}
-                            className="w-full h-12 flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition-all font-semibold text-sm shadow-lg shadow-primary/20 hover:shadow-primary/30 disabled:opacity-50 disabled:shadow-none"
+                            className="w-full h-11 flex items-center justify-center gap-2 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all font-semibold text-sm shadow-sm disabled:opacity-50 disabled:shadow-none"
                         >
                             {loading ? (
                                 <div className="w-5 h-5 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />

@@ -430,7 +430,7 @@ cd ds2api
 cp config.example.json config.json
 # Open config.json and fill in:
 #   - keys: your API access keys
-#   - accounts: DeepSeek accounts (email or mobile + password)
+#   - accounts: DeepSeek accounts (email or mobile + password; add disabled: true to skip routing)
 
 # Start
 go run ./cmd/ds2api

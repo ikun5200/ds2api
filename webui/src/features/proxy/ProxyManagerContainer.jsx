@@ -188,7 +188,7 @@ function ProxyFormModal({
     const isEditing = Boolean(editingProxy?.id)
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="bg-card w-full max-w-lg rounded-xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
                 <div className="p-4 border-b border-border flex justify-between items-center">
                     <div>
@@ -268,7 +268,7 @@ function ProxyFormModal({
                             <label className="block text-sm font-medium mb-1.5">{t('proxyManager.passwordLabel')}</label>
                             <input
                                 type="password"
-                                className="input-field bg-[#09090b]"
+                                className="input-field"
                                 placeholder={t('proxyManager.passwordPlaceholder')}
                                 value={form.password}
                                 onChange={e => setForm({ ...form, password: e.target.value })}

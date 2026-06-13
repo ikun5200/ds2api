@@ -12,7 +12,7 @@ export default function AddKeyModal({ show, t, editingKey, newKey, setNewKey, lo
     const displayKey = isEditing ? maskSecret(editingKey?.key || newKey.key) : newKey.key
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm p-4 animate-in fade-in">
             <div className="bg-card w-full max-w-md rounded-xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
                 <div className="p-4 border-b border-border flex justify-between items-center">
                     <h3 className="font-semibold">{isEditing ? t('accountManager.modalEditKeyTitle') : t('accountManager.modalAddKeyTitle')}</h3>
@@ -26,7 +26,7 @@ export default function AddKeyModal({ show, t, editingKey, newKey, setNewKey, lo
                         <div className="flex gap-2">
                             <input
                                 type="text"
-                                className={isEditing ? "input-field bg-muted/30 flex-1 cursor-not-allowed" : "input-field bg-[#09090b] flex-1"}
+                                className={isEditing ? "input-field bg-muted/30 flex-1 cursor-not-allowed" : "input-field flex-1"}
                                 placeholder={isEditing ? t('accountManager.keyReadonlyPlaceholder') : t('accountManager.newKeyPlaceholder')}
                                 value={displayKey}
                                 onChange={e => setNewKey({ ...newKey, key: e.target.value })}

@@ -151,12 +151,12 @@ export default function ConfigPanel({
                                 onChange={e => setSelectedAccount(e.target.value)}
                             >
                                 <option value="" className="bg-popover text-popover-foreground">{t('apiTester.autoRandom')}</option>
-                                {accounts.map((acc, i) => {
+                                {accounts.filter(acc => !acc.disabled).map((acc, i) => {
                                     const id = resolveAccountIdentifier(acc)
                                     if (!id) return null
                                     return (
                                         <option key={i} value={id} className="bg-popover text-popover-foreground">
-                                            👤 {id}
+                                            {id}
                                         </option>
                                     )
                                 })}

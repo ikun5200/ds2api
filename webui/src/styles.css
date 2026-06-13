@@ -2,40 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Modern Flat Theme (Big Tech Style) - Zinc & Amber */
+/* Simple admin theme */
 :root {
-  /* Base - Deep Matte Zinc */
-  --color-background: hsl(240 10% 3.9%);
-  --color-foreground: hsl(0 0% 98%);
+  --color-background: hsl(210 29% 97%);
+  --color-foreground: hsl(222 47% 11%);
 
-  /* Surface */
-  --color-card: hsl(240 10% 6.5%);
-  --color-card-foreground: hsl(0 0% 98%);
+  --color-card: hsl(0 0% 100%);
+  --color-card-foreground: hsl(222 47% 11%);
 
-  --color-popover: hsl(240 10% 3.9%);
-  --color-popover-foreground: hsl(0 0% 98%);
+  --color-popover: hsl(0 0% 100%);
+  --color-popover-foreground: hsl(222 47% 11%);
 
-  /* Primary Accent - Warm Amber/Gold */
-  --color-primary: hsl(45 93% 47%);
-  --color-primary-foreground: hsl(240 10% 3.9%);
+  --color-primary: hsl(213 94% 43%);
+  --color-primary-foreground: hsl(0 0% 100%);
 
-  /* Secondary */
-  --color-secondary: hsl(240 5.9% 10%);
-  --color-secondary-foreground: hsl(0 0% 98%);
+  --color-secondary: hsl(214 32% 91%);
+  --color-secondary-foreground: hsl(222 47% 11%);
 
-  /* UI Elements */
-  --color-muted: hsl(240 3.7% 15.9%);
-  --color-muted-foreground: hsl(240 5% 64.9%);
+  --color-muted: hsl(213 27% 94%);
+  --color-muted-foreground: hsl(215 16% 43%);
 
-  --color-accent: hsl(240 3.7% 15.9%);
-  --color-accent-foreground: hsl(0 0% 98%);
+  --color-accent: hsl(173 58% 39%);
+  --color-accent-foreground: hsl(0 0% 100%);
 
-  --color-destructive: hsl(0 84.2% 60.2%);
-  --color-destructive-foreground: hsl(0 0% 98%);
+  --color-destructive: hsl(0 72% 51%);
+  --color-destructive-foreground: hsl(0 0% 100%);
 
-  --color-border: hsl(240 3.7% 15.9%);
-  --color-input: hsl(240 3.7% 15.9%);
-  --color-ring: hsl(45 93% 47%);
+  --color-border: hsl(214 22% 84%);
+  --color-input: hsl(214 22% 84%);
+  --color-ring: hsl(213 94% 43%);
 
   --radius: 0.5rem;
 }
@@ -53,6 +48,11 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
 }
 
+.rounded-xl,
+.rounded-2xl {
+  border-radius: var(--radius) !important;
+}
+
 /* Custom scrollbar - Slim & Modern */
 ::-webkit-scrollbar {
   width: 6px;
@@ -64,12 +64,12 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: hsla(215, 27.9%, 26.9%, 0.6);
+  background: hsla(215, 16%, 55%, 0.55);
   border-radius: 10px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: hsla(215, 27.9%, 40%, 0.8);
+  background: hsla(215, 16%, 40%, 0.75);
 }
 
 /* Custom scrollbar utility */
@@ -107,7 +107,7 @@ body {
 }
 
 .btn-primary:hover {
-  background-color: rgba(248, 250, 252, 0.9);
+  background-color: hsl(213 94% 38%);
 }
 
 .btn-primary:active {
@@ -132,7 +132,7 @@ body {
 }
 
 .btn-danger:hover {
-  background-color: rgba(127, 29, 29, 0.9);
+  background-color: hsl(0 72% 46%);
 }
 
 .btn-sm {
@@ -147,8 +147,8 @@ body {
   width: 100%;
   border-radius: 0.5rem;
   border: 1px solid var(--color-input);
-  background-color: #09090b;
-  color: hsl(var(--color-foreground));
+  background-color: var(--color-card);
+  color: var(--color-foreground);
   padding: 0.5rem 0.75rem;
   font-size: 0.875rem;
   transition: all 0.15s;
@@ -173,7 +173,7 @@ body {
   background-color: var(--color-card);
   color: var(--color-card-foreground);
   border: 1px solid var(--color-border);
-  border-radius: 0.75rem;
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius);
+  box-shadow: 0 1px 2px 0 rgba(15, 23, 42, 0.05);
   overflow: hidden;
 }

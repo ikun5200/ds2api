@@ -36,6 +36,7 @@ func (h *Handler) getConfig(w http.ResponseWriter, _ *http.Request) {
 			"email":         acc.Email,
 			"mobile":        acc.Mobile,
 			"proxy_id":      acc.ProxyID,
+			"disabled":      acc.Disabled,
 			"has_password":  strings.TrimSpace(acc.Password) != "",
 			"has_token":     token != "",
 			"token_preview": maskSecretPreview(token),

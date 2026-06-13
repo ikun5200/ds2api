@@ -60,14 +60,9 @@ export default function AppRoutes() {
                     />
                 ) : (
                     <div className="min-h-screen flex flex-col bg-background relative overflow-hidden">
-                        <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
-                            <div className="absolute top-[-10%] right-[-10%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[120px]"></div>
-                            <div className="absolute bottom-[-10%] left-[-10%] w-[50%] h-[50%] bg-accent/5 rounded-full blur-[120px]"></div>
-                        </div>
-
                         {message && (
                             <div className={clsx(
-                                "fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-lg border animate-in slide-in-from-top-2 fade-in",
+                                "fixed top-4 right-4 z-50 px-4 py-3 rounded-lg shadow-sm border animate-in slide-in-from-top-2 fade-in",
                                 message.type === 'error' ? "bg-destructive/10 border-destructive/20 text-destructive" :
                                     "bg-primary/10 border-primary/20 text-primary"
                             )}>

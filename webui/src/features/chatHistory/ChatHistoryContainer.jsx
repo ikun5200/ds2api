@@ -367,7 +367,7 @@ export default function ChatHistoryContainer({ authFetch, onMessage }) {
                         type="button"
                         onClick={() => setConfirmClearOpen(true)}
                         disabled={clearing || !items.length}
-                        className="h-10 w-10 rounded-xl border border-border bg-[#111214] text-muted-foreground hover:text-destructive hover:bg-[#181a1d] disabled:opacity-50 flex items-center justify-center"
+                        className="h-10 w-10 rounded-lg border border-border bg-background text-muted-foreground hover:text-destructive hover:bg-secondary/70 disabled:opacity-50 flex items-center justify-center"
                         title={t('chatHistory.clearAll')}
                     >
                         {clearing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}

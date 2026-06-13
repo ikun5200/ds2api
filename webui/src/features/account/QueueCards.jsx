@@ -4,6 +4,8 @@ export default function QueueCards({ queueStatus, t }) {
     if (!queueStatus) {
         return null
     }
+    const configuredTotal = queueStatus.configured_total ?? queueStatus.total
+    const disabledTotal = queueStatus.disabled ?? Math.max(0, configuredTotal - queueStatus.total)
 
     return (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -36,6 +38,11 @@ export default function QueueCards({ queueStatus, t }) {
                     <span className="text-3xl font-bold text-foreground">{queueStatus.total}</span>
                     <span className="text-xs text-muted-foreground">{t('accountManager.accountsUnit')}</span>
                 </div>
+                {configuredTotal !== queueStatus.total && (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                        {t('accountManager.configuredAccounts', { total: configuredTotal, disabled: disabledTotal })}
+                    </p>
+                )}
             </div>
         </div>
     )

@@ -29,7 +29,8 @@
       "_comment": "邮箱登录方式 - 账号2",
       "name": "备用账号",
       "email": "example2@example.com",
-      "password": "your-password-2"
+      "password": "your-password-2",
+      "disabled": true
     },
     {
       "_comment": "手机号登录方式（中国大陆）",

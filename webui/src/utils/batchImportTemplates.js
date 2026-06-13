@@ -13,9 +13,9 @@ export function getBatchImportTemplates(t) {
             config: {
                 keys: ['your-api-key'],
                 accounts: [
-                    { email: 'account1@example.com', password: 'pass1', token: '' },
-                    { email: 'account2@example.com', password: 'pass2', token: '' },
-                    { email: 'account3@example.com', password: 'pass3', token: '' },
+                    { email: 'account1@example.com', password: 'pass1', disabled: false },
+                    { email: 'account2@example.com', password: 'pass2', disabled: false },
+                    { email: 'account3@example.com', password: 'pass3', disabled: false },
                 ],
             },
         },
@@ -25,9 +25,9 @@ export function getBatchImportTemplates(t) {
             config: {
                 keys: ['your-api-key'],
                 accounts: [
-                    { mobile: '+8613800000001', password: 'pass1', token: '' },
-                    { mobile: '+8613800000002', password: 'pass2', token: '' },
-                    { mobile: '+8613800000003', password: 'pass3', token: '' },
+                    { mobile: '+8613800000001', password: 'pass1', disabled: false },
+                    { mobile: '+8613800000002', password: 'pass2', disabled: false },
+                    { mobile: '+8613800000003', password: 'pass3', disabled: false },
                 ],
             },
         },

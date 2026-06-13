@@ -155,6 +155,9 @@ func (h *Handler) validateAccountsForVercelSync(ctx context.Context, enabled boo
 	}
 	jobs := []validationJob{}
 	for _, acc := range h.Store.Accounts() {
+		if acc.Disabled {
+			continue
+		}
 		if strings.TrimSpace(acc.Token) != "" {
 			continue
 		}

@@ -65,6 +65,7 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 			"email":         acc.Email,
 			"mobile":        acc.Mobile,
 			"proxy_id":      acc.ProxyID,
+			"disabled":      acc.Disabled,
 			"has_password":  acc.Password != "",
 			"has_token":     token != "",
 			"token_preview": maskSecretPreview(token),
@@ -121,6 +122,7 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 	}
 	name, nameOK := fieldStringOptional(req, "name")
 	remark, remarkOK := fieldStringOptional(req, "remark")
+	disabled, disabledOK := fieldBoolOptional(req, "disabled")
 
 	err := h.Store.Update(func(c *config.Config) error {
 		for i, acc := range c.Accounts {
@@ -133,6 +135,9 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 			if remarkOK {
 				c.Accounts[i].Remark = remark
 			}
+			if disabledOK {
+				c.Accounts[i].Disabled = disabled
+			}
 			return nil
 		}
 		return newRequestError("账号不存在")
@@ -144,6 +149,9 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 		}
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
+	}
+	if disabledOK {
+		h.Pool.Reset()
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_accounts": len(h.Store.Snapshot().Accounts)})
 }

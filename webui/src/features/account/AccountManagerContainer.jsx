@@ -61,6 +61,7 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
         deleteKey,
         addAccount,
         updateAccount,
+        toggleAccountDisabled,
         deleteAccount,
         testAccount,
         testAllAccounts,
@@ -132,6 +133,7 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
                 onTestAll={testAllAccounts}
                 onShowAddAccount={openAddAccount}
                 onEditAccount={openEditAccount}
+                onToggleAccountDisabled={toggleAccountDisabled}
                 onTestAccount={testAccount}
                 onDeleteAccount={deleteAccount}
                 onDeleteAllSessions={deleteAllSessions}

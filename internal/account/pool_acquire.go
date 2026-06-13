@@ -48,15 +48,16 @@ func (p *Pool) AcquireWait(ctx context.Context, target string, exclude map[strin
 
 func (p *Pool) acquireLocked(target string, exclude map[string]bool) (config.Account, bool) {
 	if target != "" {
-		if exclude[target] || !p.canAcquireIDLocked(target) {
-			return config.Account{}, false
-		}
 		acc, ok := p.store.FindAccount(target)
 		if !ok {
 			return config.Account{}, false
 		}
-		p.inUse[target]++
-		p.bumpQueue(target)
+		accountID := acc.Identifier()
+		if exclude[target] || exclude[accountID] || acc.Disabled || !p.canAcquireIDLocked(accountID) || !p.isQueuedLocked(accountID) {
+			return config.Account{}, false
+		}
+		p.inUse[accountID]++
+		p.bumpQueue(accountID)
 		return acc, true
 	}
 
@@ -89,6 +90,15 @@ func (p *Pool) bumpQueue(accountID string) {
 		p.queue = append(p.queue, accountID)
 		return
 	}
+}
+
+func (p *Pool) isQueuedLocked(accountID string) bool {
+	for _, id := range p.queue {
+		if id == accountID {
+			return true
+		}
+	}
+	return false
 }
 
 func normalizeExclude(exclude map[string]bool) map[string]bool {

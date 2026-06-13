@@ -29,7 +29,7 @@ const ProxyManagerContainer = lazy(() => import('../features/proxy/ProxyManagerC
 
 function TabLoadingFallback({ label }) {
     return (
-        <div className="min-h-[320px] rounded-lg border border-border bg-card flex items-center justify-center">
+        <div className="min-h-[320px] rounded-lg border border-border bg-card flex items-center justify-center shadow-sm">
             <div className="flex items-center gap-3 text-sm text-muted-foreground">
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>{label}</span>
@@ -138,12 +138,12 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
             )}
 
             <aside className={clsx(
-                "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transition-transform duration-300 ease-in-out lg:transform-none flex flex-col shadow-2xl lg:shadow-none",
+                "fixed lg:static inset-y-0 left-0 z-50 w-64 bg-card border-r border-border transition-transform duration-300 ease-in-out lg:transform-none flex flex-col shadow-xl lg:shadow-none",
                 sidebarOpen ? "translate-x-0" : "-translate-x-full"
             )}>
-                <div className="p-6">
+                <div className="p-5">
                     <div className="flex items-center gap-2.5 font-bold text-xl text-foreground tracking-tight">
-                        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-lg shadow-primary/20">
+                        <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground shadow-sm">
                             <LayoutDashboard className="w-5 h-5" />
                         </div>
                         <span>DS2API</span>
@@ -167,7 +167,7 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
                                 className={clsx(
                                     "w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group border",
                                     isActive
-                                        ? "bg-secondary text-primary border-border shadow-sm"
+                                        ? "bg-primary/10 text-primary border-primary/20 shadow-sm"
                                         : "text-muted-foreground border-transparent hover:bg-secondary/80 hover:text-foreground"
                                 )}
                             >
@@ -189,16 +189,16 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
                             </span>
                         </div>
                         <div className="grid grid-cols-2 gap-2">
-                            <div className="bg-background rounded-lg p-3 border border-border shadow-sm">
+                            <div className="bg-background rounded-lg p-3 border border-border">
                                 <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5 opacity-70">{t('sidebar.accounts')}</div>
                                 <div className="text-lg font-bold text-foreground leading-tight">{config.accounts?.length || 0}</div>
                             </div>
-                            <div className="bg-background rounded-lg p-3 border border-border shadow-sm">
+                            <div className="bg-background rounded-lg p-3 border border-border">
                                 <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-0.5 opacity-70">{t('sidebar.keys')}</div>
                                 <div className="text-lg font-bold text-foreground">{config.keys?.length || 0}</div>
                             </div>
                         </div>
-                        <div className="bg-background rounded-lg p-3 border border-border shadow-sm">
+                        <div className="bg-background rounded-lg p-3 border border-border">
                             <div className="text-[9px] text-muted-foreground font-bold uppercase tracking-wider mb-1 opacity-70">{t('sidebar.version')}</div>
                             <div className="text-xs font-semibold text-foreground">{versionInfo?.current_tag || '-'}</div>
                             {versionInfo?.has_update && (
@@ -242,13 +242,13 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
                     </div>
                 </header>
 
-                <div className="flex-1 overflow-auto bg-background p-4 lg:p-10">
+                <div className="flex-1 overflow-auto bg-background p-4 lg:p-8">
                     <div className="max-w-6xl mx-auto space-y-4 lg:space-y-6">
-                        <div className="hidden lg:block mb-8">
-                            <h1 className="text-3xl font-bold tracking-tight mb-2">
+                        <div className="hidden lg:block mb-6">
+                            <h1 className="text-2xl font-semibold tracking-tight mb-2">
                                 {activeNavItem?.label}
                             </h1>
-                            <p className="text-muted-foreground">
+                            <p className="text-sm text-muted-foreground">
                                 {activeNavItem?.description}
                             </p>
                         </div>

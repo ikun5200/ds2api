@@ -39,6 +39,10 @@ func (h *Handler) testSingleAccount(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"detail": "账号不存在"})
 		return
 	}
+	if acc.Disabled {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "账号已禁用"})
+		return
+	}
 	model, _ := req["model"].(string)
 	if model == "" {
 		model = "deepseek-v4-flash"
@@ -56,6 +60,13 @@ func (h *Handler) testAllAccounts(w http.ResponseWriter, r *http.Request) {
 		model = "deepseek-v4-flash"
 	}
 	accounts := h.Store.Snapshot().Accounts
+	enabledAccounts := accounts[:0]
+	for _, acc := range accounts {
+		if !acc.Disabled {
+			enabledAccounts = append(enabledAccounts, acc)
+		}
+	}
+	accounts = enabledAccounts
 	if len(accounts) == 0 {
 		writeJSON(w, http.StatusOK, map[string]any{"total": 0, "success": 0, "failed": 0, "results": []any{}})
 		return

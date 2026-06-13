@@ -44,7 +44,12 @@ func (p *Pool) Reset() {
 		return iHas
 	})
 	ids := make([]string, 0, len(accounts))
+	disabled := 0
 	for _, a := range accounts {
+		if a.Disabled {
+			disabled++
+			continue
+		}
 		id := a.Identifier()
 		if id != "" {
 			ids = append(ids, id)
@@ -77,6 +82,7 @@ func (p *Pool) Reset() {
 		"global_max_inflight", p.globalMaxInflight,
 		"recommended_concurrency", p.recommendedConcurrency,
 		"max_queue_size", p.maxQueueSize,
+		"disabled", disabled,
 	)
 }
 
@@ -120,7 +126,9 @@ func (p *Pool) Status() map[string]any {
 	return map[string]any{
 		"available":                len(available),
 		"in_use":                   inUseSlots,
-		"total":                    len(p.store.Accounts()),
+		"total":                    len(p.queue),
+		"configured_total":         len(p.store.Accounts()),
+		"disabled":                 len(p.store.Accounts()) - len(p.queue),
 		"available_accounts":       available,
 		"in_use_accounts":          inUseAccounts,
 		"max_inflight_per_account": p.maxInflightPerAccount,
