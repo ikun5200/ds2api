@@ -76,7 +76,7 @@ func ComputeSyncHash(store ConfigStore) string {
 	if store == nil {
 		return ""
 	}
-	snap := store.Snapshot().Clone()
+	snap := store.Snapshot()
 	snap.ClearAccountTokens()
 	snap.ClearVercelCredentials()
 	snap.VercelSyncHash = ""

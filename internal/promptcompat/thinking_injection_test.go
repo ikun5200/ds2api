@@ -79,3 +79,18 @@ func TestAppendThinkingInjectionToLatestUserSkipsDuplicate(t *testing.T) {
 		t.Fatalf("unexpected messages: %#v", out)
 	}
 }
+
+func TestAppendThinkingInjectionDoesNotTreatInlinePunctuationAsDuplicate(t *testing.T) {
+	messages := []any{
+		map[string]any{"role": "user", "content": "这里已经有句号。请继续"},
+	}
+
+	out, changed := AppendThinkingInjectionToLatestUser(messages)
+	if !changed {
+		t.Fatal("expected default punctuation prompt to be appended")
+	}
+	content, _ := out[0].(map[string]any)["content"].(string)
+	if !strings.HasSuffix(content, "\n\n"+DefaultThinkingInjectionPrompt) {
+		t.Fatalf("expected default injection at end, got %q", content)
+	}
+}

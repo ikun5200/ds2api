@@ -1135,7 +1135,7 @@ The success payload includes `sample_id`, `dir`, `meta_path`, and `upstream_path
 | `project_id` | ❌ | Fallback: `VERCEL_PROJECT_ID`, then saved config |
 | `team_id` | ❌ | Fallback: `VERCEL_TEAM_ID`, then saved config |
 | `auto_validate` | ❌ | Default `true` |
-| `save_credentials` | ❌ | Default `true`; saves explicitly supplied Vercel credentials for the next sync |
+| `save_credentials` | ❌ | Default `true`; saves Vercel credentials for the next sync; preconfigured-token mode skips saving the token but still saves project/team |
 
 **Success response**:
 

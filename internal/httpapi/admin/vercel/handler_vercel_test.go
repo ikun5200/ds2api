@@ -98,3 +98,65 @@ func TestExportSyncConfigStripsSavedVercelCredentials(t *testing.T) {
 		t.Fatalf("unexpected exported config: %#v", exported)
 	}
 }
+
+func TestVercelCredentialEnvPairsSkipsPreconfiguredTokenOnly(t *testing.T) {
+	pairs := vercelCredentialEnvPairs(vercelSyncOptions{
+		VercelToken:  "resolved-token",
+		ProjectID:    " project ",
+		TeamID:       " team ",
+		SaveCreds:    true,
+		UsePreconfig: true,
+	})
+	if len(pairs) != 2 {
+		t.Fatalf("expected project/team only, got %#v", pairs)
+	}
+	if pairs[0] != [2]string{"VERCEL_PROJECT_ID", "project"} || pairs[1] != [2]string{"VERCEL_TEAM_ID", "team"} {
+		t.Fatalf("unexpected credential env pairs: %#v", pairs)
+	}
+}
+
+func TestVercelCredentialEnvPairsIncludesExplicitToken(t *testing.T) {
+	pairs := vercelCredentialEnvPairs(vercelSyncOptions{
+		VercelToken: " token ",
+		ProjectID:   " project ",
+		SaveCreds:   true,
+	})
+	if len(pairs) != 2 {
+		t.Fatalf("expected token/project pairs, got %#v", pairs)
+	}
+	if pairs[0] != [2]string{"VERCEL_TOKEN", "token"} || pairs[1] != [2]string{"VERCEL_PROJECT_ID", "project"} {
+		t.Fatalf("unexpected credential env pairs: %#v", pairs)
+	}
+}
+
+func TestSyncHashForCanonicalJSONIsStable(t *testing.T) {
+	jsonStr, _, err := encodeVercelSyncConfig(config.Config{Keys: []string{"k1"}})
+	if err != nil {
+		t.Fatalf("encode sync config error: %v", err)
+	}
+	got := syncHashForCanonicalJSON(jsonStr)
+	if got == "" {
+		t.Fatal("expected non-empty canonical hash")
+	}
+	if again := syncHashForCanonicalJSON(jsonStr); again != got {
+		t.Fatalf("canonical hash not stable: %q then %q", got, again)
+	}
+	if blank := syncHashForCanonicalJSON("  "); blank != "" {
+		t.Fatalf("expected blank canonical JSON hash to be empty, got %q", blank)
+	}
+}
+
+func TestIndexVercelEnvIDs(t *testing.T) {
+	envs := []any{
+		map[string]any{"key": "DS2API_CONFIG_JSON", "id": "env-config"},
+		map[string]any{"key": " VERCEL_PROJECT_ID ", "id": " env-project "},
+		map[string]any{"key": "VERCEL_TOKEN"},
+	}
+	index := indexVercelEnvIDs(envs)
+	if index["DS2API_CONFIG_JSON"] != "env-config" || index["VERCEL_PROJECT_ID"] != "env-project" {
+		t.Fatalf("unexpected env index: %#v", index)
+	}
+	if _, ok := index["VERCEL_TOKEN"]; ok {
+		t.Fatalf("expected env without id to be skipped, got %#v", index)
+	}
+}

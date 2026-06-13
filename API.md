@@ -1143,7 +1143,7 @@ data: {"type":"message_stop"}
 | `project_id` | ❌ | 空则读 `VERCEL_PROJECT_ID`，再回退到已保存配置 |
 | `team_id` | ❌ | 空则读 `VERCEL_TEAM_ID`，再回退到已保存配置 |
 | `auto_validate` | ❌ | 默认 `true` |
-| `save_credentials` | ❌ | 默认 `true`；保存本次显式填写的 Vercel 凭据，供下次同步复用 |
+| `save_credentials` | ❌ | 默认 `true`；保存本次 Vercel 凭据，供下次同步复用；使用预配置 token 时不会回写 token，但仍会保存 project/team |
 
 **成功响应**：
 

@@ -119,7 +119,7 @@ DS2API 当前的核心思路，不是把客户端传来的 `messages`、`tools`�
 
 ## 5. prompt 是怎么拼出来的
 
-OpenAI Chat / Responses 在标准化后、current input file 之前，会默认执行 `thinking_injection` 增强。它参考 DeepSeek V4 “把控制指令放在 user 消息末尾更稳定”的用法，在最新 user message 后追加思考增强提示词。当前内置默认提示词以 `Reasoning Effort: Absolute maximum with no shortcuts permitted.` 开头，并继续要求模型充分分解问题、覆盖潜在路径与边界条件、把完整推演过程显式写出。该开关默认启用，可通过 `thinking_injection.enabled=false` 关闭；也可以通过 `thinking_injection.prompt` 自定义提示词，留空时使用内置默认提示词。
+OpenAI Chat / Responses 在标准化后、current input file 之前，会默认执行 `thinking_injection` 增强。它参考 DeepSeek V4 "把控制指令放在 user 消息末尾更稳定"的用法，在最新 user message 后追加思考增强提示词。当前内置默认提示词以 `Reasoning Effort: Absolute maximum with no shortcuts permitted.` 开头，并继续要求模型充分分解问题、覆盖潜在路径与边界条件、把完整推演过程显式写出。该开关默认启用，可通过 `thinking_injection.enabled=false` 关闭；也可以通过 `thinking_injection.prompt` 自定义提示词，留空时使用内置默认提示词。
 
 这段增强属于 prompt 可见上下文：
 

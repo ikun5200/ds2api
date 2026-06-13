@@ -3,10 +3,8 @@ package promptcompat
 import "strings"
 
 const (
-	ThinkingInjectionMarker        = "Reasoning Effort: Absolute maximum with no shortcuts permitted."
-	DefaultThinkingInjectionPrompt = ThinkingInjectionMarker + "\n" +
-		"You MUST be very thorough in your thinking and comprehensively decompose the problem to resolve the root cause, rigorously stress-testing your logic against all potential paths, edge cases, and adversarial scenarios.\n" +
-		"Explicitly write out your entire deliberation process, documenting every intermediate step, considered alternative, and rejected hypothesis to ensure absolutely no assumption is left unchecked."
+	DefaultThinkingInjectionPrompt = "。"
+	ThinkingInjectionMarker        = DefaultThinkingInjectionPrompt
 )
 
 func AppendThinkingInjectionToLatestUser(messages []any) ([]any, bool) {
@@ -31,7 +29,7 @@ func AppendThinkingInjectionPromptToLatestUser(messages []any, injectionPrompt s
 		}
 		content := msg["content"]
 		normalizedContent := NormalizeOpenAIContentForPrompt(content)
-		if strings.Contains(normalizedContent, ThinkingInjectionMarker) || strings.Contains(normalizedContent, injectionPrompt) {
+		if hasThinkingInjectionPrompt(normalizedContent, injectionPrompt) {
 			return messages, false
 		}
 		updatedContent := appendThinkingInjectionToContent(content, injectionPrompt)
@@ -45,6 +43,15 @@ func AppendThinkingInjectionPromptToLatestUser(messages []any, injectionPrompt s
 		return out, true
 	}
 	return messages, false
+}
+
+func hasThinkingInjectionPrompt(content, injectionPrompt string) bool {
+	content = strings.TrimSpace(content)
+	injectionPrompt = strings.TrimSpace(injectionPrompt)
+	if content == "" || injectionPrompt == "" {
+		return false
+	}
+	return content == injectionPrompt || strings.HasSuffix(content, "\n\n"+injectionPrompt)
 }
 
 func appendThinkingInjectionToContent(content any, injectionPrompt string) any {

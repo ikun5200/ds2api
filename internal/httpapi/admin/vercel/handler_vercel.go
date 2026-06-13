@@ -12,10 +12,13 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"ds2api/internal/config"
 )
+
+const vercelAccountValidationConcurrency = 3
 
 func (h *Handler) syncVercel(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
@@ -57,7 +60,7 @@ func (h *Handler) syncVercel(w http.ResponseWriter, r *http.Request) {
 		credentialsWarning = "保存 Vercel 凭据到本地配置失败: " + err.Error()
 	}
 	manual, deployURL := triggerVercelDeployment(r.Context(), client, opts.ProjectID, params, headers)
-	_ = h.Store.SetVercelSync(syncHashForJSON(cfgJSON), time.Now().Unix())
+	_ = h.Store.SetVercelSync(syncHashForCanonicalJSON(cfgJSON), time.Now().Unix())
 	result := map[string]any{"success": true, "validated_accounts": validated}
 	if manual {
 		result["message"] = "配置已同步到 Vercel，请手动触发重新部署"
@@ -143,28 +146,96 @@ func buildVercelParams(teamID string) url.Values {
 }
 
 func (h *Handler) validateAccountsForVercelSync(ctx context.Context, enabled bool) (int, []string) {
-	if !enabled {
+	if !enabled || h.Store == nil {
 		return 0, nil
 	}
-	validated, failed := 0, []string{}
-	for _, acc := range h.Store.Snapshot().Accounts {
+	type validationJob struct {
+		Identifier string
+		Account    config.Account
+	}
+	jobs := []validationJob{}
+	for _, acc := range h.Store.Accounts() {
 		if strings.TrimSpace(acc.Token) != "" {
 			continue
 		}
-		token, err := h.DS.Login(ctx, acc)
-		if err != nil {
-			failed = append(failed, acc.Identifier())
-		} else {
-			validated++
-			_ = h.Store.UpdateAccountToken(acc.Identifier(), token)
+		identifier := acc.Identifier()
+		if identifier == "" {
+			continue
 		}
-		time.Sleep(500 * time.Millisecond)
+		jobs = append(jobs, validationJob{Identifier: identifier, Account: acc})
+	}
+	if len(jobs) == 0 {
+		return 0, nil
+	}
+	if h.DS == nil {
+		failed := make([]string, 0, len(jobs))
+		for _, job := range jobs {
+			failed = append(failed, job.Identifier)
+		}
+		return 0, failed
+	}
+
+	type validationResult struct {
+		Identifier string
+		Token      string
+		Err        error
+	}
+	results := make([]validationResult, len(jobs))
+	limit := vercelAccountValidationConcurrency
+	if limit > len(jobs) {
+		limit = len(jobs)
+	}
+	sem := make(chan struct{}, limit)
+	var wg sync.WaitGroup
+	for i, job := range jobs {
+		wg.Add(1)
+		go func(i int, job validationJob) {
+			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-ctx.Done():
+				results[i] = validationResult{Identifier: job.Identifier, Err: ctx.Err()}
+				return
+			}
+			token, err := h.DS.Login(ctx, job.Account)
+			results[i] = validationResult{Identifier: job.Identifier, Token: token, Err: err}
+		}(i, job)
+	}
+	wg.Wait()
+
+	validated := 0
+	failed := []string{}
+	tokenUpdates := make([]validationResult, 0, len(results))
+	for _, result := range results {
+		if result.Err != nil || strings.TrimSpace(result.Token) == "" {
+			failed = append(failed, result.Identifier)
+			continue
+		}
+		validated++
+		tokenUpdates = append(tokenUpdates, result)
+	}
+	if len(tokenUpdates) > 0 {
+		_ = h.Store.Update(func(c *config.Config) error {
+			for _, update := range tokenUpdates {
+				for i := range c.Accounts {
+					if accountMatchesVercelIdentifier(c.Accounts[i], update.Identifier) {
+						c.Accounts[i].Token = update.Token
+						break
+					}
+				}
+			}
+			return nil
+		})
 	}
 	return validated, failed
 }
 
 func upsertVercelEnv(ctx context.Context, client *http.Client, projectID string, params url.Values, headers map[string]string, envs []any, key, value string) (int, error) {
-	existingID := findEnvID(envs, key)
+	return upsertVercelEnvWithID(ctx, client, projectID, params, headers, findEnvID(envs, key), key, value)
+}
+
+func upsertVercelEnvWithID(ctx context.Context, client *http.Client, projectID string, params url.Values, headers map[string]string, existingID, key, value string) (int, error) {
 	if existingID != "" {
 		_, status, err := vercelRequest(ctx, client, http.MethodPatch, "https://api.vercel.com/v9/projects/"+projectID+"/env/"+existingID, params, headers, map[string]any{"value": value})
 		return status, err
@@ -179,21 +250,53 @@ func upsertVercelEnv(ctx context.Context, client *http.Client, projectID string,
 }
 
 func (h *Handler) saveVercelProjectCredentials(ctx context.Context, client *http.Client, opts vercelSyncOptions, params url.Values, headers map[string]string, envs []any) []string {
-	if !opts.SaveCreds || opts.UsePreconfig {
+	if !opts.SaveCreds {
 		return nil
 	}
-	saved := []string{}
-	creds := [][2]string{{"VERCEL_TOKEN", opts.VercelToken}, {"VERCEL_PROJECT_ID", opts.ProjectID}}
-	if opts.TeamID != "" {
-		creds = append(creds, [2]string{"VERCEL_TEAM_ID", opts.TeamID})
+	creds := vercelCredentialEnvPairs(opts)
+	if len(creds) == 0 {
+		return nil
 	}
-	for _, kv := range creds {
-		status, _ := upsertVercelEnv(ctx, client, opts.ProjectID, params, headers, envs, kv[0], kv[1])
+
+	envIDs := indexVercelEnvIDs(envs)
+	saved := make([]string, 0, len(creds))
+	statuses := make([]int, len(creds))
+	var wg sync.WaitGroup
+	for i, kv := range creds {
+		wg.Add(1)
+		go func(i int, kv [2]string) {
+			defer wg.Done()
+			status, _ := upsertVercelEnvWithID(ctx, client, opts.ProjectID, params, headers, envIDs[kv[0]], kv[0], kv[1])
+			statuses[i] = status
+		}(i, kv)
+	}
+	wg.Wait()
+
+	for i, status := range statuses {
 		if status == http.StatusOK || status == http.StatusCreated {
-			saved = append(saved, kv[0])
+			saved = append(saved, creds[i][0])
 		}
 	}
 	return saved
+}
+
+func vercelCredentialEnvPairs(opts vercelSyncOptions) [][2]string {
+	creds := [][2]string{}
+	if !opts.UsePreconfig {
+		creds = append(creds, [2]string{"VERCEL_TOKEN", opts.VercelToken})
+	}
+	creds = append(creds,
+		[2]string{"VERCEL_PROJECT_ID", opts.ProjectID},
+		[2]string{"VERCEL_TEAM_ID", opts.TeamID},
+	)
+	filtered := creds[:0]
+	for _, kv := range creds {
+		if strings.TrimSpace(kv[1]) != "" {
+			filtered = append(filtered, [2]string{kv[0], strings.TrimSpace(kv[1])})
+		}
+	}
+	creds = filtered
+	return creds
 }
 
 func (h *Handler) saveLocalVercelCredentials(opts vercelSyncOptions) (bool, error) {
@@ -260,7 +363,7 @@ func (h *Handler) vercelStatus(w http.ResponseWriter, r *http.Request) {
 		var req map[string]any
 		if err := json.NewDecoder(r.Body).Decode(&req); err == nil {
 			if cfgJSON, _, err := h.exportSyncConfig(req); err == nil {
-				draftHash = syncHashForJSON(cfgJSON)
+				draftHash = syncHashForCanonicalJSON(cfgJSON)
 				draftDiffers = draftHash != "" && draftHash != current
 			}
 		}
@@ -306,20 +409,11 @@ func encodeVercelSyncConfig(cfg config.Config) (string, string, error) {
 	return string(b), base64.StdEncoding.EncodeToString(b), nil
 }
 
-func syncHashForJSON(s string) string {
-	var cfg config.Config
-	if err := json.Unmarshal([]byte(s), &cfg); err != nil {
+func syncHashForCanonicalJSON(s string) string {
+	if strings.TrimSpace(s) == "" {
 		return ""
 	}
-	cfg.VercelSyncHash = ""
-	cfg.VercelSyncTime = 0
-	cfg.ClearAccountTokens()
-	cfg.ClearVercelCredentials()
-	b, err := json.Marshal(cfg)
-	if err != nil {
-		return ""
-	}
-	sum := md5.Sum(b)
+	sum := md5.Sum([]byte(s))
 	return fmt.Sprintf("%x", sum)
 }
 
@@ -354,16 +448,36 @@ func vercelRequest(ctx context.Context, client *http.Client, method, endpoint st
 	return parsed, resp.StatusCode, nil
 }
 
-func findEnvID(envs []any, key string) string {
+func accountMatchesVercelIdentifier(acc config.Account, identifier string) bool {
+	identifier = strings.TrimSpace(identifier)
+	if identifier == "" {
+		return false
+	}
+	if acc.Identifier() == identifier || strings.TrimSpace(acc.Email) == identifier {
+		return true
+	}
+	mobileKey := config.CanonicalMobileKey(identifier)
+	return mobileKey != "" && mobileKey == config.CanonicalMobileKey(acc.Mobile)
+}
+
+func indexVercelEnvIDs(envs []any) map[string]string {
+	out := make(map[string]string, len(envs))
 	for _, item := range envs {
 		m, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
-		if k, _ := m["key"].(string); k == key {
-			id, _ := m["id"].(string)
-			return id
+		key, _ := m["key"].(string)
+		id, _ := m["id"].(string)
+		key = strings.TrimSpace(key)
+		id = strings.TrimSpace(id)
+		if key != "" && id != "" {
+			out[key] = id
 		}
 	}
-	return ""
+	return out
+}
+
+func findEnvID(envs []any, key string) string {
+	return indexVercelEnvIDs(envs)[key]
 }
