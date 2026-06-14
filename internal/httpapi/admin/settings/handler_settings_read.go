@@ -6,6 +6,7 @@ import (
 
 	authn "ds2api/internal/auth"
 	"ds2api/internal/config"
+	"ds2api/internal/prompt"
 	"ds2api/internal/promptcompat"
 )
 
@@ -38,6 +39,11 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 			"enabled":        h.Store.ThinkingInjectionEnabled(),
 			"prompt":         h.Store.ThinkingInjectionPrompt(),
 			"default_prompt": promptcompat.DefaultThinkingInjectionPrompt,
+		},
+		"output_integrity_guard": map[string]any{
+			"enabled":        h.Store.OutputIntegrityGuardEnabled(),
+			"prompt":         h.Store.OutputIntegrityGuardPrompt(),
+			"default_prompt": prompt.DefaultOutputIntegrityGuardPrompt,
 		},
 		"model_aliases":     snap.ModelAliases,
 		"env_backed":        h.Store.IsEnvBacked(),

@@ -94,6 +94,13 @@ func (h *Handler) configImport(w http.ResponseWriter, r *http.Request) {
 			if strings.TrimSpace(incoming.Embeddings.Provider) != "" {
 				next.Embeddings.Provider = incoming.Embeddings.Provider
 			}
+			if incoming.OutputIntegrity.Enabled != nil {
+				enabled := *incoming.OutputIntegrity.Enabled
+				next.OutputIntegrity.Enabled = &enabled
+			}
+			if strings.TrimSpace(incoming.OutputIntegrity.Prompt) != "" {
+				next.OutputIntegrity.Prompt = strings.TrimSpace(incoming.OutputIntegrity.Prompt)
+			}
 			incomingVercel := config.NormalizeVercelConfig(incoming.Vercel)
 			if strings.TrimSpace(incomingVercel.Token) != "" || strings.TrimSpace(incomingVercel.ProjectID) != "" || strings.TrimSpace(incomingVercel.TeamID) != "" {
 				next.Vercel = incomingVercel

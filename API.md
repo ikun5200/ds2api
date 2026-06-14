@@ -776,6 +776,7 @@ data: {"type":"message_stop"}
 - `auto_delete`（`mode`：`none` / `single` / `all`；旧配置 `sessions=true` 仍按 `all` 处理）
 - `current_input_file`（`enabled` 默认返回 `true`、`min_chars`）
 - `thinking_injection`（`enabled` 默认返回 `true`、`prompt`、`default_prompt`）
+- `output_integrity_guard`（`enabled` 默认返回 `true`、`prompt`、`default_prompt`）
 - `model_aliases`
 - `env_backed`、`needs_vercel_sync`
 - `toolcall` 策略已固定为 `feature_match + high`，不再通过 settings 返回或修改
@@ -791,6 +792,7 @@ data: {"type":"message_stop"}
 - `auto_delete.mode`
 - `current_input_file.enabled` / `current_input_file.min_chars`
 - `thinking_injection.enabled` / `thinking_injection.prompt`
+- `output_integrity_guard.enabled` / `output_integrity_guard.prompt`
 - `model_aliases`
 - `toolcall` 策略已固定，不再作为可写入字段
 
@@ -815,7 +817,7 @@ data: {"type":"message_stop"}
 
 请求可直接传配置对象，或使用 `{"config": {...}, "mode":"merge"}` 包裹格式。
 也支持在查询参数里传 `?mode=merge` / `?mode=replace`。
-`replace` 模式会按完整配置结构替换（保留 Vercel 同步元信息）；`merge` 模式会合并 `keys`、`api_keys`、`accounts`、`model_aliases`，并覆盖 `admin`、`runtime`、`responses`、`embeddings` 中的非空字段。`auto_delete`、`current_input_file` 建议通过 `/admin/settings` 或配置文件管理；`compat` 与 `toolcall` 相关字段会被忽略。
+`replace` 模式会按完整配置结构替换（保留 Vercel 同步元信息）；`merge` 模式会合并 `keys`、`api_keys`、`accounts`、`model_aliases`，并覆盖 `admin`、`runtime`、`responses`、`embeddings`、`output_integrity_guard` 中的非空字段。`auto_delete`、`current_input_file` 建议通过 `/admin/settings` 或配置文件管理；`compat` 与 `toolcall` 相关字段会被忽略。
 
 > 注意：`merge` 模式不会更新 `auto_delete`、`current_input_file`。
 

@@ -37,6 +37,8 @@ type ConfigStore interface {
 	CurrentInputFileMinChars() int
 	ThinkingInjectionEnabled() bool
 	ThinkingInjectionPrompt() string
+	OutputIntegrityGuardEnabled() bool
+	OutputIntegrityGuardPrompt() string
 	AutoDeleteSessions() bool
 }
 

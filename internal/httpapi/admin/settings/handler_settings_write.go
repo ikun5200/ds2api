@@ -17,7 +17,7 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, thinkingInjCfg, aliasMap, err := parseSettingsUpdateRequest(req)
+	adminCfg, runtimeCfg, responsesCfg, embeddingsCfg, autoDeleteCfg, currentInputCfg, thinkingInjCfg, outputIntegrityCfg, aliasMap, err := parseSettingsUpdateRequest(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
@@ -32,6 +32,8 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 	currentInputMinCharsSet := hasNestedSettingsKey(req, "current_input_file", "min_chars")
 	thinkingInjectionEnabledSet := hasNestedSettingsKey(req, "thinking_injection", "enabled")
 	thinkingInjectionPromptSet := hasNestedSettingsKey(req, "thinking_injection", "prompt")
+	outputIntegrityEnabledSet := hasNestedSettingsKey(req, "output_integrity_guard", "enabled")
+	outputIntegrityPromptSet := hasNestedSettingsKey(req, "output_integrity_guard", "prompt")
 
 	if err := h.Store.Update(func(c *config.Config) error {
 		if adminCfg != nil {
@@ -77,6 +79,14 @@ func (h *Handler) updateSettings(w http.ResponseWriter, r *http.Request) {
 			}
 			if thinkingInjectionPromptSet {
 				c.ThinkingInjection.Prompt = thinkingInjCfg.Prompt
+			}
+		}
+		if outputIntegrityCfg != nil {
+			if outputIntegrityEnabledSet {
+				c.OutputIntegrity.Enabled = outputIntegrityCfg.Enabled
+			}
+			if outputIntegrityPromptSet {
+				c.OutputIntegrity.Prompt = outputIntegrityCfg.Prompt
 			}
 		}
 		if aliasMap != nil {

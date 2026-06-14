@@ -44,3 +44,21 @@ func TestStoreThinkingInjectionAccessors(t *testing.T) {
 		t.Fatalf("thinking injection prompt=%q want custom thinking prompt", got)
 	}
 }
+
+func TestStoreOutputIntegrityGuardAccessors(t *testing.T) {
+	store := &Store{cfg: Config{}}
+	if !store.OutputIntegrityGuardEnabled() {
+		t.Fatal("expected output integrity guard enabled by default")
+	}
+
+	disabled := false
+	store.cfg.OutputIntegrity.Enabled = &disabled
+	if store.OutputIntegrityGuardEnabled() {
+		t.Fatal("expected output integrity guard disabled by explicit config")
+	}
+
+	store.cfg.OutputIntegrity.Prompt = "  custom clean output prompt  "
+	if got := store.OutputIntegrityGuardPrompt(); got != "custom clean output prompt" {
+		t.Fatalf("output integrity guard prompt=%q want custom clean output prompt", got)
+	}
+}

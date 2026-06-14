@@ -31,6 +31,41 @@ export default function BehaviorSection({ t, form, setForm }) {
                 <label className="flex items-start gap-3 rounded-lg border border-border bg-background/60 p-4">
                     <input
                         type="checkbox"
+                        checked={Boolean(form.output_integrity_guard?.enabled ?? true)}
+                        onChange={(e) => setForm((prev) => ({
+                            ...prev,
+                            output_integrity_guard: {
+                                ...prev.output_integrity_guard,
+                                enabled: e.target.checked,
+                            },
+                        }))}
+                        className="mt-1 h-4 w-4 rounded border-border"
+                    />
+                    <div className="space-y-1">
+                        <span className="text-sm font-medium block">{t('settings.outputIntegrityGuardEnabled')}</span>
+                        <span className="text-xs text-muted-foreground block">{t('settings.outputIntegrityGuardDesc')}</span>
+                    </div>
+                </label>
+                <label className="text-sm space-y-2 md:col-span-2">
+                    <span className="text-muted-foreground">{t('settings.outputIntegrityGuardPrompt')}</span>
+                    <textarea
+                        rows={4}
+                        value={form.output_integrity_guard?.prompt || ''}
+                        placeholder={form.output_integrity_guard?.default_prompt || ''}
+                        onChange={(e) => setForm((prev) => ({
+                            ...prev,
+                            output_integrity_guard: {
+                                ...prev.output_integrity_guard,
+                                prompt: e.target.value,
+                            },
+                        }))}
+                        className="w-full bg-background border border-border rounded-lg px-3 py-2 resize-y min-h-28"
+                    />
+                    <p className="text-xs text-muted-foreground">{t('settings.outputIntegrityGuardPromptHelp')}</p>
+                </label>
+                <label className="flex items-start gap-3 rounded-lg border border-border bg-background/60 p-4">
+                    <input
+                        type="checkbox"
                         checked={Boolean(form.thinking_injection?.enabled ?? true)}
                         onChange={(e) => setForm((prev) => ({
                             ...prev,

@@ -20,6 +20,7 @@ type Config struct {
 	AutoDelete        AutoDeleteConfig        `json:"auto_delete"`
 	CurrentInputFile  CurrentInputFileConfig  `json:"current_input_file,omitempty"`
 	ThinkingInjection ThinkingInjectionConfig `json:"thinking_injection,omitempty"`
+	OutputIntegrity   OutputIntegrityConfig   `json:"output_integrity_guard,omitempty"`
 	Vercel            VercelConfig            `json:"vercel,omitempty"`
 	VercelSyncHash    string                  `json:"_vercel_sync_hash,omitempty"`
 	VercelSyncTime    int64                   `json:"_vercel_sync_time,omitempty"`
@@ -175,6 +176,11 @@ type CurrentInputFileConfig struct {
 }
 
 type ThinkingInjectionConfig struct {
+	Enabled *bool  `json:"enabled,omitempty"`
+	Prompt  string `json:"prompt,omitempty"`
+}
+
+type OutputIntegrityConfig struct {
 	Enabled *bool  `json:"enabled,omitempty"`
 	Prompt  string `json:"prompt,omitempty"`
 }

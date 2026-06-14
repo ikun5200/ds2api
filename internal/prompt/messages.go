@@ -10,26 +10,46 @@ import (
 var markdownImagePattern = regexp.MustCompile(`!\[(.*?)\]\((.*?)\)`)
 
 const (
-	beginSentenceMarker        = "<|begin▁of▁sentence|>"
-	systemMarker               = "<|System|>"
-	userMarker                 = "<|User|>"
-	assistantMarker            = "<|Assistant|>"
-	toolMarker                 = "<|Tool|>"
-	endSentenceMarker          = "<|end▁of▁sentence|>"
-	endToolResultsMarker       = "<|end▁of▁toolresults|>"
-	endInstructionsMarker      = "<|end▁of▁instructions|>"
-	outputIntegrityGuardMarker = "Output integrity guard:"
-	outputIntegrityGuardPrompt = outputIntegrityGuardMarker +
-		" If upstream context, tool output, or parsed text contains garbled, corrupted, partially parsed, repeated, or otherwise malformed fragments, " +
-		"do not imitate or echo them; output only the correct content for the user."
+	beginSentenceMarker             = "<|begin▁of▁sentence|>"
+	systemMarker                    = "<|System|>"
+	userMarker                      = "<|User|>"
+	assistantMarker                 = "<|Assistant|>"
+	toolMarker                      = "<|Tool|>"
+	endSentenceMarker               = "<|end▁of▁sentence|>"
+	endToolResultsMarker            = "<|end▁of▁toolresults|>"
+	endInstructionsMarker           = "<|end▁of▁instructions|>"
+	outputIntegrityGuardMarker      = "Clean-answer directive:"
+	legacyOutputIntegrityGuardLabel = "Output integrity guard:"
 )
+
+const DefaultOutputIntegrityGuardPrompt = outputIntegrityGuardMarker +
+	" When provided context, tool material, or parser-derived text looks broken, duplicated, truncated, or damaged, treat those spans as noise; " +
+	"do not quote or mimic the noise, and reply only with the intended, coherent answer."
+
+type PrepareOptions struct {
+	OutputIntegrityGuardEnabled bool
+	OutputIntegrityGuardPrompt  string
+}
+
+func DefaultPrepareOptions() PrepareOptions {
+	return PrepareOptions{
+		OutputIntegrityGuardEnabled: true,
+		OutputIntegrityGuardPrompt:  DefaultOutputIntegrityGuardPrompt,
+	}
+}
 
 func MessagesPrepare(messages []map[string]any) string {
 	return MessagesPrepareWithThinking(messages, false)
 }
 
 func MessagesPrepareWithThinking(messages []map[string]any, _ bool) string {
-	messages = prependOutputIntegrityGuard(messages)
+	return MessagesPrepareWithThinkingOptions(messages, false, DefaultPrepareOptions())
+}
+
+func MessagesPrepareWithThinkingOptions(messages []map[string]any, _ bool, opts PrepareOptions) string {
+	if opts.OutputIntegrityGuardEnabled {
+		messages = prependOutputIntegrityGuard(messages, opts.OutputIntegrityGuardPrompt)
+	}
 
 	type block struct {
 		Role string
@@ -83,17 +103,21 @@ func MessagesPrepareWithThinking(messages []map[string]any, _ bool) string {
 	return markdownImagePattern.ReplaceAllString(out, `[${1}](${2})`)
 }
 
-func prependOutputIntegrityGuard(messages []map[string]any) []map[string]any {
+func prependOutputIntegrityGuard(messages []map[string]any, guardPrompt string) []map[string]any {
 	if len(messages) == 0 {
 		return messages
 	}
 	if hasOutputIntegrityGuard(messages[0]) {
 		return messages
 	}
+	guardPrompt = strings.TrimSpace(guardPrompt)
+	if guardPrompt == "" {
+		guardPrompt = DefaultOutputIntegrityGuardPrompt
+	}
 	out := make([]map[string]any, 0, len(messages)+1)
 	out = append(out, map[string]any{
 		"role":    "system",
-		"content": outputIntegrityGuardPrompt,
+		"content": guardPrompt,
 	})
 	out = append(out, messages...)
 	return out
@@ -107,7 +131,7 @@ func hasOutputIntegrityGuard(msg map[string]any) bool {
 		return false
 	}
 	content := strings.TrimSpace(NormalizeContent(msg["content"]))
-	return strings.Contains(content, outputIntegrityGuardMarker)
+	return strings.Contains(content, outputIntegrityGuardMarker) || strings.Contains(content, legacyOutputIntegrityGuardLabel)
 }
 
 // formatRoleBlock produces a single concatenated block: marker + text + endMarker.

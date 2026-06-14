@@ -12,6 +12,8 @@ func normalizeSettingsConfig(c *config.Config) {
 	}
 	c.Admin.PasswordHash = strings.TrimSpace(c.Admin.PasswordHash)
 	c.Embeddings.Provider = strings.TrimSpace(c.Embeddings.Provider)
+	c.ThinkingInjection.Prompt = strings.TrimSpace(c.ThinkingInjection.Prompt)
+	c.OutputIntegrity.Prompt = strings.TrimSpace(c.OutputIntegrity.Prompt)
 }
 
 func NormalizeSettingsConfig(c *config.Config) {

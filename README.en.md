@@ -324,6 +324,7 @@ Common fields:
 - `auto_delete.mode`: remote session cleanup after each request, supporting `none` / `single` / `all`.
 - `current_input_file`: the global context split/upload mode; it is enabled by default and uploads the full context as a `DS2API_HISTORY.txt` context file once the character threshold is reached.
 - If you turn off `current_input_file`, requests pass through directly without uploading any split context file.
+- `output_integrity_guard`: enabled by default; prepends an output cleanup rule to the final prompt so malformed, corrupted, repeated, or garbled fragments are not echoed. It can be turned off or customized from the admin panel.
 
 For the full environment variable list, see [docs/DEPLOY.en.md](docs/DEPLOY.en.md). For auth behavior, see [API.en.md](API.en.md#authentication).
 

@@ -55,14 +55,29 @@ func TestMessagesPreparePrependsOutputIntegrityGuard(t *testing.T) {
 		{"role": "user", "content": "Question"},
 	}
 	got := MessagesPrepare(messages)
-	if !strings.HasPrefix(got, beginSentenceMarker+systemMarker+outputIntegrityGuardPrompt) {
+	if !strings.HasPrefix(got, beginSentenceMarker+systemMarker+DefaultOutputIntegrityGuardPrompt) {
 		t.Fatalf("expected output integrity guard to be prepended, got %q", got)
 	}
-	if !strings.Contains(got, outputIntegrityGuardPrompt+"\n\nSystem rule") {
+	if !strings.Contains(got, DefaultOutputIntegrityGuardPrompt+"\n\nSystem rule") {
 		t.Fatalf("expected output integrity guard to precede system prompt content, got %q", got)
 	}
 	if !strings.Contains(got, "<|User|>Question") {
 		t.Fatalf("expected user question after guard, got %q", got)
+	}
+}
+
+func TestMessagesPrepareCanDisableOutputIntegrityGuard(t *testing.T) {
+	messages := []map[string]any{
+		{"role": "user", "content": "Question"},
+	}
+	got := MessagesPrepareWithThinkingOptions(messages, false, PrepareOptions{
+		OutputIntegrityGuardEnabled: false,
+	})
+	if strings.Contains(got, outputIntegrityGuardMarker) || strings.Contains(got, legacyOutputIntegrityGuardLabel) {
+		t.Fatalf("expected no output integrity guard when disabled, got %q", got)
+	}
+	if !strings.HasPrefix(got, beginSentenceMarker+userMarker+"Question") {
+		t.Fatalf("expected user prompt to remain first when guard disabled, got %q", got)
 	}
 }
 

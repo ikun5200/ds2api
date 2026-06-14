@@ -126,10 +126,11 @@ OpenAI Chat / Responses 在标准化后、current input file 之前，会默认�
 - 普通请求会直接出现在最终 `prompt` 的最新 user block 末尾。
 - 如果触发 current input file，它会进入完整上下文文件中。
 
-另外，`MessagesPrepareWithThinking` 还会在最终 prompt 的最前面预置一段固定的 system 级“输出完整性约束（Output integrity guard）”：
+另外，`MessagesPrepareWithThinking` 默认会在最终 prompt 的最前面预置一段 system 级“输出清理约束”，当前内置文案以 `Clean-answer directive:` 开头：
 
 - 如果上游上下文、工具输出或解析后的文本出现乱码、损坏、部分解析、重复或其他畸形片段，不要模仿、不要回显，只输出给用户的正确内容。
 - 这段约束位于普通 system / tool prompt 之前，因此是当前最终 prompt 里的最高优先级前置指令。
+- 该开关默认启用，可通过 `output_integrity_guard.enabled=false` 关闭；也可以通过 `output_integrity_guard.prompt` 自定义文案，留空时使用内置默认提示词。
 
 ### 5.1 角色标记
 

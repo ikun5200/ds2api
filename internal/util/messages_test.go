@@ -30,7 +30,7 @@ func TestMessagesPrepareRoles(t *testing.T) {
 		{"role": "user", "content": "How are you"},
 	}
 	got := MessagesPrepare(messages)
-	if !contains(got, "Output integrity guard") {
+	if !contains(got, "Clean-answer directive") {
 		t.Fatalf("expected output integrity guard in %q", got)
 	}
 	if !contains(got, "You are helper") || !contains(got, "<|User|>Hi") {
@@ -87,7 +87,7 @@ func TestMessagesPrepareArrayTextVariants(t *testing.T) {
 	if !contains(got, "line1\nline2") {
 		t.Fatalf("unexpected content from text variants: %q", got)
 	}
-	if !strings.Contains(got, "Output integrity guard") {
+	if !strings.Contains(got, "Clean-answer directive") {
 		t.Fatalf("expected output integrity guard in %q", got)
 	}
 }

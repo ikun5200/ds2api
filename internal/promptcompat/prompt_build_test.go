@@ -168,7 +168,7 @@ func TestBuildOpenAIFinalPromptPrependsOutputIntegrityGuard(t *testing.T) {
 	}
 
 	finalPrompt, _ := buildOpenAIFinalPrompt(messages, tools, "", false)
-	guardIdx := strings.Index(finalPrompt, "Output integrity guard")
+	guardIdx := strings.Index(finalPrompt, "Clean-answer directive")
 	toolIdx := strings.Index(finalPrompt, "TOOL CALL FORMAT")
 	if guardIdx < 0 {
 		t.Fatalf("expected output integrity guard in final prompt, got: %q", finalPrompt)
@@ -179,6 +179,27 @@ func TestBuildOpenAIFinalPromptPrependsOutputIntegrityGuard(t *testing.T) {
 	if guardIdx > toolIdx {
 		t.Fatalf("expected output integrity guard to precede tool instructions, got: %q", finalPrompt)
 	}
+}
+
+func TestBuildOpenAIFinalPromptCanDisableOutputIntegrityGuard(t *testing.T) {
+	messages := []any{
+		map[string]any{"role": "user", "content": "hello"},
+	}
+
+	finalPrompt, _ := BuildOpenAIPromptWithPrepareOptions(messages, nil, "", DefaultToolChoicePolicy(), false, PromptPrepareOptionsFromConfig(outputIntegrityDisabledStore{}))
+	if strings.Contains(finalPrompt, "Clean-answer directive") || strings.Contains(finalPrompt, "Output integrity guard") {
+		t.Fatalf("expected output integrity guard to be disabled, got: %q", finalPrompt)
+	}
+	if !strings.Contains(finalPrompt, "<|User|>hello") {
+		t.Fatalf("expected user content to remain in prompt, got: %q", finalPrompt)
+	}
+}
+
+type outputIntegrityDisabledStore struct{}
+
+func (outputIntegrityDisabledStore) OutputIntegrityGuardEnabled() bool { return false }
+func (outputIntegrityDisabledStore) OutputIntegrityGuardPrompt() string {
+	return ""
 }
 
 func TestBuildOpenAIFinalPromptReadLikeToolIncludesCacheGuard(t *testing.T) {

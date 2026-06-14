@@ -55,6 +55,10 @@
     "enabled": true,
     "prompt": ""
   },
+  "output_integrity_guard": {
+    "enabled": true,
+    "prompt": ""
+  },
   "embeddings": {
     "provider": "deterministic"
   },

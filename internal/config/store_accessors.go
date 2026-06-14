@@ -174,3 +174,18 @@ func (s *Store) ThinkingInjectionPrompt() string {
 	defer s.mu.RUnlock()
 	return strings.TrimSpace(s.cfg.ThinkingInjection.Prompt)
 }
+
+func (s *Store) OutputIntegrityGuardEnabled() bool {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.cfg.OutputIntegrity.Enabled == nil {
+		return true
+	}
+	return *s.cfg.OutputIntegrity.Enabled
+}
+
+func (s *Store) OutputIntegrityGuardPrompt() string {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return strings.TrimSpace(s.cfg.OutputIntegrity.Prompt)
+}

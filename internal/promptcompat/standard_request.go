@@ -1,6 +1,11 @@
 package promptcompat
 
-import "ds2api/internal/config"
+import (
+	"strings"
+
+	"ds2api/internal/config"
+	"ds2api/internal/prompt"
+)
 
 type StandardRequest struct {
 	Surface                 string
@@ -15,6 +20,8 @@ type StandardRequest struct {
 	CurrentToolsFileID      string
 	ToolsRaw                any
 	FinalPrompt             string
+	PromptPrepareOptions    prompt.PrepareOptions
+	PromptPrepareOptionsSet bool
 	ToolNames               []string
 	ToolChoice              ToolChoicePolicy
 	Stream                  bool
@@ -23,6 +30,35 @@ type StandardRequest struct {
 	RefFileIDs              []string
 	RefFileTokens           int
 	PassThrough             map[string]any
+}
+
+type PromptPrepareOptionsReader interface {
+	OutputIntegrityGuardEnabled() bool
+	OutputIntegrityGuardPrompt() string
+}
+
+func PromptPrepareOptionsFromConfig(store any) prompt.PrepareOptions {
+	opts := prompt.DefaultPrepareOptions()
+	reader, ok := store.(PromptPrepareOptionsReader)
+	if !ok || reader == nil {
+		return opts
+	}
+	opts.OutputIntegrityGuardEnabled = reader.OutputIntegrityGuardEnabled()
+	if customPrompt := strings.TrimSpace(reader.OutputIntegrityGuardPrompt()); customPrompt != "" {
+		opts.OutputIntegrityGuardPrompt = customPrompt
+	}
+	return opts
+}
+
+func (r StandardRequest) PrepareOptionsOrDefault() prompt.PrepareOptions {
+	if !r.PromptPrepareOptionsSet {
+		return prompt.DefaultPrepareOptions()
+	}
+	opts := r.PromptPrepareOptions
+	if strings.TrimSpace(opts.OutputIntegrityGuardPrompt) == "" {
+		opts.OutputIntegrityGuardPrompt = prompt.DefaultOutputIntegrityGuardPrompt
+	}
+	return opts
 }
 
 type ToolChoiceMode string

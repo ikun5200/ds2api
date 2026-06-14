@@ -770,6 +770,7 @@ Reads runtime settings and status, including:
 - `auto_delete` (`mode`: `none` / `single` / `all`; legacy `sessions=true` is still treated as `all`)
 - `current_input_file` (`enabled` defaults to `true`, plus `min_chars`)
 - `thinking_injection` (`enabled` defaults to `true`, `prompt`, and `default_prompt`)
+- `output_integrity_guard` (`enabled` defaults to `true`, `prompt`, and `default_prompt`)
 - `model_aliases`
 - `env_backed`, `needs_vercel_sync`
 - `toolcall` policy is fixed to `feature_match + high` and is no longer returned or editable via settings
@@ -785,6 +786,7 @@ Hot-updates runtime settings. Supported fields:
 - `auto_delete.mode`
 - `current_input_file.enabled` / `current_input_file.min_chars`
 - `thinking_injection.enabled` / `thinking_injection.prompt`
+- `output_integrity_guard.enabled` / `output_integrity_guard.prompt`
 - `model_aliases`
 - `toolcall` policy is fixed and is no longer writable through settings
 
@@ -809,7 +811,7 @@ Imports full config with:
 
 The request can send config directly, or wrapped as `{"config": {...}, "mode":"merge"}`.
 Query params `?mode=merge` / `?mode=replace` are also supported.
-`replace` mode replaces the full config shape while preserving Vercel sync metadata. `merge` mode merges `keys`, `api_keys`, `accounts`, and `model_aliases`, and overwrites non-empty fields under `admin`, `runtime`, `responses`, and `embeddings`. Manage `auto_delete` and `current_input_file` via `/admin/settings` or the config file; legacy `compat` and `toolcall` fields are ignored.
+`replace` mode replaces the full config shape while preserving Vercel sync metadata. `merge` mode merges `keys`, `api_keys`, `accounts`, and `model_aliases`, and overwrites non-empty fields under `admin`, `runtime`, `responses`, `embeddings`, and `output_integrity_guard`. Manage `auto_delete` and `current_input_file` via `/admin/settings` or the config file; legacy `compat` and `toolcall` fields are ignored.
 
 > Note: `merge` mode does not update `auto_delete` or `current_input_file`.
 

@@ -74,6 +74,16 @@ func TestGetSettingsIncludesCurrentInputFileDefaults(t *testing.T) {
 	if got, _ := thinkingInjection["default_prompt"].(string); got == "" {
 		t.Fatalf("expected default thinking prompt, body=%v", body)
 	}
+	outputIntegrityGuard, _ := body["output_integrity_guard"].(map[string]any)
+	if got := boolFrom(outputIntegrityGuard["enabled"]); !got {
+		t.Fatalf("expected output_integrity_guard.enabled=true, body=%v", body)
+	}
+	if got, _ := outputIntegrityGuard["prompt"].(string); got != "" {
+		t.Fatalf("expected empty custom output integrity prompt, got %q body=%v", got, body)
+	}
+	if got, _ := outputIntegrityGuard["default_prompt"].(string); got == "" {
+		t.Fatalf("expected default output integrity prompt, body=%v", body)
+	}
 }
 
 func TestUpdateSettingsValidation(t *testing.T) {
@@ -351,6 +361,79 @@ func TestUpdateSettingsThinkingInjectionPartialEnabledPreservesPrompt(t *testing
 	}
 	if got := h.Store.ThinkingInjectionPrompt(); got != "original prompt" {
 		t.Fatalf("expected original prompt to be preserved, got %q", got)
+	}
+}
+
+func TestUpdateSettingsOutputIntegrityGuard(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"]}`)
+	payload := map[string]any{
+		"output_integrity_guard": map[string]any{
+			"enabled": false,
+			"prompt":  " custom clean output prompt ",
+		},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings", bytes.NewReader(b))
+	rec := httptest.NewRecorder()
+	h.updateSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	snap := h.Store.Snapshot()
+	if snap.OutputIntegrity.Enabled == nil || *snap.OutputIntegrity.Enabled {
+		t.Fatalf("expected output_integrity_guard.enabled=false, got %#v", snap.OutputIntegrity.Enabled)
+	}
+	if h.Store.OutputIntegrityGuardEnabled() {
+		t.Fatal("expected output integrity guard accessor to reflect disabled config")
+	}
+	if got := h.Store.OutputIntegrityGuardPrompt(); got != "custom clean output prompt" {
+		t.Fatalf("expected custom output integrity prompt, got %q", got)
+	}
+}
+
+func TestUpdateSettingsOutputIntegrityGuardPartialPromptPreservesEnabled(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"],"output_integrity_guard":{"enabled":false,"prompt":"original prompt"}}`)
+	payload := map[string]any{
+		"output_integrity_guard": map[string]any{
+			"prompt": " updated prompt ",
+		},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings", bytes.NewReader(b))
+	rec := httptest.NewRecorder()
+	h.updateSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	snap := h.Store.Snapshot()
+	if snap.OutputIntegrity.Enabled == nil || *snap.OutputIntegrity.Enabled {
+		t.Fatalf("expected output_integrity_guard.enabled to remain false, got %#v", snap.OutputIntegrity.Enabled)
+	}
+	if got := h.Store.OutputIntegrityGuardPrompt(); got != "updated prompt" {
+		t.Fatalf("expected updated output integrity prompt, got %q", got)
+	}
+}
+
+func TestUpdateSettingsOutputIntegrityGuardPartialEnabledPreservesPrompt(t *testing.T) {
+	h := newAdminTestHandler(t, `{"keys":["k1"],"output_integrity_guard":{"enabled":false,"prompt":"original prompt"}}`)
+	payload := map[string]any{
+		"output_integrity_guard": map[string]any{
+			"enabled": true,
+		},
+	}
+	b, _ := json.Marshal(payload)
+	req := httptest.NewRequest(http.MethodPut, "/admin/settings", bytes.NewReader(b))
+	rec := httptest.NewRecorder()
+	h.updateSettings(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
+	}
+	snap := h.Store.Snapshot()
+	if snap.OutputIntegrity.Enabled == nil || !*snap.OutputIntegrity.Enabled {
+		t.Fatalf("expected output_integrity_guard.enabled=true, got %#v", snap.OutputIntegrity.Enabled)
+	}
+	if got := h.Store.OutputIntegrityGuardPrompt(); got != "original prompt" {
+		t.Fatalf("expected original output integrity prompt to be preserved, got %q", got)
 	}
 }
 
