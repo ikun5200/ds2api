@@ -305,7 +305,16 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # 个人账号可留空
 | `VERCEL_PROJECT_ID` | Vercel 项目 ID | — |
 | `VERCEL_TEAM_ID` | Vercel 团队 ID | — |
 | `DS2API_CHAT_HISTORY_PATH` | Chat history 存储路径（Vercel 上必须设为 `/tmp/chat_history.json`，否则因文件系统只读而不可用） | `data/chat_history.json` |
+| `DS2API_DATABASE_MODE` | Chat history 存储后端：`builtin` 使用原 JSON 文件；`external` 使用外部 SQL 数据库 | `builtin` |
+| `DS2API_DATABASE_TYPE` | 外部数据库类型，支持 `postgres` / `mysql`（`mariadb` 作为 `mysql` 处理） | — |
+| `DS2API_DATABASE_DSN` | 外部数据库连接串；也可用 `DS2API_DATABASE_URL`；显式外部模式下还可回退使用 `DATABASE_URL` | — |
+| `DS2API_DATABASE_TABLE_PREFIX` | 外部数据库表名前缀，仅允许小写字母、数字和下划线 | `ds2api_` |
+| `DS2API_DATABASE_MAX_OPEN_CONNS` | 外部数据库最大打开连接数，`0` 表示使用 Go 默认值 | `0` |
+| `DS2API_DATABASE_MAX_IDLE_CONNS` | 外部数据库最大空闲连接数，`0` 表示使用 Go 默认值 | `0` |
+| `DS2API_DATABASE_CONN_MAX_LIFETIME_SECONDS` | 外部数据库连接最大生命周期秒数，`0` 表示不主动限制 | `0` |
 | `DS2API_VERCEL_PROTECTION_BYPASS` | 部署保护绕过密钥（内部 Node→Go 调用） | — |
+
+外部数据库当前用于 Chat history 持久化；账号、API Key、运行时设置仍沿用现有 `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` 配置链路。PostgreSQL 示例：`DS2API_DATABASE_TYPE=postgres`、`DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable`。MySQL/MariaDB 示例：`DS2API_DATABASE_TYPE=mysql`、`DS2API_DATABASE_DSN=user:pass@tcp(host:3306)/ds2api?parseTime=true`。
 
 ### 3.3 运行时行为配置（通过 Admin API 设置）
 
@@ -419,6 +428,8 @@ DS2API_CHAT_HISTORY_PATH=/tmp/chat_history.json
 ```
 
 `/tmp` 是 Vercel Serverless 环境中唯一可写的目录。数据在函数冷启动之间不会持久化（ephemeral），但在单个实例生命周期内功能正常。
+
+如果需要跨冷启动持久化 Chat history，也可以设置 `DS2API_DATABASE_MODE=external` 并配置 PostgreSQL 或 MySQL/MariaDB 外部数据库。
 
 ### 3.6 仓库不提交构建产物
 

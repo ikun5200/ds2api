@@ -305,7 +305,16 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `VERCEL_PROJECT_ID` | Vercel project ID | — |
 | `VERCEL_TEAM_ID` | Vercel team ID | — |
 | `DS2API_CHAT_HISTORY_PATH` | Chat history storage path (must be set to `/tmp/chat_history.json` on Vercel, otherwise unavailable due to read-only filesystem) | `data/chat_history.json` |
+| `DS2API_DATABASE_MODE` | Chat history storage backend: `builtin` keeps the existing JSON files; `external` uses an external SQL database | `builtin` |
+| `DS2API_DATABASE_TYPE` | External database type: `postgres` / `mysql` (`mariadb` is treated as `mysql`) | — |
+| `DS2API_DATABASE_DSN` | External database connection string; `DS2API_DATABASE_URL` is also accepted; explicit external mode may also fall back to `DATABASE_URL` | — |
+| `DS2API_DATABASE_TABLE_PREFIX` | External database table prefix; lowercase letters, numbers, and underscores only | `ds2api_` |
+| `DS2API_DATABASE_MAX_OPEN_CONNS` | External database max open connections; `0` keeps the Go default | `0` |
+| `DS2API_DATABASE_MAX_IDLE_CONNS` | External database max idle connections; `0` keeps the Go default | `0` |
+| `DS2API_DATABASE_CONN_MAX_LIFETIME_SECONDS` | External database connection max lifetime in seconds; `0` means unlimited | `0` |
 | `DS2API_VERCEL_PROTECTION_BYPASS` | Deployment protection bypass for internal Node→Go calls | — |
+
+External database mode currently persists Chat history. Accounts, API keys, and runtime settings continue to use the existing `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` configuration flow. PostgreSQL example: `DS2API_DATABASE_TYPE=postgres`, `DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable`. MySQL/MariaDB example: `DS2API_DATABASE_TYPE=mysql`, `DS2API_DATABASE_DSN=user:pass@tcp(host:3306)/ds2api?parseTime=true`.
 
 ### 3.4 Vercel Architecture
 
@@ -409,6 +418,8 @@ DS2API_CHAT_HISTORY_PATH=/tmp/chat_history.json
 ```
 
 `/tmp` is the only writable directory in Vercel Serverless. Data is ephemeral (not persisted across cold starts), but the feature works within a single instance lifetime.
+
+For Chat history persistence across cold starts, you can instead set `DS2API_DATABASE_MODE=external` and configure a PostgreSQL or MySQL/MariaDB database.
 
 ### 3.6 Build Artifacts Not Committed
 

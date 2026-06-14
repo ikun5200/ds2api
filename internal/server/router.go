@@ -57,7 +57,7 @@ func NewApp() (*App, error) {
 	} else {
 		config.Logger.Info("[PoW] pure Go solver ready")
 	}
-	chatHistoryStore := chathistory.New(config.ChatHistoryPath())
+	chatHistoryStore := newChatHistoryStore()
 	if err := chatHistoryStore.Err(); err != nil {
 		config.Logger.Warn("[chat_history] unavailable", "path", chatHistoryStore.Path(), "error", err)
 	}
@@ -128,6 +128,21 @@ func NewApp() (*App, error) {
 	})
 
 	return &App{Store: store, Pool: pool, Resolver: resolver, DS: dsClient, Router: r}, nil
+}
+
+func newChatHistoryStore() *chathistory.Store {
+	dbCfg := config.DatabaseFromEnv()
+	if dbCfg.ExternalEnabled() {
+		return chathistory.NewSQL(chathistory.SQLConfig{
+			Type:            dbCfg.Type,
+			DSN:             dbCfg.DSN,
+			TablePrefix:     dbCfg.TablePrefix,
+			MaxOpenConns:    dbCfg.MaxOpenConns,
+			MaxIdleConns:    dbCfg.MaxIdleConns,
+			ConnMaxLifetime: time.Duration(dbCfg.ConnMaxLifetimeSeconds) * time.Second,
+		})
+	}
+	return chathistory.New(config.ChatHistoryPath())
 }
 
 func timeout(d time.Duration) func(http.Handler) http.Handler {

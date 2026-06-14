@@ -131,6 +131,7 @@ type legacyProbe struct {
 }
 
 type Store struct {
+	sql       *sqlStore
 	mu        sync.Mutex
 	path      string
 	detailDir string
@@ -165,11 +166,17 @@ func (s *Store) Path() string {
 	if s == nil {
 		return ""
 	}
+	if s.sql != nil {
+		return s.sql.Path()
+	}
 	return s.path
 }
 
 func (s *Store) DetailDir() string {
 	if s == nil {
+		return ""
+	}
+	if s.sql != nil {
 		return ""
 	}
 	return s.detailDir
@@ -179,6 +186,9 @@ func (s *Store) Err() error {
 	if s == nil {
 		return errors.New("chat history store is nil")
 	}
+	if s.sql != nil {
+		return s.sql.Err()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.err
@@ -187,6 +197,9 @@ func (s *Store) Err() error {
 func (s *Store) Snapshot() (File, error) {
 	if s == nil {
 		return File{}, errors.New("chat history store is nil")
+	}
+	if s.sql != nil {
+		return s.sql.Snapshot()
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -200,6 +213,9 @@ func (s *Store) Revision() (int64, error) {
 	if s == nil {
 		return 0, errors.New("chat history store is nil")
 	}
+	if s.sql != nil {
+		return s.sql.Revision()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.err != nil {
@@ -212,6 +228,9 @@ func (s *Store) Enabled() bool {
 	if s == nil {
 		return false
 	}
+	if s.sql != nil {
+		return s.sql.Enabled()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.err != nil {
@@ -223,6 +242,9 @@ func (s *Store) Enabled() bool {
 func (s *Store) Get(id string) (Entry, error) {
 	if s == nil {
 		return Entry{}, errors.New("chat history store is nil")
+	}
+	if s.sql != nil {
+		return s.sql.Get(id)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -240,6 +262,9 @@ func (s *Store) DetailRevision(id string) (int64, error) {
 	if s == nil {
 		return 0, errors.New("chat history store is nil")
 	}
+	if s.sql != nil {
+		return s.sql.DetailRevision(id)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.err != nil {
@@ -255,6 +280,9 @@ func (s *Store) DetailRevision(id string) (int64, error) {
 func (s *Store) Start(params StartParams) (Entry, error) {
 	if s == nil {
 		return Entry{}, errors.New("chat history store is nil")
+	}
+	if s.sql != nil {
+		return s.sql.Start(params)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -294,6 +322,9 @@ func (s *Store) Start(params StartParams) (Entry, error) {
 func (s *Store) Update(id string, params UpdateParams) (Entry, error) {
 	if s == nil {
 		return Entry{}, errors.New("chat history store is nil")
+	}
+	if s.sql != nil {
+		return s.sql.Update(id, params)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -343,6 +374,9 @@ func (s *Store) Delete(id string) error {
 	if s == nil {
 		return errors.New("chat history store is nil")
 	}
+	if s.sql != nil {
+		return s.sql.Delete(id)
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.err != nil {
@@ -369,6 +403,9 @@ func (s *Store) Clear() error {
 	if s == nil {
 		return errors.New("chat history store is nil")
 	}
+	if s.sql != nil {
+		return s.sql.Clear()
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.err != nil {
@@ -389,6 +426,9 @@ func (s *Store) Clear() error {
 func (s *Store) SetLimit(limit int) (File, error) {
 	if s == nil {
 		return File{}, errors.New("chat history store is nil")
+	}
+	if s.sql != nil {
+		return s.sql.SetLimit(limit)
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()

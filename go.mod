@@ -4,9 +4,11 @@ go 1.26.0
 
 require (
 	github.com/andybalholm/brotli v1.2.1
+	github.com/go-sql-driver/mysql v1.8.1
 	github.com/go-chi/chi/v5 v5.2.5
 	github.com/google/uuid v1.6.0
 	github.com/hupe1980/go-tiktoken v0.0.10
+	github.com/jackc/pgx/v5 v5.5.5
 	github.com/refraction-networking/utls v1.8.2
 	github.com/router-for-me/CLIProxyAPI/v6 v6.9.14
 )
