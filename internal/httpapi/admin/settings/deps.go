@@ -23,6 +23,9 @@ func fieldString(m map[string]any, key string) string {
 func validateRuntimeSettings(runtime config.RuntimeConfig) error {
 	return adminshared.ValidateRuntimeSettings(runtime)
 }
+func configMutationResponse(store adminshared.ConfigStore, payload map[string]any) map[string]any {
+	return adminshared.WithConfigMutationStatus(store, payload)
+}
 
 func (h *Handler) computeSyncHash() string {
 	return adminshared.ComputeSyncHash(h.Store)

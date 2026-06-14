@@ -17,6 +17,25 @@ var intFrom = util.IntFrom
 var WriteJSON = util.WriteJSON
 var IntFrom = util.IntFrom
 
+const manualVercelSyncMessage = "配置已保存。Vercel 部署请在 Vercel Sync 页面手动同步并重新部署。"
+
+func WithConfigMutationStatus(store ConfigStore, payload map[string]any) map[string]any {
+	if payload == nil {
+		payload = map[string]any{}
+	}
+	envBacked := false
+	if store != nil {
+		envBacked = store.IsEnvBacked()
+	}
+	needsSync := config.IsVercel() || envBacked
+	payload["env_backed"] = envBacked
+	payload["needs_vercel_sync"] = needsSync
+	if needsSync {
+		payload["manual_sync_message"] = manualVercelSyncMessage
+	}
+	return payload
+}
+
 func ReverseAccounts(a []config.Account) { reverseAccounts(a) }
 func IntFromQuery(r *http.Request, key string, d int) int {
 	return intFromQuery(r, key, d)

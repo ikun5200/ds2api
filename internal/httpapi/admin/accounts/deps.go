@@ -43,6 +43,9 @@ func findProxyByID(c config.Config, proxyID string) (config.Proxy, bool) {
 func findAccountByIdentifier(store adminshared.ConfigStore, identifier string) (config.Account, bool) {
 	return adminshared.FindAccountByIdentifier(store, identifier)
 }
+func configMutationResponse(store adminshared.ConfigStore, payload map[string]any) map[string]any {
+	return adminshared.WithConfigMutationStatus(store, payload)
+}
 func newRequestError(detail string) error { return adminshared.NewRequestError(detail) }
 func requestErrorDetail(err error) (string, bool) {
 	return adminshared.RequestErrorDetail(err)

@@ -15,6 +15,7 @@ func (h *Handler) getConfig(w http.ResponseWriter, _ *http.Request) {
 		"accounts":              []map[string]any{},
 		"proxies":               []map[string]any{},
 		"env_backed":            h.Store.IsEnvBacked(),
+		"needs_vercel_sync":     config.IsVercel() || h.Store.IsEnvBacked(),
 		"env_source_present":    h.Store.HasEnvConfigSource(),
 		"env_writeback_enabled": h.Store.IsEnvWritebackEnabled(),
 		"config_path":           h.Store.ConfigPath(),

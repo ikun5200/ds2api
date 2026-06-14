@@ -715,6 +715,7 @@ data: {"type":"message_stop"}
     {"key": "k2", "name": "备用 Key", "remark": "压测"}
   ],
   "env_backed": false,
+  "needs_vercel_sync": false,
   "env_source_present": true,
   "env_writeback_enabled": true,
   "config_path": "/data/config.json",
@@ -740,6 +741,14 @@ data: {"type":"message_stop"}
   }
 }
 ```
+
+会修改配置的管理接口（例如 `/admin/config`、`/admin/config/import`、`/admin/import`、`/admin/keys`、`/admin/accounts`、`/admin/proxies`、`/admin/settings`）会返回：
+
+- `env_backed`：当前运行配置是否来自环境变量/不可直接落盘来源。
+- `needs_vercel_sync`：本次保存后是否需要到 Vercel 同步并重新部署，才能让刷新、冷启动或其它实例稳定读取新配置。
+- `manual_sync_message`：当 `needs_vercel_sync=true` 时返回给管理台展示的提示文案。
+
+在 Vercel 上，管理台保存会先热更新当前函数实例；若未执行 Vercel Sync 并重部署，不同请求可能命中不同实例或重新从旧 `DS2API_CONFIG_JSON` 启动，看起来就会出现禁用/保存状态刷新后反复变化。
 
 ### `POST /admin/config`
 

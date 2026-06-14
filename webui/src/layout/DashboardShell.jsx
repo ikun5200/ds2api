@@ -12,7 +12,8 @@ import {
     Users,
     Globe,
     History,
-    Loader2
+    Loader2,
+    AlertTriangle
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -257,9 +258,12 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
                             <div className={clsx(
                                 "p-4 rounded-lg border flex items-center gap-3 animate-in fade-in slide-in-from-top-2",
                                 message.type === 'error' ? "bg-destructive/10 border-destructive/20 text-destructive" :
+                                    message.type === 'warning' ? "bg-amber-500/10 border-amber-500/20 text-amber-700" :
                                     "bg-emerald-500/10 border-emerald-500/20 text-emerald-500"
                             )}>
-                                {message.type === 'error' ? <X className="w-5 h-5" /> : <div className="w-5 h-5 rounded-full border-2 border-emerald-500 flex items-center justify-center text-[10px]">✓</div>}
+                                {message.type === 'error' ? <X className="w-5 h-5" /> :
+                                    message.type === 'warning' ? <AlertTriangle className="w-5 h-5" /> :
+                                        <div className="w-5 h-5 rounded-full border-2 border-emerald-500 flex items-center justify-center text-[10px]">✓</div>}
                                 {message.text}
                             </div>
                         )}

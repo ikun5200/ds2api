@@ -709,6 +709,7 @@ Returns sanitized config, including both `keys` and `api_keys`.
     {"key": "k2", "name": "Backup", "remark": "Load test"}
   ],
   "env_backed": false,
+  "needs_vercel_sync": false,
   "env_source_present": true,
   "env_writeback_enabled": true,
   "config_path": "/data/config.json",
@@ -734,6 +735,14 @@ Returns sanitized config, including both `keys` and `api_keys`.
   }
 }
 ```
+
+Config-mutating admin APIs (for example `/admin/config`, `/admin/config/import`, `/admin/import`, `/admin/keys`, `/admin/accounts`, `/admin/proxies`, and `/admin/settings`) return:
+
+- `env_backed`: whether the active config came from an environment-variable or otherwise non-file-backed source.
+- `needs_vercel_sync`: whether this save needs a Vercel Sync plus redeploy before refreshes, cold starts, or other instances reliably see the new config.
+- `manual_sync_message`: the Admin UI hint shown when `needs_vercel_sync=true`.
+
+On Vercel, Admin UI saves hot-reload only the current function instance first. Until Vercel Sync updates `DS2API_CONFIG_JSON` and redeploys, another request may hit a different instance or cold-start from the old config, which can make disabled/saved state appear to flip after refresh.
 
 ### `POST /admin/config`
 

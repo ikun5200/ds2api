@@ -7,6 +7,7 @@ import {
     postPassword,
     putSettings,
 } from './settingsApi'
+import { mutationMessage, mutationMessageType } from '../../utils/adminMutation'
 
 const MAX_AUTO_FETCH_FAILURES = 3
 
@@ -209,7 +210,7 @@ export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogo
                 onMessage('error', data.detail || t('settings.saveFailed'))
                 return
             }
-            onMessage('success', t('settings.saveSuccess'))
+            onMessage(mutationMessageType(data), mutationMessage(data, t('settings.saveSuccess'), t('settings.vercelSyncHint')))
             if (typeof onRefresh === 'function') {
                 onRefresh()
             }
@@ -235,7 +236,7 @@ export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogo
                 onMessage('error', data.detail || t('settings.passwordUpdateFailed'))
                 return
             }
-            onMessage('success', t('settings.passwordUpdated'))
+            onMessage(mutationMessageType(data), mutationMessage(data, t('settings.passwordUpdated'), t('settings.vercelSyncHint')))
             setNewPassword('')
             if (typeof onForceLogout === 'function') {
                 onForceLogout()
@@ -325,7 +326,7 @@ export function useSettingsForm({ apiFetch, t, onMessage, onRefresh, onForceLogo
                 onMessage('error', data.detail || t('settings.importFailed'))
                 return
             }
-            onMessage('success', t('settings.importSuccess', { mode: importMode }))
+            onMessage(mutationMessageType(data), mutationMessage(data, t('settings.importSuccess', { mode: importMode }), t('settings.vercelSyncHint')))
             if (typeof onRefresh === 'function') {
                 onRefresh()
             }

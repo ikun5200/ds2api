@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { FileCode, Download, Upload, Copy, Check, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 import { useI18n } from '../i18n'
+import { mutationMessage, mutationMessageType } from '../utils/adminMutation'
 import { getBatchImportTemplates } from '../utils/batchImportTemplates'
 
 export default function BatchImport({ onRefresh, onMessage, authFetch }) {
@@ -39,7 +40,8 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
             const data = await res.json()
             if (res.ok) {
                 setResult(data)
-                onMessage('success', t('batchImport.importSuccess', { keys: data.imported_keys, accounts: data.imported_accounts }))
+                const successMessage = t('batchImport.importSuccess', { keys: data.imported_keys, accounts: data.imported_accounts })
+                onMessage(mutationMessageType(data), mutationMessage(data, successMessage, t('settings.vercelSyncHint')))
                 onRefresh()
             } else {
                 onMessage('error', data.detail || t('messages.importFailed'))

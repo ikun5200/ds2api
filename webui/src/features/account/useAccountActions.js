@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { mutationMessage, mutationMessageType, readMutationResponse } from '../../utils/adminMutation'
 
 export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, fetchAccounts, resolveAccountIdentifier }) {
     const [showAddKey, setShowAddKey] = useState(false)
@@ -17,6 +18,10 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const [sessionCounts, setSessionCounts] = useState({})
     const [deletingSessions, setDeletingSessions] = useState({})
     const [updatingProxy, setUpdatingProxy] = useState({})
+
+    const notifyMutationSuccess = (data, fallback) => {
+        onMessage(mutationMessageType(data), mutationMessage(data, fallback, t('settings.vercelSyncHint')))
+    }
 
     const openAddKey = () => {
         setEditingKey(null)
@@ -100,12 +105,13 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload),
             })
+            const data = await readMutationResponse(res)
             if (res.ok) {
-                onMessage('success', isEditing ? t('accountManager.updateKeySuccess') : t('accountManager.addKeySuccess'))
+                const successMessage = isEditing ? t('accountManager.updateKeySuccess') : t('accountManager.addKeySuccess')
+                notifyMutationSuccess(data, successMessage)
                 closeKeyModal()
                 onRefresh()
             } else {
-                const data = await res.json()
                 onMessage('error', data.detail || (isEditing ? t('messages.requestFailed') : t('messages.failedToAdd')))
             }
         } catch (e) {
@@ -119,11 +125,12 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         if (!confirm(t('accountManager.deleteKeyConfirm'))) return
         try {
             const res = await apiFetch(`/admin/keys/${encodeURIComponent(key)}`, { method: 'DELETE' })
+            const data = await readMutationResponse(res)
             if (res.ok) {
-                onMessage('success', t('messages.deleted'))
+                notifyMutationSuccess(data, t('messages.deleted'))
                 onRefresh()
             } else {
-                onMessage('error', t('messages.deleteFailed'))
+                onMessage('error', data.detail || t('messages.deleteFailed'))
             }
         } catch (e) {
             onMessage('error', t('messages.networkError'))
@@ -142,13 +149,13 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(newAccount),
             })
+            const data = await readMutationResponse(res)
             if (res.ok) {
-                onMessage('success', t('accountManager.addAccountSuccess'))
+                notifyMutationSuccess(data, t('accountManager.addAccountSuccess'))
                 closeAddAccount()
                 fetchAccounts(1)
                 onRefresh()
             } else {
-                const data = await res.json()
                 onMessage('error', data.detail || t('messages.failedToAdd'))
             }
         } catch (e) {
@@ -171,13 +178,13 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(editAccount),
             })
+            const data = await readMutationResponse(res)
             if (res.ok) {
-                onMessage('success', t('accountManager.updateAccountSuccess'))
+                notifyMutationSuccess(data, t('accountManager.updateAccountSuccess'))
                 closeEditAccount()
                 fetchAccounts()
                 onRefresh()
             } else {
-                const data = await res.json()
                 onMessage('error', data.detail || t('messages.requestFailed'))
             }
         } catch (e) {
@@ -200,12 +207,13 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ disabled: nextDisabled }),
             })
+            const data = await readMutationResponse(res)
             if (res.ok) {
-                onMessage('success', nextDisabled ? t('accountManager.disableAccountSuccess') : t('accountManager.enableAccountSuccess'))
+                const successMessage = nextDisabled ? t('accountManager.disableAccountSuccess') : t('accountManager.enableAccountSuccess')
+                notifyMutationSuccess(data, successMessage)
                 fetchAccounts()
                 onRefresh()
             } else {
-                const data = await res.json()
                 onMessage('error', data.detail || t('messages.requestFailed'))
             }
         } catch (_e) {
@@ -222,12 +230,13 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         if (!confirm(t('accountManager.deleteAccountConfirm'))) return
         try {
             const res = await apiFetch(`/admin/accounts/${encodeURIComponent(identifier)}`, { method: 'DELETE' })
+            const data = await readMutationResponse(res)
             if (res.ok) {
-                onMessage('success', t('messages.deleted'))
+                notifyMutationSuccess(data, t('messages.deleted'))
                 fetchAccounts()
                 onRefresh()
             } else {
-                onMessage('error', t('messages.deleteFailed'))
+                onMessage('error', data.detail || t('messages.deleteFailed'))
             }
         } catch (e) {
             onMessage('error', t('messages.networkError'))
@@ -360,12 +369,12 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ proxy_id: proxyID || '' }),
             })
-            const data = await res.json()
+            const data = await readMutationResponse(res)
             if (!res.ok) {
                 onMessage('error', data.detail || t('messages.requestFailed'))
                 return
             }
-            onMessage('success', t('accountManager.proxyUpdateSuccess'))
+            notifyMutationSuccess(data, t('accountManager.proxyUpdateSuccess'))
             fetchAccounts()
             onRefresh()
         } catch (_err) {

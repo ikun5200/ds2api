@@ -123,6 +123,37 @@ func TestUpdateAccountDisabledState(t *testing.T) {
 	}
 }
 
+func TestUpdateAccountDisabledResponseMarksEnvBackedMutation(t *testing.T) {
+	h := newAdminTestHandler(t, `{
+		"accounts":[{"email":"u@example.com","password":"secret"}]
+	}`)
+
+	r := chi.NewRouter()
+	r.Put("/admin/accounts/{identifier}", h.updateAccount)
+
+	req := httptest.NewRequest(http.MethodPut, "/admin/accounts/u@example.com", strings.NewReader(`{"disabled":true}`))
+	rec := httptest.NewRecorder()
+	r.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("unexpected status: %d body=%s", rec.Code, rec.Body.String())
+	}
+
+	var payload map[string]any
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode response failed: %v", err)
+	}
+	if envBacked, _ := payload["env_backed"].(bool); !envBacked {
+		t.Fatalf("expected env_backed=true, got %#v", payload)
+	}
+	if needsSync, _ := payload["needs_vercel_sync"].(bool); !needsSync {
+		t.Fatalf("expected needs_vercel_sync=true, got %#v", payload)
+	}
+	if msg, _ := payload["manual_sync_message"].(string); msg == "" {
+		t.Fatalf("expected manual_sync_message, got %#v", payload)
+	}
+}
+
 func TestListAccountsMasksTokenPreview(t *testing.T) {
 	h := newAdminTestHandler(t, `{
 		"accounts":[{"email":"u@example.com","password":"pwd"}]

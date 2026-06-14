@@ -284,6 +284,8 @@ Recommended: convert `config.json` to Base64 locally, then paste into `DS2API_CO
 base64 < config.json | tr -d '\n'
 ```
 
+> **Vercel config saves**: Vercel function instances are stateless. Disabling accounts or changing keys, proxies, and settings in the Admin UI first hot-reloads only the current instance. To make the new config stable across refreshes, cold starts, and other instances, use **Vercel Sync** in the Admin UI to update `DS2API_CONFIG_JSON` and redeploy. Otherwise saved state can appear to flip after refresh.
+
 > **Streaming note**: OpenAI Chat streaming on Vercel is routed to `api/chat-stream.js` (Node Runtime), but `vercel.json` rewrites only the canonical `/v1/chat/completions` path to Node; the root shortcut `/chat/completions` stays on the Go main path. Auth, account selection, and session/PoW preparation are still handled by the Go internal prepare endpoint; streaming output (including `tools`) is assembled on Node with Go-aligned anti-leak handling. Use `/v1/chat/completions` on Vercel when real-time streaming is required.
 
 For detailed deployment instructions, see the [Deployment Guide](docs/DEPLOY.en.md).

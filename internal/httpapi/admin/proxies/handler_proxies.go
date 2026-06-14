@@ -70,7 +70,7 @@ func (h *Handler) addProxy(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "proxy": proxyResponse(proxy)})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "proxy": proxyResponse(proxy)}))
 }
 
 func (h *Handler) updateProxy(w http.ResponseWriter, r *http.Request) {
@@ -105,7 +105,7 @@ func (h *Handler) updateProxy(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "proxy": proxyResponse(proxy)})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "proxy": proxyResponse(proxy)}))
 }
 
 func (h *Handler) deleteProxy(w http.ResponseWriter, r *http.Request) {
@@ -141,7 +141,7 @@ func (h *Handler) deleteProxy(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true}))
 }
 
 func (h *Handler) testProxy(w http.ResponseWriter, r *http.Request) {
@@ -198,5 +198,5 @@ func (h *Handler) updateAccountProxy(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Pool.Reset()
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "proxy_id": proxyID})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "proxy_id": proxyID}))
 }

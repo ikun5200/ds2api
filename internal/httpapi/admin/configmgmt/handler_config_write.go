@@ -72,7 +72,7 @@ func (h *Handler) updateConfig(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Pool.Reset()
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "message": "配置已更新"})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "message": "配置已更新"}))
 }
 
 func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +99,7 @@ func (h *Handler) addKey(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": len(h.Store.Snapshot().Keys)})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "total_keys": len(h.Store.Snapshot().Keys)}))
 }
 
 func (h *Handler) updateKey(w http.ResponseWriter, r *http.Request) {
@@ -140,7 +140,7 @@ func (h *Handler) updateKey(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"detail": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": len(h.Store.Snapshot().Keys)})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "total_keys": len(h.Store.Snapshot().Keys)}))
 }
 
 func (h *Handler) deleteKey(w http.ResponseWriter, r *http.Request) {
@@ -163,7 +163,7 @@ func (h *Handler) deleteKey(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusNotFound, map[string]any{"detail": err.Error()})
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_keys": len(h.Store.Snapshot().Keys)})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "total_keys": len(h.Store.Snapshot().Keys)}))
 }
 
 func (h *Handler) batchImport(w http.ResponseWriter, r *http.Request) {
@@ -223,5 +223,5 @@ func (h *Handler) batchImport(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Pool.Reset()
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "imported_keys": importedKeys, "imported_accounts": importedAccounts})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "imported_keys": importedKeys, "imported_accounts": importedAccounts}))
 }

@@ -146,11 +146,11 @@ func (h *Handler) configImport(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.Pool.Reset()
-	writeJSON(w, http.StatusOK, map[string]any{
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{
 		"success":           true,
 		"mode":              mode,
 		"imported_keys":     importedKeys,
 		"imported_accounts": importedAccounts,
 		"message":           "config imported",
-	})
+	}))
 }

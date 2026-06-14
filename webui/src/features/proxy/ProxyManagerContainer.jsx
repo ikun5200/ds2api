@@ -3,6 +3,7 @@ import { Pencil, Play, Plus, Shield, Trash2, X } from 'lucide-react'
 import clsx from 'clsx'
 
 import { useI18n } from '../../i18n'
+import { mutationMessage, mutationMessageType } from '../../utils/adminMutation'
 
 async function readApiResponse(res, nonJsonMessage) {
     const contentType = String(res.headers.get('content-type') || '').toLowerCase()
@@ -317,6 +318,10 @@ export default function ProxyManagerContainer({ config, onRefresh, onMessage, au
     const [testing, setTesting] = useState({})
     const [testResults, setTestResults] = useState({})
 
+    const notifyMutationSuccess = (data, fallback) => {
+        onMessage(mutationMessageType(data), mutationMessage(data, fallback, t('settings.vercelSyncHint')))
+    }
+
     const proxies = config?.proxies || []
 
     const openCreate = () => {
@@ -373,7 +378,8 @@ export default function ProxyManagerContainer({ config, onRefresh, onMessage, au
                 return
             }
             await onRefresh?.()
-            onMessage('success', editingProxy?.id ? t('proxyManager.updateSuccess') : t('proxyManager.addSuccess'))
+            const successMessage = editingProxy?.id ? t('proxyManager.updateSuccess') : t('proxyManager.addSuccess')
+            notifyMutationSuccess(data, successMessage)
             closeModal()
         } catch (err) {
             onMessage('error', err?.message || t('messages.networkError'))
@@ -392,7 +398,7 @@ export default function ProxyManagerContainer({ config, onRefresh, onMessage, au
                 return
             }
             await onRefresh?.()
-            onMessage('success', t('messages.deleted'))
+            notifyMutationSuccess(data, t('messages.deleted'))
             setTestResults(prev => {
                 const next = { ...prev }
                 delete next[proxy.id]

@@ -26,6 +26,9 @@ func toProxy(m map[string]any) config.Proxy { return adminshared.ToProxy(m) }
 func findProxyByID(c config.Config, proxyID string) (config.Proxy, bool) {
 	return adminshared.FindProxyByID(c, proxyID)
 }
+func configMutationResponse(store adminshared.ConfigStore, payload map[string]any) map[string]any {
+	return adminshared.WithConfigMutationStatus(store, payload)
+}
 func newRequestError(detail string) error { return adminshared.NewRequestError(detail) }
 func requestErrorDetail(err error) (string, bool) {
 	return adminshared.RequestErrorDetail(err)

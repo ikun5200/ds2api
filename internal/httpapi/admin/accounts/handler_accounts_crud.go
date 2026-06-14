@@ -106,7 +106,7 @@ func (h *Handler) addAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Pool.Reset()
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_accounts": len(h.Store.Snapshot().Accounts)})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "total_accounts": len(h.Store.Snapshot().Accounts)}))
 }
 
 func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
@@ -153,7 +153,7 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 	if disabledOK {
 		h.Pool.Reset()
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_accounts": len(h.Store.Snapshot().Accounts)})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "total_accounts": len(h.Store.Snapshot().Accounts)}))
 }
 
 func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
@@ -180,5 +180,5 @@ func (h *Handler) deleteAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	h.Pool.Reset()
-	writeJSON(w, http.StatusOK, map[string]any{"success": true, "total_accounts": len(h.Store.Snapshot().Accounts)})
+	writeJSON(w, http.StatusOK, configMutationResponse(h.Store, map[string]any{"success": true, "total_accounts": len(h.Store.Snapshot().Accounts)}))
 }

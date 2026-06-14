@@ -296,6 +296,8 @@ cp config.example.json config.json
 base64 < config.json | tr -d '\n'
 ```
 
+> **Vercel 配置保存说明**：Vercel 函数实例是无状态的。管理台里禁用账号、修改 Key/代理/设置等操作会先热更新当前实例；要让刷新、冷启动和其它实例都稳定读取新配置，需要到管理台的 **Vercel 同步** 页面同步 `DS2API_CONFIG_JSON` 并重新部署。否则可能看到保存状态在刷新后反复变化。
+
 > **流式说明**：OpenAI Chat 流式在 Vercel 上会由 `api/chat-stream.js`（Node Runtime）承接，但 `vercel.json` 只把规范路径 `/v1/chat/completions` 重写到 Node；根路径快捷别名 `/chat/completions` 仍走 Go 主链路。鉴权、账号选择、会话/PoW 准备仍由 Go 内部 prepare 接口完成；流式响应（含 `tools`）在 Node 侧执行与 Go 对齐的输出组装与防泄漏处理。Vercel 上需要实时流式时请使用 `/v1/chat/completions`。
 
 详细部署说明请参阅 [部署指南](docs/DEPLOY.md)。
