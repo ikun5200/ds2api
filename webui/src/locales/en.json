@@ -75,6 +75,7 @@
     "landing": {
         "adminConsole": "Admin Console",
         "apiStatus": "API Status",
+        "visualDocs": "Visual Docs",
         "features": {
             "compatibility": {
                 "title": "Full Compatibility",
@@ -91,6 +92,57 @@
             "search": {
                 "title": "Web Search",
                 "desc": "Integrated native web search"
+            }
+        }
+    },
+    "docs": {
+        "back": "Back home",
+        "badge": "Visual guide",
+        "title": "See DS2API from deploy to request flow",
+        "subtitle": "This page keeps the core flow, reading order, and GitHub documentation links visible without embedding long-form docs in app code.",
+        "openRepo": "Open GitHub docs",
+        "openAdmin": "Open admin console",
+        "flowTitle": "Request flow",
+        "reading": {
+            "title": "Recommended reading order",
+            "deploy": "1. Start with deployment options for Docker, Vercel, Zeabur, or local source runs.",
+            "config": "2. Review the config example for API keys, accounts, proxies, and concurrency limits.",
+            "client": "3. Use the API reference to connect OpenAI, Claude, or Gemini-compatible clients."
+        },
+        "flow": {
+            "client": {
+                "title": "Client / SDK",
+                "desc": "Compatible clients call DS2API through OpenAI, Claude, or Gemini-shaped requests."
+            },
+            "adapter": {
+                "title": "Protocol adapter",
+                "desc": "Requests normalize into the shared model while preserving tools, files, and history."
+            },
+            "runtime": {
+                "title": "Runtime",
+                "desc": "Account pool, PoW, file upload, and streaming all use the shared runtime path."
+            },
+            "response": {
+                "title": "Compatible response",
+                "desc": "Responses render back into the target protocol with content, usage, status, and tool calls."
+            }
+        },
+        "links": {
+            "deploy": {
+                "title": "Deployment guide",
+                "desc": "Docker, Vercel, Zeabur, local source runs, and troubleshooting."
+            },
+            "api": {
+                "title": "API reference",
+                "desc": "Auth, models, Chat, Responses, Claude, Gemini, and Admin API."
+            },
+            "arch": {
+                "title": "Architecture",
+                "desc": "Module boundaries, protocol adapters, runtime, and WebUI structure."
+            },
+            "config": {
+                "title": "Config example",
+                "desc": "API keys, account pool, model aliases, concurrency, and auto-delete settings."
             }
         }
     },

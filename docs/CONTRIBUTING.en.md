@@ -16,7 +16,7 @@ Thanks for your interest in contributing to DS2API!
 
 ```bash
 # 1. Clone
-git clone https://github.com/CJackHwang/ds2api.git
+git clone https://github.com/ikun5200/ds2api.git
 cd ds2api
 
 # 2. Configure
@@ -108,7 +108,7 @@ Before contributing, review the architecture doc sections for request flow and `
 
 ## Reporting Issues
 
-Please use [GitHub Issues](https://github.com/CJackHwang/ds2api/issues) and include:
+Please use [GitHub Issues](https://github.com/ikun5200/ds2api/issues) and include:
 
 - Steps to reproduce
 - Relevant log output

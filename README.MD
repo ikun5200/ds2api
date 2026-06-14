@@ -4,16 +4,14 @@
 
 # DS2API
 
-<a href="https://trendshift.io/repositories/24508" target="_blank"><img src="https://trendshift.io/api/badge/repositories/24508" alt="CJackHwang%2Fds2api | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-[![License](https://img.shields.io/github/license/CJackHwang/ds2api.svg)](LICENSE)
-![Stars](https://img.shields.io/github/stars/CJackHwang/ds2api.svg)
-![Forks](https://img.shields.io/github/forks/CJackHwang/ds2api.svg)
-[![Release](https://img.shields.io/github/v/release/CJackHwang/ds2api?display_name=tag)](https://github.com/CJackHwang/ds2api/releases)
+[![License](https://img.shields.io/github/license/ikun5200/ds2api.svg)](LICENSE)
+![Stars](https://img.shields.io/github/stars/ikun5200/ds2api.svg)
+![Forks](https://img.shields.io/github/forks/ikun5200/ds2api.svg)
+[![Release](https://img.shields.io/github/v/release/ikun5200/ds2api?display_name=tag)](https://github.com/ikun5200/ds2api/releases)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docs/DEPLOY.md)
 
 [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/L4CFHP)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/CJackHwang/ds2api)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ikun5200/ds2api)
 
 语言 / Language: [中文](README.MD) | [English](README.en.md)
 
@@ -25,11 +23,11 @@
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=cjackhwang%2Fds2api&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=ikun5200%2Fds2api&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=cjackhwang/ds2api&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=cjackhwang/ds2api&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=cjackhwang/ds2api&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=ikun5200/ds2api&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=ikun5200/ds2api&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=ikun5200/ds2api&type=date&legend=top-left" />
  </picture>
 </a>
 
@@ -308,7 +306,7 @@ base64 < config.json | tr -d '\n'
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/CJackHwang/ds2api.git
+git clone https://github.com/ikun5200/ds2api.git
 cd ds2api
 
 # 2. 配置
@@ -449,7 +447,7 @@ npm run build --prefix webui
 
 - **触发条件**：默认仅在 GitHub Release `published` 时自动触发；也支持在 Actions 页面手动 `workflow_dispatch`，并填写 `release_tag` 复跑/补发
 - **构建产物**：多平台二进制包（`linux/amd64`、`linux/arm64`、`linux/armv7`、`darwin/amd64`、`darwin/arm64`、`windows/amd64`、`windows/arm64`）、Linux Docker 镜像导出包 + `sha256sums.txt`
-- **容器镜像发布**：仅推送到 GHCR（`ghcr.io/cjackhwang/ds2api`）
+- **容器镜像发布**：仅推送到 GHCR（`ghcr.io/ikun5200/ds2api`）
 - **每个二进制压缩包包含**：`ds2api` 可执行文件、`static/admin`、`config.example.json`、`.env.example`、`README.MD`、`README.en.md`、`LICENSE`
 
 ## 免责声明

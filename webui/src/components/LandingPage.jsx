@@ -1,4 +1,4 @@
-import { Brain, Github, LayoutDashboard, Radio, Search, Scale, Workflow } from 'lucide-react'
+import { BookOpen, Brain, Github, LayoutDashboard, Radio, Search, Scale, Workflow } from 'lucide-react'
 import { useI18n } from '../i18n'
 import LanguageToggle from './LanguageToggle'
 
@@ -49,6 +49,13 @@ export default function LandingPage({ onEnter }) {
                             {t('landing.adminConsole')}
                         </button>
                         <a
+                            href="/docs"
+                            className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"
+                        >
+                            <BookOpen className="h-4 w-4" />
+                            {t('landing.visualDocs')}
+                        </a>
+                        <a
                             href="/v1/models"
                             target="_blank"
                             rel="noreferrer"
@@ -58,7 +65,7 @@ export default function LandingPage({ onEnter }) {
                             {t('landing.apiStatus')}
                         </a>
                         <a
-                            href="https://github.com/CJackHwang/ds2api"
+                            href="https://github.com/ikun5200/ds2api"
                             target="_blank"
                             rel="noreferrer"
                             className="inline-flex h-10 items-center gap-2 rounded-lg border border-border bg-card px-4 text-sm font-medium text-foreground transition-colors hover:bg-secondary/70"

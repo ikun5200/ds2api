@@ -2,6 +2,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import clsx from 'clsx'
 
 import LandingPage from '../components/LandingPage'
+import DocsPage from '../components/DocsPage'
 import Login from '../components/Login'
 import DashboardShell from '../layout/DashboardShell'
 import { useI18n } from '../i18n'
@@ -45,6 +46,9 @@ export default function AppRoutes() {
         <Routes>
             {!isProduction && (
                 <Route path="/" element={<LandingPage onEnter={() => navigate('/admin')} />} />
+            )}
+            {!isProduction && (
+                <Route path="/docs" element={<DocsPage />} />
             )}
             <Route path={isProduction ? "/*" : "/admin/*"} element={
                 token ? (

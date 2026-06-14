@@ -4,15 +4,13 @@
 
 # DS2API
 
-<a href="https://trendshift.io/repositories/24508" target="_blank"><img src="https://trendshift.io/api/badge/repositories/24508" alt="CJackHwang%2Fds2api | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
-
-[![License](https://img.shields.io/github/license/CJackHwang/ds2api.svg)](LICENSE)
-![Stars](https://img.shields.io/github/stars/CJackHwang/ds2api.svg)
-![Forks](https://img.shields.io/github/forks/CJackHwang/ds2api.svg)
-[![Release](https://img.shields.io/github/v/release/CJackHwang/ds2api?display_name=tag)](https://github.com/CJackHwang/ds2api/releases)
+[![License](https://img.shields.io/github/license/ikun5200/ds2api.svg)](LICENSE)
+![Stars](https://img.shields.io/github/stars/ikun5200/ds2api.svg)
+![Forks](https://img.shields.io/github/forks/ikun5200/ds2api.svg)
+[![Release](https://img.shields.io/github/v/release/ikun5200/ds2api?display_name=tag)](https://github.com/ikun5200/ds2api/releases)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docs/DEPLOY.en.md)
 [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/L4CFHP)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/CJackHwang/ds2api)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ikun5200/ds2api)
 
 Language: [中文](README.MD) | [English](README.en.md)
 
@@ -22,11 +20,11 @@ Documentation entry: [Docs Index](docs/README.md) / [Architecture](docs/ARCHITEC
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=cjackhwang%2Fds2api&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=ikun5200%2Fds2api&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=cjackhwang/ds2api&type=date&theme=dark&legend=top-left" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=cjackhwang/ds2api&type=date&legend=top-left" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=cjackhwang/ds2api&type=date&legend=top-left" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=ikun5200/ds2api&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=ikun5200/ds2api&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=ikun5200/ds2api&type=date&legend=top-left" />
  </picture>
 </a>
 
@@ -234,10 +232,10 @@ cp config.example.json config.json
 
 ```bash
 # Pull prebuilt image
-docker pull ghcr.io/cjackhwang/ds2api:latest
+docker pull ghcr.io/ikun5200/ds2api:latest
 
 # Or run a pinned version
-# docker pull ghcr.io/cjackhwang/ds2api:v3.0.0
+# docker pull ghcr.io/ikun5200/ds2api:v3.0.0
 
 # Prepare env file and config file
 cp .env.example .env
@@ -247,7 +245,7 @@ cp config.example.json config.json
 docker-compose up -d
 ```
 
-The default `docker-compose.yml` uses `ghcr.io/cjackhwang/ds2api:latest` and maps host port `6011` to container port `5001`. If you want `5001` exposed directly, set `DS2API_HOST_PORT=5001` (or adjust the `ports` mapping).
+The default `docker-compose.yml` uses `ghcr.io/ikun5200/ds2api:latest` and maps host port `6011` to container port `5001`. If you want `5001` exposed directly, set `DS2API_HOST_PORT=5001` (or adjust the `ports` mapping).
 It also mounts `./config.json` to `/data/config.json` and sets `DS2API_CONFIG_PATH=/data/config.json` by default, which avoids runtime token persistence failures caused by read-only `/app`.
 
 Rebuild after updates: `docker-compose up -d --build`
@@ -296,7 +294,7 @@ For detailed deployment instructions, see the [Deployment Guide](docs/DEPLOY.en.
 
 ```bash
 # 1. Clone
-git clone https://github.com/CJackHwang/ds2api.git
+git clone https://github.com/ikun5200/ds2api.git
 cd ds2api
 
 # 2. Configure
@@ -433,7 +431,7 @@ Workflow: `.github/workflows/release-artifacts.yml`
 
 - **Trigger**: by default only on GitHub Release `published`; you can also run it manually via `workflow_dispatch` and pass `release_tag` to rerun / backfill
 - **Outputs**: multi-platform binary archives (`linux/amd64`, `linux/arm64`, `linux/armv7`, `darwin/amd64`, `darwin/arm64`, `windows/amd64`, `windows/arm64`), Linux Docker image export tarballs, and `sha256sums.txt`
-- **Container publishing**: GHCR only (`ghcr.io/cjackhwang/ds2api`)
+- **Container publishing**: GHCR only (`ghcr.io/ikun5200/ds2api`)
 - **Each binary archive includes**: the `ds2api` executable, `static/admin`, `config.example.json`, `.env.example`, `README.MD`, `README.en.md`, and `LICENSE`
 
 ## Disclaimer

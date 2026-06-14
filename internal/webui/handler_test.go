@@ -78,6 +78,38 @@ func TestServeFromDiskPinsContentType(t *testing.T) {
 	}
 }
 
+func TestWelcomeAndDocsPagesExposeVisualDocs(t *testing.T) {
+	h := &Handler{}
+
+	indexReq := httptest.NewRequest(http.MethodGet, "/", nil)
+	indexRec := httptest.NewRecorder()
+	h.index(indexRec, indexReq)
+	if indexRec.Code != http.StatusOK {
+		t.Fatalf("index status = %d, want 200", indexRec.Code)
+	}
+	indexBody := indexRec.Body.String()
+	if !strings.Contains(indexBody, `href="/docs"`) || !strings.Contains(indexBody, "图形化文档") {
+		t.Fatalf("index page should link to visual docs, got: %s", indexBody)
+	}
+
+	docsReq := httptest.NewRequest(http.MethodGet, "/docs", nil)
+	docsRec := httptest.NewRecorder()
+	h.docs(docsRec, docsReq)
+	if docsRec.Code != http.StatusOK {
+		t.Fatalf("docs status = %d, want 200", docsRec.Code)
+	}
+	docsBody := docsRec.Body.String()
+	for _, want := range []string{
+		"请求链路",
+		"https://github.com/ikun5200/ds2api/blob/main/docs/DEPLOY.md",
+		"https://github.com/ikun5200/ds2api/blob/main/API.md",
+	} {
+		if !strings.Contains(docsBody, want) {
+			t.Fatalf("docs page missing %q", want)
+		}
+	}
+}
+
 func TestServeFromDiskRejectsSiblingDirectoryWithSharedPrefix(t *testing.T) {
 	parent := t.TempDir()
 	staticDir := filepath.Join(parent, "admin")

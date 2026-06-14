@@ -1213,7 +1213,7 @@ Checks the current build version and the latest GitHub Release:
   "checked_at": "2026-03-29T00:00:00Z",
   "latest_tag": "v3.0.0",
   "latest_version": "3.0.0",
-  "release_url": "https://github.com/CJackHwang/ds2api/releases/tag/v3.0.0",
+  "release_url": "https://github.com/ikun5200/ds2api/releases/tag/v3.0.0",
   "published_at": "2026-03-28T12:00:00Z",
   "has_update": false
 }

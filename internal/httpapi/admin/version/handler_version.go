@@ -9,7 +9,7 @@ import (
 	"ds2api/internal/version"
 )
 
-const latestReleaseAPI = "https://api.github.com/repos/CJackHwang/ds2api/releases/latest"
+const latestReleaseAPI = "https://api.github.com/repos/ikun5200/ds2api/releases/latest"
 
 type latestReleasePayload struct {
 	TagName     string `json:"tag_name"`

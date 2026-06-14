@@ -16,7 +16,7 @@
 
 ```bash
 # 1. 克隆仓库
-git clone https://github.com/CJackHwang/ds2api.git
+git clone https://github.com/ikun5200/ds2api.git
 cd ds2api
 
 # 2. 配置
@@ -108,7 +108,7 @@ npm run build --prefix webui
 
 ## 问题反馈
 
-请使用 [GitHub Issues](https://github.com/CJackHwang/ds2api/issues) 并附上：
+请使用 [GitHub Issues](https://github.com/ikun5200/ds2api/issues) 并附上：
 
 - 复现步骤
 - 相关日志输出

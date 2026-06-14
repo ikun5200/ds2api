@@ -1,6 +1,6 @@
 services:
   ds2api:
-    image: ghcr.io/cjackhwang/ds2api:latest
+    image: ghcr.io/ikun5200/ds2api:latest
     container_name: ds2api
     restart: always
     env_file:

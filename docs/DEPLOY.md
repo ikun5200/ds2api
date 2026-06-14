@@ -66,7 +66,7 @@ cp config.example.json config.json
 
 - **触发条件**：默认仅在 Release `published` 时自动触发；也支持在 Actions 页面手动 `workflow_dispatch`，并填写 `release_tag` 复跑/补发
 - **构建产物**：多平台二进制压缩包、Linux Docker 镜像导出包 + `sha256sums.txt`
-- **容器镜像发布**：仅发布到 GHCR（`ghcr.io/cjackhwang/ds2api`）
+- **容器镜像发布**：仅发布到 GHCR（`ghcr.io/ikun5200/ds2api`）
 
 | 平台 | 架构 | 文件格式 |
 | --- | --- | --- |
@@ -111,7 +111,7 @@ cp config.example.json config.json
 
 ```bash
 # 拉取预编译镜像
-docker pull ghcr.io/cjackhwang/ds2api:latest
+docker pull ghcr.io/ikun5200/ds2api:latest
 
 # 复制环境变量模板和配置文件
 cp .env.example .env
@@ -129,7 +129,7 @@ docker-compose up -d
 docker-compose logs -f
 ```
 
-默认 `docker-compose.yml` 直接使用 `ghcr.io/cjackhwang/ds2api:latest`，并把宿主机 `6011` 映射到容器内的 `5001`。如果你希望直接对外暴露 `5001`，请设置 `DS2API_HOST_PORT=5001`（或者手动调整 `ports` 配置）。
+默认 `docker-compose.yml` 直接使用 `ghcr.io/ikun5200/ds2api:latest`，并把宿主机 `6011` 映射到容器内的 `5001`。如果你希望直接对外暴露 `5001`，请设置 `DS2API_HOST_PORT=5001`（或者手动调整 `ports` 配置）。
 Compose 模板还会默认设置 `DS2API_CONFIG_PATH=/data/config.json` 并挂载 `./config.json:/data/config.json`，优先避免 `/app` 只读带来的配置持久化问题。
 镜像内会预创建 `/data` 并授权给非 root 的 `ds2api` 用户；如果你使用 bind mount 单文件，请确保宿主机 `config.json` 至少可被容器用户读取/写入，例如 `chmod 644 config.json`，否则 Linux UID/GID 不一致时仍可能出现 `open /data/config.json: permission denied`。
 兼容说明：若未设置 `DS2API_CONFIG_PATH` 且运行目录是 `/app`，新版本会优先使用 `/data/config.json`；当该文件不存在但检测到历史 `/app/config.json` 时，会自动回退读取旧路径，避免升级后“配置丢失”。
@@ -137,7 +137,7 @@ Compose 模板还会默认设置 `DS2API_CONFIG_PATH=/data/config.json` 并挂�
 如需固定版本，也可以直接拉取指定 tag：
 
 ```bash
-docker pull ghcr.io/cjackhwang/ds2api:v3.0.0
+docker pull ghcr.io/ikun5200/ds2api:v3.0.0
 ```
 
 ### 2.2 更新
@@ -444,7 +444,7 @@ DS2API_CHAT_HISTORY_PATH=/tmp/chat_history.json
 
 ```bash
 # 克隆仓库
-git clone https://github.com/CJackHwang/ds2api.git
+git clone https://github.com/ikun5200/ds2api.git
 cd ds2api
 
 # 复制并编辑配置
