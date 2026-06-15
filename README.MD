@@ -17,7 +17,7 @@
 
 将 DeepSeek Web 对话能力转换为 OpenAI、Claude 与 Gemini 兼容 API。核心后端以 **Go** 实现，Vercel 流式桥接额外使用少量 Node Runtime，前端为 React WebUI 管理台（源码在 `webui/`，部署时自动构建到 `static/admin`）。
 
-文档入口：[文档导航](docs/README.md) / [架构说明](docs/ARCHITECTURE.md) / [接口文档](API.md)
+文档入口：[文档导航](docs/README.md) / [架构说明](docs/ARCHITECTURE.md) / [接口文档](API.md) / [外部存储说明](docs/DEPLOY.md#321-外部存储chat-history详细说明)
 
 【感谢Linux.do社区及GitHub社区各位开发者对项目的支持与贡献】
 
@@ -54,6 +54,7 @@
   - [方式三：Vercel 部署](#方式三vercel-部署)
   - [方式四：本地源码运行](#方式四本地源码运行)
 - [配置说明](#配置说明)
+  - [外部存储怎么选](#外部存储怎么选)
 - [鉴权模式](#鉴权模式)
 - [并发模型](#并发模型)
 - [Tool Call 适配](#tool-call-适配)
@@ -140,6 +141,7 @@ flowchart LR
 | Tool Calling | 防泄漏处理：非代码块高置信特征识别、`delta.tool_calls` 早发、结构化增量输出 |
 | Admin API | 配置管理、运行时设置热更新、代理管理、账号测试 / 批量测试、会话清理、导入导出、Vercel 同步、版本检查 |
 | WebUI 管理台 | `/admin` 单页应用（中英文双语、深色模式，支持查看服务器端对话记录） |
+| 外部存储 | Chat history 默认使用内置 JSON 文件，也可切换到 PostgreSQL、MySQL 或 MariaDB，适合 Vercel、跨容器和多实例场景 |
 | 运维探针 | `GET /healthz`（存活）、`GET /readyz`（就绪） |
 
 OpenAI `/v1/*` 仍是推荐的规范路径；同时支持 `/models`、`/chat/completions`、`/responses`、`/embeddings`、`/files`、`/files/{file_id}` 等根路径快捷路由，方便只配置 DS2API 根地址的第三方客户端。
@@ -338,6 +340,20 @@ go run ./cmd/ds2api
 - 如果关闭 `current_input_file`，请求会直接透传，不上传拆分上下文文件。
 - `thinking_injection`：默认开启；在最新 user 消息末尾追加思考增强提示词，提高高强度推理与工具调用前的思考稳定性；`prompt` 留空时使用内置默认提示词。
 - `output_integrity_guard`：默认开启；在最终 prompt 最前面加入输出清理约束，遇到乱码、损坏、重复或畸形片段时要求模型只回答干净内容；可在管理员面板关闭或自定义 `prompt`。
+
+### 外部存储怎么选
+
+DS2API 的 Chat history 默认保存在内置 JSON 文件中，路径由 `DS2API_CHAT_HISTORY_PATH` 控制，适合本地运行、Docker 单实例和不需要跨实例共享响应记录的部署。
+
+如果你希望响应记录能跨冷启动、跨容器或跨实例长期保留，可以切换到外部 SQL 数据库：
+
+```text
+DS2API_DATABASE_MODE=external
+DS2API_DATABASE_TYPE=postgres   # 也支持 mysql / mariadb
+DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable
+```
+
+外部存储目前只保存 Chat history，也就是管理台「响应记录」页面和各协议共享历史链路使用的数据；账号、API Key、代理、Admin 密码和运行时设置仍由 `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` 管理。完整字段、MySQL 示例、自动建表和注意事项见 [外部存储详细说明](docs/DEPLOY.md#321-外部存储chat-history详细说明)。
 
 环境变量完整列表见 [部署指南](docs/DEPLOY.md)，接口鉴权规则见 [API.md](API.md#鉴权规则)。
 

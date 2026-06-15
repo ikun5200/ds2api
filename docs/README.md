@@ -10,13 +10,15 @@
 2. [架构与目录说明](./ARCHITECTURE.md)
 3. [接口文档（API）](../API.md)
 4. [部署指南](./DEPLOY.md)
-5. [测试指南](./TESTING.md)
-6. [开发者速查](./DEVELOPMENT.md)
-7. [贡献指南](./CONTRIBUTING.md)
+5. [外部存储（Chat history）说明](./DEPLOY.md#321-外部存储chat-history详细说明)
+6. [测试指南](./TESTING.md)
+7. [开发者速查](./DEVELOPMENT.md)
+8. [贡献指南](./CONTRIBUTING.md)
 
 ### 专题文档
 
 - [DS2API 项目价值说明](./project-value.md)
+- [外部存储（PostgreSQL / MySQL / MariaDB）配置说明](./DEPLOY.md#321-外部存储chat-history详细说明)
 - [API -> 网页对话纯文本兼容主链路说明](./prompt-compatibility.md)
 - [Tool Calling 统一语义](./toolcall-semantics.md)
 - [DeepSeek SSE 行为结构说明（逆向观察）](./DeepSeekSSE行为结构说明-2026-04-05.md)

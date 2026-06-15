@@ -88,7 +88,9 @@ func TestWelcomeAndDocsPagesExposeVisualDocs(t *testing.T) {
 		t.Fatalf("index status = %d, want 200", indexRec.Code)
 	}
 	indexBody := indexRec.Body.String()
-	if !strings.Contains(indexBody, `href="/docs"`) || !strings.Contains(indexBody, "图形化文档") {
+	if !strings.Contains(indexBody, `href="/docs"`) ||
+		!strings.Contains(indexBody, "图形化文档") ||
+		!strings.Contains(indexBody, "响应记录存储") {
 		t.Fatalf("index page should link to visual docs, got: %s", indexBody)
 	}
 
@@ -101,7 +103,10 @@ func TestWelcomeAndDocsPagesExposeVisualDocs(t *testing.T) {
 	docsBody := docsRec.Body.String()
 	for _, want := range []string{
 		"请求链路",
+		"外部存储怎么选",
+		"DS2API_DATABASE_MODE=external",
 		"https://github.com/ikun5200/ds2api/blob/main/docs/DEPLOY.md",
+		"https://github.com/ikun5200/ds2api/blob/main/docs/DEPLOY.md#321-外部存储chat-history详细说明",
 		"https://github.com/ikun5200/ds2api/blob/main/API.md",
 	} {
 		if !strings.Contains(docsBody, want) {

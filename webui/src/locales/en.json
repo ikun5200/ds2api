@@ -76,6 +76,9 @@
         "adminConsole": "Admin Console",
         "apiStatus": "API Status",
         "visualDocs": "Visual Docs",
+        "consoleLabel": "Online Admin Console",
+        "kicker": "DeepSeek compatible gateway",
+        "subtitle": "Convert DeepSeek Web chat into OpenAI, Claude, and Gemini compatible APIs, with optional external database storage for response records.",
         "features": {
             "compatibility": {
                 "title": "Full Compatibility",
@@ -92,6 +95,10 @@
             "search": {
                 "title": "Web Search",
                 "desc": "Integrated native web search"
+            },
+            "externalStorage": {
+                "title": "External Storage",
+                "desc": "Store Chat history in PostgreSQL, MySQL, or MariaDB"
             }
         }
     },
@@ -106,7 +113,7 @@
         "reading": {
             "title": "Recommended reading order",
             "deploy": "1. Start with deployment options for Docker, Vercel, Zeabur, or local source runs.",
-            "config": "2. Review the config example for API keys, accounts, proxies, and concurrency limits.",
+            "config": "2. Review external storage and the config example to decide where response records should live.",
             "client": "3. Use the API reference to connect OpenAI, Claude, or Gemini-compatible clients."
         },
         "flow": {
@@ -132,6 +139,10 @@
                 "title": "Deployment guide",
                 "desc": "Docker, Vercel, Zeabur, local source runs, and troubleshooting."
             },
+            "storage": {
+                "title": "External storage",
+                "desc": "PostgreSQL, MySQL, MariaDB, auto-created tables, and environment variables."
+            },
             "api": {
                 "title": "API reference",
                 "desc": "Auth, models, Chat, Responses, Claude, Gemini, and Admin API."
@@ -144,6 +155,15 @@
                 "title": "Config example",
                 "desc": "API keys, account pool, model aliases, concurrency, and auto-delete settings."
             }
+        },
+        "storage": {
+            "title": "Choosing external storage",
+            "desc": "The built-in JSON file works well for local and single-instance deployments. Use an external SQL database when response records must survive cold starts, containers, or multiple instances.",
+            "supported": "Supported databases: PostgreSQL, MySQL, and MariaDB.",
+            "envs": "Set at least DS2API_DATABASE_MODE=external, DS2API_DATABASE_TYPE, and DS2API_DATABASE_DSN.",
+            "scope": "External storage only stores Chat history. Accounts, API keys, proxies, admin passwords, and runtime settings stay in the normal config source.",
+            "examplesTitle": "Connection string examples",
+            "prefix": "Use DS2API_DATABASE_TABLE_PREFIX when multiple DS2API instances share one database."
         }
     },
     "accountManager": {

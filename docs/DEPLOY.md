@@ -305,16 +305,85 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # 个人账号可留空
 | `VERCEL_PROJECT_ID` | Vercel 项目 ID | — |
 | `VERCEL_TEAM_ID` | Vercel 团队 ID | — |
 | `DS2API_CHAT_HISTORY_PATH` | Chat history 存储路径（Vercel 上必须设为 `/tmp/chat_history.json`，否则因文件系统只读而不可用） | `data/chat_history.json` |
-| `DS2API_DATABASE_MODE` | Chat history 存储后端：`builtin` 使用原 JSON 文件；`external` 使用外部 SQL 数据库 | `builtin` |
-| `DS2API_DATABASE_TYPE` | 外部数据库类型，支持 `postgres` / `mysql`（`mariadb` 作为 `mysql` 处理） | — |
-| `DS2API_DATABASE_DSN` | 外部数据库连接串；也可用 `DS2API_DATABASE_URL`；显式外部模式下还可回退使用 `DATABASE_URL` | — |
-| `DS2API_DATABASE_TABLE_PREFIX` | 外部数据库表名前缀，仅允许小写字母、数字和下划线 | `ds2api_` |
-| `DS2API_DATABASE_MAX_OPEN_CONNS` | 外部数据库最大打开连接数，`0` 表示使用 Go 默认值 | `0` |
-| `DS2API_DATABASE_MAX_IDLE_CONNS` | 外部数据库最大空闲连接数，`0` 表示使用 Go 默认值 | `0` |
-| `DS2API_DATABASE_CONN_MAX_LIFETIME_SECONDS` | 外部数据库连接最大生命周期秒数，`0` 表示不主动限制 | `0` |
+| `DS2API_DATABASE_MODE` | Chat history 存储后端：`builtin` 使用内置 JSON 文件；`external` 使用外部 SQL 数据库 | `builtin` |
+| `DS2API_DATABASE_TYPE` | 外部存储数据库类型，支持 `postgres` / `mysql`（`mariadb` 作为 `mysql` 处理） | — |
+| `DS2API_DATABASE_DSN` | 外部存储连接串；也可用 `DS2API_DATABASE_URL`；显式外部模式下还可回退使用 `DATABASE_URL` | — |
+| `DS2API_DATABASE_TABLE_PREFIX` | 外部存储表名前缀，仅允许小写字母、数字和下划线 | `ds2api_` |
+| `DS2API_DATABASE_MAX_OPEN_CONNS` | 外部存储最大打开连接数，`0` 表示使用 Go 默认值 | `0` |
+| `DS2API_DATABASE_MAX_IDLE_CONNS` | 外部存储最大空闲连接数，`0` 表示使用 Go 默认值 | `0` |
+| `DS2API_DATABASE_CONN_MAX_LIFETIME_SECONDS` | 外部存储连接最大生命周期秒数，`0` 表示不主动限制 | `0` |
 | `DS2API_VERCEL_PROTECTION_BYPASS` | 部署保护绕过密钥（内部 Node→Go 调用） | — |
 
-外部数据库当前用于 Chat history 持久化；账号、API Key、运行时设置仍沿用现有 `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` 配置链路。PostgreSQL 示例：`DS2API_DATABASE_TYPE=postgres`、`DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable`。MySQL/MariaDB 示例：`DS2API_DATABASE_TYPE=mysql`、`DS2API_DATABASE_DSN=user:pass@tcp(host:3306)/ds2api?parseTime=true`。
+### 3.2.1 外部存储（Chat history）详细说明
+
+默认情况下，DS2API 使用内置 JSON 文件保存 Chat history：主索引在 `DS2API_CHAT_HISTORY_PATH`，详情文件在同名 `.d` 目录中。这种模式最简单，适合本地、Docker 单实例或不需要跨实例共享历史记录的场景。
+
+当你需要 **跨冷启动、跨容器、跨实例持久保存 Chat history** 时，可以把存储后端切到外部 SQL 数据库。外部存储目前只负责服务端 Chat history，包括：
+
+- 响应记录列表、详情、状态、模型、账号、调用方、耗时、finish reason、usage 等归档信息；
+- OpenAI Chat、OpenAI Responses、Claude、Gemini 等接口通过共享历史链路写入的记录；
+- 管理台「响应记录」页面读取、删除、清空和调整保留条数所需的数据。
+
+外部存储 **不会** 接管账号、API Key、代理、Admin 密码、运行时设置等配置数据。这些仍然由 `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` 负责。这样做是为了避免部署启动配置和历史记录存储互相影响：配置仍可通过环境变量、配置文件和管理台同步管理；历史记录则可以独立放到数据库里。
+
+启用外部存储至少需要设置：
+
+```text
+DS2API_DATABASE_MODE=external
+DS2API_DATABASE_TYPE=postgres   # 或 mysql / mariadb
+DS2API_DATABASE_DSN=你的数据库连接串
+```
+
+PostgreSQL 示例：
+
+```text
+DS2API_DATABASE_MODE=external
+DS2API_DATABASE_TYPE=postgres
+DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable
+```
+
+MySQL / MariaDB 示例：
+
+```text
+DS2API_DATABASE_MODE=external
+DS2API_DATABASE_TYPE=mysql
+DS2API_DATABASE_DSN=user:pass@tcp(host:3306)/ds2api?parseTime=true
+```
+
+也可以用 URL 写法：
+
+```text
+DS2API_DATABASE_MODE=external
+DS2API_DATABASE_TYPE=mysql
+DS2API_DATABASE_DSN=mysql://user:pass@host:3306/ds2api?parseTime=true
+```
+
+表会在启动时自动创建，默认表名前缀为 `ds2api_`，会生成：
+
+- `ds2api_chat_history_state`：保存版本、保留条数、全局 revision；
+- `ds2api_chat_history_entries`：保存每条 Chat history 的摘要字段和 JSON 详情。
+
+如同一个数据库里要部署多套 DS2API，可用 `DS2API_DATABASE_TABLE_PREFIX` 隔离表名，例如：
+
+```text
+DS2API_DATABASE_TABLE_PREFIX=prod_a_
+```
+
+连接池参数通常可以不设置；只有数据库连接数受限或高并发部署时才建议调整：
+
+```text
+DS2API_DATABASE_MAX_OPEN_CONNS=10
+DS2API_DATABASE_MAX_IDLE_CONNS=5
+DS2API_DATABASE_CONN_MAX_LIFETIME_SECONDS=300
+```
+
+注意事项：
+
+- 设置 `DS2API_DATABASE_DSN` 或 `DS2API_DATABASE_TYPE` 会自动进入外部模式；单独存在平台注入的通用 `DATABASE_URL` 不会自动启用，除非显式设置 `DS2API_DATABASE_MODE=external`。
+- 切换到外部存储后，新记录会写入数据库；已有 JSON 文件历史不会自动导入数据库。
+- Vercel 的 `/tmp` 是临时目录，冷启动后可能丢失历史记录；如果你希望 Vercel 上长期保留 Chat history，应使用外部 PostgreSQL 或 MySQL/MariaDB。
+- 外部存储连接串通常包含账号密码，请放在部署平台的环境变量/密钥配置里，不要提交到仓库。
+- 如果数据库连接失败，启动时会记录 Chat history 不可用，业务接口仍可工作，但管理台响应记录功能会受影响。
 
 ### 3.3 运行时行为配置（通过 Admin API 设置）
 
