@@ -186,9 +186,9 @@ func latestUserInputForFile(messages []any) (int, string) {
 }
 
 func currentInputFilePrompt(hasToolsFile bool) string {
-	prompt := "Continue from the latest state in the attached " + currentInputFilename + " context. Treat it as the current working state and answer the latest user request directly."
+	prompt := "Use the attached conversation notes as the current context and answer the latest user request directly."
 	if hasToolsFile {
-		prompt += " Available tool descriptions and parameter schemas are attached in " + currentToolsFilename + "; use only those tools and follow the tool-call format rules in this prompt."
+		prompt += " Tool details are provided in a separate attachment; use only those listed tools and follow the XML tool-call rules in this prompt."
 	}
 	return prompt
 }

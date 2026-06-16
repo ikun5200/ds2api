@@ -10,14 +10,14 @@ import (
 var markdownImagePattern = regexp.MustCompile(`!\[(.*?)\]\((.*?)\)`)
 
 const (
-	beginSentenceMarker             = "<|begin▁of▁sentence|>"
-	systemMarker                    = "<|System|>"
-	userMarker                      = "<|User|>"
-	assistantMarker                 = "<|Assistant|>"
-	toolMarker                      = "<|Tool|>"
-	endSentenceMarker               = "<|end▁of▁sentence|>"
-	endToolResultsMarker            = "<|end▁of▁toolresults|>"
-	endInstructionsMarker           = "<|end▁of▁instructions|>"
+	beginSentenceMarker             = ""
+	systemMarker                    = "System instructions:\n"
+	userMarker                      = "User message:\n"
+	assistantMarker                 = "Assistant response:\n"
+	toolMarker                      = "Tool result:\n"
+	endSentenceMarker               = "\n\n"
+	endToolResultsMarker            = "\n\n"
+	endInstructionsMarker           = "\n\n"
 	outputIntegrityGuardMarker      = "Clean-answer directive:"
 	legacyOutputIntegrityGuardLabel = "Output integrity guard:"
 )
@@ -89,7 +89,7 @@ func MessagesPrepareWithThinkingOptions(messages []map[string]any, _ bool, opts 
 				parts = append(parts, formatRoleBlock(systemMarker, text, endInstructionsMarker))
 			}
 		case "user":
-			parts = append(parts, formatRoleBlock(userMarker, m.Text, ""))
+			parts = append(parts, formatRoleBlock(userMarker, m.Text, "\n\n"))
 		default:
 			if strings.TrimSpace(m.Text) != "" {
 				parts = append(parts, m.Text)

@@ -400,7 +400,7 @@ func TestChatCompletionsCurrentInputFilePersistsNeutralPrompt(t *testing.T) {
 	if len(full.Messages) != 1 {
 		t.Fatalf("expected continuation prompt to be the only persisted message, got %#v", full.Messages)
 	}
-	if !strings.Contains(full.Messages[0].Content, "Continue from the latest state in the attached HISTORY.txt context.") {
+	if !strings.Contains(full.Messages[0].Content, "Use the attached conversation notes as the current context.") {
 		t.Fatalf("expected continuation prompt to be persisted, got %#v", full.Messages[0])
 	}
 }

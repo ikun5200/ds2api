@@ -47,10 +47,10 @@ func TestBuildOpenAIFinalPrompt_HandlerPathIncludesToolRoundtripSemantics(t *tes
 	if !strings.Contains(finalPrompt, `"condition":"sunny"`) {
 		t.Fatalf("handler finalPrompt should preserve tool output content: %q", finalPrompt)
 	}
-	if !strings.Contains(finalPrompt, "<|DSML|tool_calls>") {
+	if !strings.Contains(finalPrompt, "<tool_calls>") {
 		t.Fatalf("handler finalPrompt should preserve assistant tool history: %q", finalPrompt)
 	}
-	if !strings.Contains(finalPrompt, `<|DSML|invoke name="get_weather">`) {
+	if !strings.Contains(finalPrompt, `<invoke name="get_weather">`) {
 		t.Fatalf("handler finalPrompt should include tool name history: %q", finalPrompt)
 	}
 }
@@ -74,7 +74,7 @@ func TestBuildOpenAIFinalPrompt_VercelPreparePathKeepsFinalAnswerInstruction(t *
 	}
 
 	finalPrompt, _ := buildOpenAIFinalPrompt(messages, tools, "", false)
-	if !strings.Contains(finalPrompt, "Remember: The ONLY valid way to use tools is the <|DSML|tool_calls>...</|DSML|tool_calls> block at the end of your response.") {
+	if !strings.Contains(finalPrompt, "Remember: The ONLY valid way to use tools is the <tool_calls>...</tool_calls> block at the end of your response.") {
 		t.Fatalf("vercel prepare finalPrompt missing final tool-call anchor instruction: %q", finalPrompt)
 	}
 	if !strings.Contains(finalPrompt, "TOOL CALL FORMAT") {
@@ -113,7 +113,7 @@ func TestBuildOpenAIPromptWithToolInstructionsOnlyOmitsSchemas(t *testing.T) {
 	if strings.Contains(finalPrompt, "You have access to these tools") || strings.Contains(finalPrompt, "Description: search docs") || strings.Contains(finalPrompt, "Parameters:") {
 		t.Fatalf("tool descriptions should be externalized, got: %q", finalPrompt)
 	}
-	if !strings.Contains(finalPrompt, "Treat TOOLS.txt as the authoritative list of callable tools and schemas") {
+	if !strings.Contains(finalPrompt, "Tool descriptions and parameter details are provided in an attached reference file") {
 		t.Fatalf("expected instructions-only prompt to point model at tools file, got: %q", finalPrompt)
 	}
 	if !strings.Contains(finalPrompt, "TOOL CALL FORMAT") || !strings.Contains(finalPrompt, "Remember: The ONLY valid way to use tools") {
@@ -144,7 +144,7 @@ func TestBuildOpenAIToolsContextTranscriptContainsOnlyDescriptions(t *testing.T)
 			t.Fatalf("expected tools transcript to contain %q, got: %q", want, transcript)
 		}
 	}
-	if strings.Contains(transcript, "TOOL CALL FORMAT") || strings.Contains(transcript, "<|DSML|tool_calls>") {
+	if strings.Contains(transcript, "TOOL CALL FORMAT") || strings.Contains(transcript, "<tool_calls>") {
 		t.Fatalf("tools transcript should not duplicate format instructions, got: %q", transcript)
 	}
 }
@@ -190,7 +190,7 @@ func TestBuildOpenAIFinalPromptCanDisableOutputIntegrityGuard(t *testing.T) {
 	if strings.Contains(finalPrompt, "Clean-answer directive") || strings.Contains(finalPrompt, "Output integrity guard") {
 		t.Fatalf("expected output integrity guard to be disabled, got: %q", finalPrompt)
 	}
-	if !strings.Contains(finalPrompt, "<|User|>hello") {
+	if !strings.Contains(finalPrompt, "User message:\nhello") {
 		t.Fatalf("expected user content to remain in prompt, got: %q", finalPrompt)
 	}
 }

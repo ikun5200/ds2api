@@ -11,8 +11,9 @@ const TOOL_MARKER = '<|Tool|>'
 const END_INSTRUCTIONS_MARKER = '<|end▁of▁instructions|>'
 const END_SENTENCE_MARKER = '<|end▁of▁sentence|>'
 const END_TOOL_RESULTS_MARKER = '<|end▁of▁toolresults|>'
-const CURRENT_INPUT_FILE_PROMPT = 'Continue from the latest state in the attached HISTORY.txt context. Treat it as the current working state and answer the latest user request directly.'
+const CURRENT_INPUT_FILE_PROMPT = 'Use the attached conversation notes as the current context and answer the latest user request directly.'
 const LEGACY_CURRENT_INPUT_FILE_PROMPTS = new Set([
+    'Continue from the latest state in the attached HISTORY.txt context. Treat it as the current working state and answer the latest user request directly.',
     'The current request and prior conversation context have already been provided. Answer the latest user request directly.',
 ])
 const HISTORY_TRANSCRIPT_TITLE = '# HISTORY.txt'

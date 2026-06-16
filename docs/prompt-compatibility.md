@@ -89,7 +89,7 @@ DS2API 当前的核心思路，不是把客户端传来的 `messages`、`tools`�
   "chat_session_id": "session-id",
   "model_type": "default",
   "parent_message_id": null,
-  "prompt": "<|begin▁of▁sentence|>...",
+  "prompt": "System instructions:\n...",
   "ref_file_ids": [
     "file-history",
     "file-systemprompt",
@@ -132,18 +132,16 @@ OpenAI Chat / Responses 在标准化后、current input file 之前，会默认�
 - 这段约束位于普通 system / tool prompt 之前，因此是当前最终 prompt 里的最高优先级前置指令。
 - 该开关默认启用，可通过 `output_integrity_guard.enabled=false` 关闭；也可以通过 `output_integrity_guard.prompt` 自定义文案，留空时使用内置默认提示词。
 
-### 5.1 角色标记
+### 5.1 角色边界
 
-最终 prompt 使用 DeepSeek 风格角色标记：
+最终 prompt 使用普通 transcript 风格的角色边界，避免把 DeepSeek / 模型内部特殊 token 暴露给下游：
 
-- `<|begin▁of▁sentence|>`
-- `<|System|>`
-- `<|User|>`
-- `<|Assistant|>`
-- `<|Tool|>`
-- `<|end▁of▁instructions|>`
-- `<|end▁of▁sentence|>`
-- `<|end▁of▁toolresults|>`
+- `System instructions:`
+- `User message:`
+- `Assistant response:`
+- `Tool result:`
+
+各 role block 之间用空行分隔；如果最后一轮不是 assistant，会追加一个空的 `Assistant response:` 前缀，引导下游继续生成助手回复。
 
 实现位置：
 [internal/prompt/messages.go](../internal/prompt/messages.go)
@@ -165,11 +163,11 @@ OpenAI Chat / Responses 在标准化后、current input file 之前，会默认�
 
 1. 把每个 tool 的名称、描述、参数 schema 序列化成文本。
 2. 拼成 `You have access to these tools:` 大段说明。
-3. 再附上统一的 DSML tool call 外壳格式约束。
-4. 普通直传请求会把“工具描述 + 格式约束”一起并入 system prompt；如果 `current_input_file` 触发，则工具描述/schema 会单独上传成 `TOOLS.txt`，live prompt 和 system tool 格式提示都会明确要求模型把 `TOOLS.txt` 当作可调用工具和参数 schema 的权威来源。
+3. 再附上统一的 XML tool call 外壳格式约束。
+4. 普通直传请求会把“工具描述 + 格式约束”一起并入 system prompt；如果 `current_input_file` 触发，则工具描述/schema 会单独上传成 `TOOLS.txt`，live prompt 会用更自然的方式说明工具细节在附件中，并保留 XML 工具调用格式规则。
 
-工具调用正例现在优先示范半角管道符 DSML 风格：`<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`。
-兼容层仍接受旧式纯 `<tool_calls>` wrapper，并会容错若干 DSML 标签变体，包括短横线形式 `<dsml-tool-calls>` / `<dsml-invoke>` / `<dsml-parameter>`、下划线形式 `<dsml_tool_calls>` / `<dsml_invoke>` / `<dsml_parameter>`，以及其他前缀分隔形态如 `<vendor|tool_calls>` / `<vendor_tool_calls>` / `<vendor - tool_calls>`；标签壳扫描还会把全角 ASCII 漂移归一化，例如 `<ｄＳＭＬ|tool_calls>` 与全角 `＞` 结束符，也会容错 CJK 尖括号、全角感叹号或顿号分隔符、弯引号属性值、PascalCase 本地名和属性尾部分隔符漂移，例如 `<DSM|parameter name="command"|>...〈/DSM|parameter〉`、`<！DSML！invoke name=“Bash”>`、`<、DSML、tool_calls>`、`<DSmartToolCalls>`、`<DSMLtool_calls※>`。更一般地，Go / Node tag 扫描以固定本地标签名 `tool_calls` / `invoke` / `parameter` 为准，标签名前或标签名后的非结构性协议分隔符都会在解析入口剥离，例如 `<DSML␂tool_calls>`、`<proto💥tool_calls>` 这类控制符或非 ASCII 分隔符漂移也会归一化回现有 XML 标签后继续走同一套 parser；结构性字符如 `<` / `>` / `/` / `=` / 引号、空白和 ASCII 字母数字不会被当作这类分隔符。进入现有 DSML rewrite / XML parse 之前，Go / Node 还会先对“已经识别成工具标签壳的 candidate span”做一次窄 canonicalization：只折叠 wrapper / `invoke` / `parameter` / `name` / `CDATA` / `DSML` 及其壳层分隔符里的 confusable 字符，清理零宽 / BOM / 控制类干扰，并把引号、空白、dash / underscore 变体等统一回可解析的工具语法。这个阶段不会广义改写普通正文、参数内容、Markdown 行内 code span、CDATA 里的示例文本或其他非工具 XML。CDATA 开头也使用同一类扫描式容错，`<![CDATA[` / `<！[CDATA[` / `<、[CDATA[` 都会作为参数原文容器处理。但提示词会优先要求模型输出官方 DSML 标签，并强调不能只输出 closing wrapper 而漏掉 opening tag。需要注意：这是“兼容 DSML 外壳，内部仍以 XML 解析语义为准”，不是原生 DSML 全链路实现。解析器会先截获非 Markdown 代码上下文中的疑似工具 wrapper，完整解析失败或工具语义无效时再按普通文本放行。
+工具调用正例现在优先示范普通 XML 风格：`<tool_calls>` → `<invoke name="...">` → `<parameter name="...">`。
+兼容层仍接受历史 DSML 标签变体，包括短横线形式 `<dsml-tool-calls>` / `<dsml-invoke>` / `<dsml-parameter>`、下划线形式 `<dsml_tool_calls>` / `<dsml_invoke>` / `<dsml_parameter>`，以及其他前缀分隔形态如 `<vendor|tool_calls>` / `<vendor_tool_calls>` / `<vendor - tool_calls>`；标签壳扫描还会把全角 ASCII 漂移归一化，例如 `<ｄＳＭＬ|tool_calls>` 与全角 `＞` 结束符，也会容错 CJK 尖括号、全角感叹号或顿号分隔符、弯引号属性值、PascalCase 本地名和属性尾部分隔符漂移，例如 `<DSM|parameter name="command"|>...〈/DSM|parameter〉`、`<！DSML！invoke name=“Bash”>`、`<、DSML、tool_calls>`、`<DSmartToolCalls>`、`<DSMLtool_calls※>`。更一般地，Go / Node tag 扫描以固定本地标签名 `tool_calls` / `invoke` / `parameter` 为准，标签名前或标签名后的非结构性协议分隔符都会在解析入口剥离，例如 `<DSML␂tool_calls>`、`<proto💥tool_calls>` 这类控制符或非 ASCII 分隔符漂移也会归一化回现有 XML 标签后继续走同一套 parser；结构性字符如 `<` / `>` / `/` / `=` / 引号、空白和 ASCII 字母数字不会被当作这类分隔符。进入现有 rewrite / XML parse 之前，Go / Node 还会先对“已经识别成工具标签壳的 candidate span”做一次窄 canonicalization：只折叠 wrapper / `invoke` / `parameter` / `name` / `CDATA` / DSML 前缀及其壳层分隔符里的 confusable 字符，清理零宽 / BOM / 控制类干扰，并把引号、空白、dash / underscore 变体等统一回可解析的工具语法。这个阶段不会广义改写普通正文、参数内容、Markdown 行内 code span、CDATA 里的示例文本或其他非工具 XML。CDATA 开头也使用同一类扫描式容错，`<![CDATA[` / `<！[CDATA[` / `<、[CDATA[` 都会作为参数原文容器处理。提示词会优先要求模型输出普通 XML 标签，并强调不能只输出 closing wrapper 而漏掉 opening tag。解析器会先截获非 Markdown 代码上下文中的疑似工具 wrapper，完整解析失败或工具语义无效时再按普通文本放行。
 数组参数使用 `<item>...</item>` 子节点表示；当某个参数体只包含 item 子节点时，Go / Node 解析器会把它还原成数组，避免 `questions` / `options` 这类 schema 中要求 array 的参数被误解析成 `{ "item": ... }` 对象。除此之外，解析器还会回收一些更松散的列表写法，例如 JSON array 字面量或逗号分隔的 JSON 项序列，只要它们足够明确；但 `<item>` 仍然是首选形态。若模型把完整结构化 XML fragment 误包进 CDATA，兼容层会在保护 `content` / `command` 等原文字段的前提下，尝试把非原文字段中的 CDATA XML fragment 还原成 object / array。不过，如果 CDATA 只是单个平面的 XML/HTML 标签，例如 `<b>urgent</b>` 这种行内标记，兼容层会保留原始字符串，不会强行升成 object / array；只有明显表示结构的 CDATA 片段，例如多兄弟节点、嵌套子节点或 `item` 列表，才会触发结构化恢复。对 `command` / `content` 等长文本参数，CDATA 内部的 Markdown fenced DSML / XML 示例会作为原文保护；示例里的 `]]></parameter>` 或 `</tool_calls>` 不会截断外层工具调用，解析器会继续等待围栏外真正的参数 / wrapper 结束标签。
 Go 侧读取 DeepSeek SSE 时不再依赖 `bufio.Scanner` 的固定 2MiB 单行上限；当写文件类工具把很长的 `content` 放在单个 `data:` 行里返回时，非流式收集、流式解析和 auto-continue 透传都会保留完整行，再进入同一套工具解析与序列化流程。
 在 assistant 最终回包阶段，如果某个 tool 参数在声明 schema 中明确是 `string`，兼容层会在把解析后的 `tool_calls` / `function_call` 重新序列化成 OpenAI / Responses / Claude 可见参数前，递归把该路径上的 number / bool / object / array 统一转成字符串；其中 object / array 会压成紧凑 JSON 字符串。这个保护只对 schema 明确声明为 string 的路径生效，不会改写本来就是 `number` / `boolean` / `object` / `array` 的参数。这样可以兼容 DeepSeek 输出了结构化片段、但上游客户端工具 schema 又严格要求字符串参数的场景（例如 `content`、`prompt`、`path`、`taskId` 等）。
@@ -209,21 +207,21 @@ assistant 的 reasoning 会变成一个显式标签块：
 
 对最终返回给客户端的 assistant 轮次，reasoning 不会因为本轮输出了工具调用而被丢弃。OpenAI Chat 会在同一个 assistant message 上同时返回 `reasoning_content` 和 `tool_calls`；OpenAI Responses 会先返回一个包含 `reasoning` content 的 assistant message item，再返回后续 `function_call` item；Claude / Gemini 也会在各自原生 thinking / thought 结构后继续返回 tool_use / functionCall。
 
-对进入后续 prompt / `HISTORY.txt` 的历史轮次，兼容层也会把同一轮工具调用前的 reasoning 绑定到 assistant tool call 历史上。OpenAI Chat 原生 `reasoning_content + tool_calls` 会直接保留；OpenAI Responses 若以 `reasoning` message item 后接 `function_call` item 的形式回放历史，会在归一化时合并为同一个 assistant 历史块；Claude 的 `thinking` block 会绑定到后续 `tool_use`；Gemini 的 `thought: true` part 会绑定到后续 `functionCall`。最终 prompt 中的顺序固定为 `[reasoning_content]...[/reasoning_content]`，再接 DSML tool call 外壳。
+对进入后续 prompt / `HISTORY.txt` 的历史轮次，兼容层也会把同一轮工具调用前的 reasoning 绑定到 assistant tool call 历史上。OpenAI Chat 原生 `reasoning_content + tool_calls` 会直接保留；OpenAI Responses 若以 `reasoning` message item 后接 `function_call` item 的形式回放历史，会在归一化时合并为同一个 assistant 历史块；Claude 的 `thinking` block 会绑定到后续 `tool_use`；Gemini 的 `thought: true` part 会绑定到后续 `functionCall`。最终 prompt 中的顺序固定为 `[reasoning_content]...[/reasoning_content]`，再接 XML tool call 外壳。
 
 ### 7.2 历史 tool_calls 保留方式
 
-assistant 历史 `tool_calls` 不会保留成 OpenAI 原生 JSON，而会转成 prompt 可见的 DSML 外壳：
+assistant 历史 `tool_calls` 不会保留成 OpenAI 原生 JSON，而会转成 prompt 可见的 XML 外壳：
 
 ```xml
-<|DSML|tool_calls>
-  <|DSML|invoke name="read_file">
-    <|DSML|parameter name="path"><![CDATA[src/main.go]]></|DSML|parameter>
-  </|DSML|invoke>
-</|DSML|tool_calls>
+<tool_calls>
+  <invoke name="read_file">
+    <parameter name="path"><![CDATA[src/main.go]]></parameter>
+  </invoke>
+</tool_calls>
 ```
 
-如果客户端历史里没有结构化 `tool_calls` 字段、却把一个可独立解析的 assistant 工具块放进了普通 `content`，兼容层会在写入后续 prompt 前先按工具调用解析它，再重渲染为规范 DSML 历史外壳。这样可以避免一次 malformed 工具块未被结构化保存后，作为普通 assistant 文本回灌，继续污染后续模型的 few-shot 工具格式。
+如果客户端历史里没有结构化 `tool_calls` 字段、却把一个可独立解析的 assistant 工具块放进了普通 `content`，兼容层会在写入后续 prompt 前先按工具调用解析它，再重渲染为规范 XML 历史外壳。这样可以避免一次 malformed 工具块未被结构化保存后，作为普通 assistant 文本回灌，继续污染后续模型的 few-shot 工具格式。
 
 解析层同时兼容旧式纯 XML 形态：`<tool_calls>` / `<invoke>` / `<parameter>`。两者都会先归一到现有 XML 解析语义；其他旧格式都会作为普通文本保留，不会作为可执行调用语法。
 例外是 parser 会对一个非常窄的模型失误做修复：如果 assistant 输出了 `<invoke ...>` ... `</tool_calls>`（或 DSML 对应标签），但漏掉最前面的 opening wrapper，解析阶段会在 wrapper-confidence 足够高时补回 wrapper 后再尝试识别。这里的 wrapper-confidence 指 scanner 已经识别出白名单工具壳结构，剩余失败只像壳层结构漂移，而不是语义上接近但不在白名单内的 near-miss 标签名。修复成功时，wrapper 后面的 suffix prose 会继续保留在可见文本里；修复失败时，该块仍按普通文本处理。
@@ -238,7 +236,7 @@ assistant 历史 `tool_calls` 不会保留成 OpenAI 原生 JSON，而会转成 
 
 ### 7.3 tool result 保留方式
 
-tool / function role 的结果会作为 `<|Tool|>...<|end▁of▁toolresults|>` 进入 prompt。
+tool / function role 的结果会作为 `Tool result:` block 进入 prompt。
 
 如果 tool content 为空，当前会补成字符串 `"null"`，避免整个 tool turn 丢失。
 
@@ -279,7 +277,7 @@ OpenAI 的文件上传现在不再是“只传文件本体”的通用路径，�
 
 兼容层现在只保留 `current_input_file` 这一种拆分方式；旧的 `history_split` 配置字段已移除，读取旧配置时会忽略它且不会再写回。
 
-- `current_input_file` 默认开启；它在统一 completion runtime 入口全局生效，用于把“完整上下文”合并进 `HISTORY.txt` 上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，runtime 会上传一个文件名为 `HISTORY.txt` 的上下文文件。文件内容会先经过各协议入口的标准化，再序列化成按轮次编号的 `HISTORY.txt` 风格 transcript，带有 `# HISTORY.txt` 标题和 `=== N. ROLE ===` 分段；如果当前请求声明了可用工具，还会把工具名称、描述和参数 schema 单独上传成 `TOOLS.txt`，带有 `# TOOLS.txt` 标题。live prompt 中则会给出一个 continuation 语气的 user 消息，引导模型从 `HISTORY.txt` 的最新状态继续推进，并在有工具文件时明确可用工具 schema 位于 `TOOLS.txt`；system prompt 也会在统一 DSML 工具格式约束前说明 `TOOLS.txt` 是可调用工具和 schema 的权威来源，同时保留本轮工具选择策略，避免把任务拉回起点。
+- `current_input_file` 默认开启；它在统一 completion runtime 入口全局生效，用于把“完整上下文”合并进 `HISTORY.txt` 上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，runtime 会上传一个文件名为 `HISTORY.txt` 的上下文文件。文件内容会先经过各协议入口的标准化，再序列化成按轮次编号的 `HISTORY.txt` 风格 transcript，带有 `# HISTORY.txt` 标题和 `=== N. ROLE ===` 分段；如果当前请求声明了可用工具，还会把工具名称、描述和参数 schema 单独上传成 `TOOLS.txt`，带有 `# TOOLS.txt` 标题。live prompt 中则会给出一个自然的 continuation 语气 user 消息，要求模型使用附件里的对话笔记作为当前上下文并直接回答最新请求；如果有工具文件，会说明工具细节在单独附件中，同时保留本轮工具选择策略，避免把任务拉回起点。
 - 如果 `current_input_file.enabled=false`，请求会直接透传，不上传任何拆分上下文文件。
 - 即使触发 `current_input_file` 后 live prompt 被缩短，对客户端回包里的上下文 token 统计，仍会沿用**拆分前的完整 prompt 语义**做计数，而不是按缩短后的占位 prompt 计算；否则会把真实上下文显著算小。
 
@@ -292,7 +290,7 @@ OpenAI 的文件上传现在不再是“只传文件本体”的通用路径，�
 - 全局 completion runtime 应用点：
   [internal/completionruntime/nonstream.go](../internal/completionruntime/nonstream.go)
 
-当前输入转文件启用并触发时，上传的历史文件真实文件名是 `HISTORY.txt`，文件内容是完整 `messages` 上下文；它会使用 OpenAI-compatible 的消息/transcript 序列化规则和 DeepSeek 角色标记，再按轮次编号成 `HISTORY.txt` 风格的 transcript（不再注入文件边界标签）：
+当前输入转文件启用并触发时，上传的历史文件真实文件名是 `HISTORY.txt`，文件内容是完整 `messages` 上下文；它会使用 OpenAI-compatible 的消息/transcript 序列化规则和普通角色边界，再按轮次编号成 `HISTORY.txt` 风格的 transcript（不再注入文件边界标签）：
 
 ```text
 [uploaded filename]: HISTORY.txt
@@ -326,7 +324,7 @@ Description: ...
 Parameters: ...
 ```
 
-开启后，请求的 live prompt 不再直接内联完整上下文，也不再内联大段工具 schema；它保留一个 user role 的短提示，提示模型基于已提供上下文直接回答最新请求，并在有工具时引用 `TOOLS.txt`。上传后的 `HISTORY.txt` file_id 会排在 `ref_file_ids` 最前；如果存在 `TOOLS.txt`，它的 file_id 紧随其后；客户端已有的其他 file_id 保持在后面。上下文 token 统计会包含上传的历史文件、工具文件和 live prompt。自动生成的 current-input 文件引用会被记录为 runtime 状态；如果托管账号模式切号 fresh retry，runtime 会重新上传这些自动文件，而不是把上一账号的 file_id 交给新账号。
+开启后，请求的 live prompt 不再直接内联完整上下文，也不再内联大段工具 schema；它保留一个 user role 的短提示，提示模型基于已提供上下文直接回答最新请求，并在有工具时说明工具细节在单独附件中。上传后的 `HISTORY.txt` file_id 会排在 `ref_file_ids` 最前；如果存在 `TOOLS.txt`，它的 file_id 紧随其后；客户端已有的其他 file_id 保持在后面。上下文 token 统计会包含上传的历史文件、工具文件和 live prompt。自动生成的 current-input 文件引用会被记录为 runtime 状态；如果托管账号模式切号 fresh retry，runtime 会重新上传这些自动文件，而不是把上一账号的 file_id 交给新账号。
 
 ## 10. 各协议入口的差异
 
@@ -336,7 +334,7 @@ Parameters: ...
 
 - `developer` 会映射到 `system`
 - Responses `instructions` 会 prepend 为 system message
-- 普通直传时 `tools` 会注入 system prompt；`current_input_file` 触发时工具描述/schema 会拆成 `TOOLS.txt`，system prompt 保留格式/策略规则并明确要求模型从 `TOOLS.txt` 获取可调用工具和 schema
+- 普通直传时 `tools` 会注入 system prompt；`current_input_file` 触发时工具描述/schema 会拆成 `TOOLS.txt`，live prompt 用自然语言说明工具细节在单独附件中，同时保留 XML 工具格式/策略规则
 - `attachments` / `input_file` / inline 文件会进入 `ref_file_ids`
 - current input file 在统一 completion runtime 入口全局生效
 
@@ -375,7 +373,7 @@ Parameters: ...
 
 ```json
 {
-  "prompt": "<|begin▁of▁sentence|><|System|>原 system / developer\n\nTOOL CALL FORMAT — FOLLOW EXACTLY: ...<|end▁of▁instructions|><|User|>Continue from the latest state in the attached HISTORY.txt context. Treat it as the current working state and answer the latest user request directly. Available tool descriptions and parameter schemas are attached in TOOLS.txt; use only those tools and follow the tool-call format rules in this prompt.<|Assistant|>",
+  "prompt": "System instructions:\n原 system / developer\n\nTOOL CALL FORMAT — FOLLOW EXACTLY: ...\n\nUser message:\nUse the attached conversation notes as the current context and answer the latest user request directly. Tool details are provided in a separate attachment; use only those listed tools and follow the XML tool-call rules in this prompt.\n\nAssistant response:\n",
   "ref_file_ids": [
     "file-ds2api-history",
     "file-ds2api-tools",

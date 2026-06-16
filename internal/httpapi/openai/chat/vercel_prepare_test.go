@@ -135,7 +135,7 @@ func TestHandleVercelStreamPrepareAppliesCurrentInputFile(t *testing.T) {
 		t.Fatalf("expected payload object, got %#v", body["payload"])
 	}
 	promptText, _ := payload["prompt"].(string)
-	if !strings.Contains(promptText, "Continue from the latest state in the attached HISTORY.txt context.") {
+	if !strings.Contains(promptText, "Use the attached conversation notes as the current context.") {
 		t.Fatalf("expected continuation prompt, got %s", promptText)
 	}
 	if strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {
@@ -147,7 +147,7 @@ func TestHandleVercelStreamPrepareAppliesCurrentInputFile(t *testing.T) {
 	}
 }
 
-func TestHandleVercelStreamPrepareUsesHalfwidthDSMLToolPrompt(t *testing.T) {
+func TestHandleVercelStreamPrepareUsesPlainXMLToolPrompt(t *testing.T) {
 	t.Setenv("VERCEL", "1")
 	t.Setenv("DS2API_VERCEL_INTERNAL_SECRET", "stream-secret")
 
@@ -199,8 +199,8 @@ func TestHandleVercelStreamPrepareUsesHalfwidthDSMLToolPrompt(t *testing.T) {
 	payload, _ := body["payload"].(map[string]any)
 	payloadPrompt, _ := payload["prompt"].(string)
 	for label, promptText := range map[string]string{"final_prompt": finalPrompt, "payload.prompt": payloadPrompt} {
-		if !strings.Contains(promptText, "<|DSML|tool_calls>") || !strings.Contains(promptText, "Tag punctuation alphabet: ASCII < > / = \" plus the halfwidth pipe |.") {
-			t.Fatalf("expected %s to contain halfwidth DSML tool instructions, got %q", label, promptText)
+		if !strings.Contains(promptText, "<tool_calls>") || !strings.Contains(promptText, "Tag punctuation alphabet: ASCII < > / = \" only.") {
+			t.Fatalf("expected %s to contain plain XML tool instructions, got %q", label, promptText)
 		}
 		if strings.Contains(promptText, "\uff5c") || strings.Contains(promptText, "full"+"width vertical bar") {
 			t.Fatalf("expected %s not to contain legacy pipe guidance, got %q", label, promptText)
@@ -371,7 +371,7 @@ func TestHandleVercelStreamPrepareUploadsToolsSeparately(t *testing.T) {
 	payload, _ := body["payload"].(map[string]any)
 	payloadPrompt, _ := payload["prompt"].(string)
 	for label, promptText := range map[string]string{"final_prompt": finalPrompt, "payload.prompt": payloadPrompt} {
-		if !strings.Contains(promptText, "TOOLS.txt") || !strings.Contains(promptText, "TOOL CALL FORMAT") {
+		if !strings.Contains(promptText, "Tool details are provided in a separate attachment") || !strings.Contains(promptText, "TOOL CALL FORMAT") {
 			t.Fatalf("expected %s to reference tools file and retain tool instructions, got %q", label, promptText)
 		}
 		if strings.Contains(promptText, "Description: search docs") {
@@ -452,7 +452,7 @@ func TestHandleVercelStreamSwitchReuploadsCurrentInputFile(t *testing.T) {
 		RequestedModel:          "deepseek-v4-flash",
 		ResolvedModel:           "deepseek-v4-flash",
 		ResponseModel:           "deepseek-v4-flash",
-		FinalPrompt:             "Continue from the latest state in the attached HISTORY.txt context. Available tool descriptions and parameter schemas are attached in TOOLS.txt; use only those tools and follow the tool-call format rules in this prompt.",
+		FinalPrompt:             "Use the attached conversation notes as the current context and answer the latest user request directly. Tool details are provided in a separate attachment; use only those listed tools and follow the XML tool-call rules in this prompt.",
 		PromptTokenText:         "# HISTORY.txt\n\n=== 1. USER ===\nhello\n\n# TOOLS.txt\nAvailable tool descriptions and parameter schemas for this request.\n\nYou have access to these tools:\n\nTool: search\nDescription: search docs\nParameters: {\"type\":\"object\"}\n",
 		HistoryText:             "# HISTORY.txt\n\n=== 1. USER ===\nhello\n",
 		CurrentInputFileApplied: true,
@@ -500,7 +500,7 @@ func TestHandleVercelStreamSwitchReuploadsCurrentInputFile(t *testing.T) {
 		t.Fatalf("expected reuploaded current input ref plus client ref, got %#v", payload["ref_file_ids"])
 	}
 	promptText, _ := payload["prompt"].(string)
-	if !strings.Contains(promptText, "TOOLS.txt") {
+	if !strings.Contains(promptText, "Tool details are provided in a separate attachment") {
 		t.Fatalf("expected switched payload prompt to retain tools file reference, got %q", promptText)
 	}
 }

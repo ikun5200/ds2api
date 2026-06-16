@@ -15,7 +15,7 @@ test('chat history strict parser merges current input file placeholder', async (
   const item = {
     messages: [{
       role: 'user',
-      content: 'Continue from the latest state in the attached HISTORY.txt context. Treat it as the current working state and answer the latest user request directly.',
+      content: 'Use the attached conversation notes as the current context and answer the latest user request directly.',
     }],
     history_text: [
       '<|begin▁of▁sentence|>',
@@ -67,7 +67,7 @@ test('chat history transcript parser replaces current input file placeholder', a
   const item = {
     messages: [{
       role: 'user',
-      content: 'Continue from the latest state in the attached HISTORY.txt context. Treat it as the current working state and answer the latest user request directly.',
+      content: 'Use the attached conversation notes as the current context and answer the latest user request directly.',
     }],
     history_text: [
       '# HISTORY.txt',

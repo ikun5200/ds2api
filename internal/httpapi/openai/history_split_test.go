@@ -84,7 +84,7 @@ func TestBuildOpenAICurrentInputContextTranscriptUsesNumberedHistorySections(t *
 		"latest user turn",
 		"[reasoning_content]",
 		"hidden reasoning",
-		"<|DSML|tool_calls>",
+		"<tool_calls>",
 	} {
 		if !strings.Contains(transcript, want) {
 			t.Fatalf("expected transcript to contain %q, got %q", want, transcript)
@@ -271,7 +271,7 @@ func TestApplyCurrentInputFileUploadsFirstTurnWithNumberedHistoryTranscript(t *t
 	if strings.Contains(out.FinalPrompt, "CURRENT_USER_INPUT.txt") || strings.Contains(out.FinalPrompt, "Read that file") {
 		t.Fatalf("expected live prompt not to instruct file reads, got %s", out.FinalPrompt)
 	}
-	if !strings.Contains(out.FinalPrompt, "Continue from the latest state in the attached HISTORY.txt context.") {
+	if !strings.Contains(out.FinalPrompt, "Use the attached conversation notes as the current context.") {
 		t.Fatalf("expected continuation-oriented prompt in live prompt, got %s", out.FinalPrompt)
 	}
 	if len(out.RefFileIDs) != 1 || out.RefFileIDs[0] != "file-inline-1" {
@@ -322,7 +322,7 @@ func TestApplyCurrentInputFilePreservesFullContextPromptForTokenCounting(t *test
 	if !strings.Contains(out.PromptTokenText, "# HISTORY.txt") || !strings.Contains(out.PromptTokenText, "=== 1. SYSTEM ===") {
 		t.Fatalf("expected prompt token text to include numbered history transcript, got %q", out.PromptTokenText)
 	}
-	if !strings.Contains(out.PromptTokenText, "Continue from the latest state in the attached HISTORY.txt context.") {
+	if !strings.Contains(out.PromptTokenText, "Use the attached conversation notes as the current context.") {
 		t.Fatalf("expected prompt token text to also include continuation prompt, got %q", out.PromptTokenText)
 	}
 	if strings.Contains(out.FinalPrompt, "first user turn") || strings.Contains(out.FinalPrompt, "latest user turn") {
@@ -375,7 +375,7 @@ func TestApplyCurrentInputFileUploadsFullContextFile(t *testing.T) {
 	if strings.Contains(out.FinalPrompt, "first user turn") || strings.Contains(out.FinalPrompt, "latest user turn") || strings.Contains(out.FinalPrompt, "CURRENT_USER_INPUT.txt") || strings.Contains(out.FinalPrompt, "Read that file") {
 		t.Fatalf("expected live prompt to use only a continuation instruction, got %s", out.FinalPrompt)
 	}
-	if !strings.Contains(out.FinalPrompt, "Continue from the latest state in the attached HISTORY.txt context.") {
+	if !strings.Contains(out.FinalPrompt, "Use the attached conversation notes as the current context.") {
 		t.Fatalf("expected continuation-oriented prompt in live prompt, got %s", out.FinalPrompt)
 	}
 }
@@ -436,7 +436,7 @@ func TestApplyCurrentInputFileUploadsToolsContextSeparately(t *testing.T) {
 	if strings.Contains(toolsText, "TOOL CALL FORMAT") {
 		t.Fatalf("tools transcript should not duplicate tool format instructions, got %q", toolsText)
 	}
-	if !strings.Contains(out.FinalPrompt, "Continue from the latest state in the attached HISTORY.txt context.") || !strings.Contains(out.FinalPrompt, "TOOLS.txt") {
+	if !strings.Contains(out.FinalPrompt, "Use the attached conversation notes as the current context.") || !strings.Contains(out.FinalPrompt, "Tool details are provided in a separate attachment") {
 		t.Fatalf("expected live prompt to reference both context files, got %q", out.FinalPrompt)
 	}
 	if !strings.Contains(out.FinalPrompt, "TOOL CALL FORMAT") || !strings.Contains(out.FinalPrompt, "Remember: The ONLY valid way to use tools") {
@@ -448,7 +448,7 @@ func TestApplyCurrentInputFileUploadsToolsContextSeparately(t *testing.T) {
 	if len(out.RefFileIDs) < 2 || out.RefFileIDs[0] != "file-inline-1" || out.RefFileIDs[1] != "file-inline-2" {
 		t.Fatalf("expected history and tools file ids first, got %#v", out.RefFileIDs)
 	}
-	if !strings.Contains(out.PromptTokenText, "# HISTORY.txt") || !strings.Contains(out.PromptTokenText, "# TOOLS.txt") || !strings.Contains(out.PromptTokenText, "Description: search docs") {
+	if !strings.Contains(out.PromptTokenText, "# HISTORY.txt") || !strings.Contains(out.PromptTokenText, "# Tool details are provided in a separate attachment") || !strings.Contains(out.PromptTokenText, "Description: search docs") {
 		t.Fatalf("expected prompt token text to include uploaded history and tools content, got %q", out.PromptTokenText)
 	}
 }
@@ -533,7 +533,7 @@ func TestChatCompletionsCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *t
 		t.Fatal("expected completion payload to be captured")
 	}
 	promptText, _ := ds.completionReq["prompt"].(string)
-	if !strings.Contains(promptText, "Continue from the latest state in the attached HISTORY.txt context.") {
+	if !strings.Contains(promptText, "Use the attached conversation notes as the current context.") {
 		t.Fatalf("expected continuation-oriented prompt, got %s", promptText)
 	}
 	if strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {
@@ -592,7 +592,7 @@ func TestResponsesCurrentInputFileUploadsContextAndKeepsNeutralPrompt(t *testing
 		t.Fatal("expected completion payload to be captured")
 	}
 	promptText, _ := ds.completionReq["prompt"].(string)
-	if !strings.Contains(promptText, "Continue from the latest state in the attached HISTORY.txt context.") {
+	if !strings.Contains(promptText, "Use the attached conversation notes as the current context.") {
 		t.Fatalf("expected continuation-oriented prompt, got %s", promptText)
 	}
 	if strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {
@@ -657,11 +657,11 @@ func TestResponsesCurrentInputFileUploadsToolsSeparately(t *testing.T) {
 		t.Fatalf("history transcript should not embed tool descriptions, got %q", historyText)
 	}
 	toolsText := string(ds.uploadCalls[1].Data)
-	if !strings.Contains(toolsText, "# TOOLS.txt") || !strings.Contains(toolsText, "Tool: search") || !strings.Contains(toolsText, "Description: search docs") {
+	if !strings.Contains(toolsText, "# Tool details are provided in a separate attachment") || !strings.Contains(toolsText, "Tool: search") || !strings.Contains(toolsText, "Description: search docs") {
 		t.Fatalf("expected tools transcript to include schema, got %q", toolsText)
 	}
 	promptText, _ := ds.completionReq["prompt"].(string)
-	if !strings.Contains(promptText, "TOOLS.txt") || !strings.Contains(promptText, "TOOL CALL FORMAT") {
+	if !strings.Contains(promptText, "Tool details are provided in a separate attachment") || !strings.Contains(promptText, "TOOL CALL FORMAT") {
 		t.Fatalf("expected live prompt to reference tools file and retain format instructions, got %q", promptText)
 	}
 	if strings.Contains(promptText, "Description: search docs") {
@@ -801,7 +801,7 @@ func TestCurrentInputFileWorksAcrossAutoDeleteModes(t *testing.T) {
 				t.Fatalf("expected completion payload for mode=%s", mode)
 			}
 			promptText, _ := ds.completionReq["prompt"].(string)
-			if !strings.Contains(promptText, "Continue from the latest state in the attached HISTORY.txt context.") || strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {
+			if !strings.Contains(promptText, "Use the attached conversation notes as the current context.") || strings.Contains(promptText, "first user turn") || strings.Contains(promptText, "latest user turn") {
 				t.Fatalf("unexpected prompt for mode=%s: %s", mode, promptText)
 			}
 		})

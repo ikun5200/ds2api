@@ -9,7 +9,7 @@ func TestStringifyToolCallArgumentsPreservesConcatenatedJSON(t *testing.T) {
 	}
 }
 
-func TestFormatToolCallsForPromptDSML(t *testing.T) {
+func TestFormatToolCallsForPromptXML(t *testing.T) {
 	got := FormatToolCallsForPrompt([]any{
 		map[string]any{
 			"id": "call_1",
@@ -22,8 +22,8 @@ func TestFormatToolCallsForPromptDSML(t *testing.T) {
 	if got == "" {
 		t.Fatal("expected non-empty formatted tool calls")
 	}
-	if got != "<|DSML|tool_calls>\n  <|DSML|invoke name=\"search_web\">\n    <|DSML|parameter name=\"query\"><![CDATA[latest]]></|DSML|parameter>\n  </|DSML|invoke>\n</|DSML|tool_calls>" {
-		t.Fatalf("unexpected formatted tool call DSML: %q", got)
+	if got != "<tool_calls>\n  <invoke name=\"search_web\">\n    <parameter name=\"query\"><![CDATA[latest]]></parameter>\n  </invoke>\n</tool_calls>" {
+		t.Fatalf("unexpected formatted tool call XML: %q", got)
 	}
 }
 
@@ -34,7 +34,7 @@ func TestFormatToolCallsForPromptEscapesXMLEntities(t *testing.T) {
 			"arguments": `{"q":"a < b && c > d"}`,
 		},
 	})
-	want := "<|DSML|tool_calls>\n  <|DSML|invoke name=\"search&lt;&amp;&gt;\">\n    <|DSML|parameter name=\"q\"><![CDATA[a < b && c > d]]></|DSML|parameter>\n  </|DSML|invoke>\n</|DSML|tool_calls>"
+	want := "<tool_calls>\n  <invoke name=\"search&lt;&amp;&gt;\">\n    <parameter name=\"q\"><![CDATA[a < b && c > d]]></parameter>\n  </invoke>\n</tool_calls>"
 	if got != want {
 		t.Fatalf("unexpected escaped tool call XML: %q", got)
 	}
@@ -50,7 +50,7 @@ func TestFormatToolCallsForPromptUsesCDATAForMultilineContent(t *testing.T) {
 			},
 		},
 	})
-	want := "<|DSML|tool_calls>\n  <|DSML|invoke name=\"write_file\">\n    <|DSML|parameter name=\"content\"><![CDATA[#!/bin/bash\nprintf \"hello\"\n]]></|DSML|parameter>\n    <|DSML|parameter name=\"path\"><![CDATA[script.sh]]></|DSML|parameter>\n  </|DSML|invoke>\n</|DSML|tool_calls>"
+	want := "<tool_calls>\n  <invoke name=\"write_file\">\n    <parameter name=\"content\"><![CDATA[#!/bin/bash\nprintf \"hello\"\n]]></parameter>\n    <parameter name=\"path\"><![CDATA[script.sh]]></parameter>\n  </invoke>\n</tool_calls>"
 	if got != want {
 		t.Fatalf("unexpected multiline cdata tool call XML: %q", got)
 	}

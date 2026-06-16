@@ -40,7 +40,7 @@ func injectToolPromptWithDescriptions(messages []map[string]any, tools []any, po
 	if includeDescriptions && parts.Descriptions != "" {
 		toolPrompt = parts.Descriptions + "\n\n" + toolPrompt
 	} else if !includeDescriptions && parts.Descriptions != "" {
-		toolPrompt = "Available tool descriptions and parameter schemas are attached in " + CurrentToolsContextFilename + ". Treat " + CurrentToolsContextFilename + " as the authoritative list of callable tools and schemas; use only tools and parameters listed there.\n\n" + toolPrompt
+		toolPrompt = "Tool descriptions and parameter details are provided in an attached reference file. Use only the tools and parameters listed in that reference.\n\n" + toolPrompt
 	}
 
 	for i := range messages {
