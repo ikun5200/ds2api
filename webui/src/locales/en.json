@@ -482,7 +482,7 @@
         "thinkingInjectionPromptHelp": "Leave empty to use the built-in default prompt shown as the input placeholder.",
         "currentInputFileTitle": "Independent Split",
         "currentInputFileEnabled": "Independent split (by size)",
-        "currentInputFileDesc": "Enabled by default. Once the character threshold is reached, upload the full context as a DS2API_HISTORY.txt context file.",
+        "currentInputFileDesc": "Enabled by default. Once the character threshold is reached, upload the full context as a HISTORY.txt context file.",
         "currentInputFileMinChars": "Current input threshold (characters)",
         "currentInputFileHelp": "Default is 0, which uses independent split for any non-empty input.",
         "modelTitle": "Model mapping",

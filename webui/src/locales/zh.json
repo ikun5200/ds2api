@@ -482,7 +482,7 @@
         "thinkingInjectionPromptHelp": "留空时使用内置默认提示词；默认内容会显示在输入框占位文本中。",
         "currentInputFileTitle": "独立拆分",
         "currentInputFileEnabled": "独立拆分（按量）",
-        "currentInputFileDesc": "默认开启。达到字符阈值后，将完整上下文上传为 DS2API_HISTORY.txt 上下文文件。",
+        "currentInputFileDesc": "默认开启。达到字符阈值后，将完整上下文上传为 HISTORY.txt 上下文文件。",
         "currentInputFileMinChars": "当前输入阈值（字符数）",
         "currentInputFileHelp": "默认 0，表示只要有输入就会使用独立拆分。",
         "modelTitle": "模型映射",

@@ -391,8 +391,8 @@ func TestChatCompletionsCurrentInputFilePersistsNeutralPrompt(t *testing.T) {
 	if len(ds.uploadCalls) != 1 {
 		t.Fatalf("expected current input upload to happen, got %d", len(ds.uploadCalls))
 	}
-	if ds.uploadCalls[0].Filename != "DS2API_HISTORY.txt" {
-		t.Fatalf("expected DS2API_HISTORY.txt upload, got %q", ds.uploadCalls[0].Filename)
+	if ds.uploadCalls[0].Filename != "HISTORY.txt" {
+		t.Fatalf("expected HISTORY.txt upload, got %q", ds.uploadCalls[0].Filename)
 	}
 	if full.HistoryText != string(ds.uploadCalls[0].Data) {
 		t.Fatalf("expected uploaded current input file to be persisted in history text")
@@ -400,7 +400,7 @@ func TestChatCompletionsCurrentInputFilePersistsNeutralPrompt(t *testing.T) {
 	if len(full.Messages) != 1 {
 		t.Fatalf("expected continuation prompt to be the only persisted message, got %#v", full.Messages)
 	}
-	if !strings.Contains(full.Messages[0].Content, "Continue from the latest state in the attached DS2API_HISTORY.txt context.") {
+	if !strings.Contains(full.Messages[0].Content, "Continue from the latest state in the attached HISTORY.txt context.") {
 		t.Fatalf("expected continuation prompt to be persisted, got %#v", full.Messages[0])
 	}
 }

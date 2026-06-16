@@ -9,9 +9,9 @@ import (
 	"ds2api/internal/toolcall"
 )
 
-const CurrentToolsContextFilename = "DS2API_TOOLS.txt"
+const CurrentToolsContextFilename = "TOOLS.txt"
 
-const toolsTranscriptTitle = "# DS2API_TOOLS.txt"
+const toolsTranscriptTitle = "# " + CurrentToolsContextFilename
 const toolsTranscriptSummary = "Available tool descriptions and parameter schemas for this request."
 
 type toolPromptParts struct {
@@ -40,7 +40,7 @@ func injectToolPromptWithDescriptions(messages []map[string]any, tools []any, po
 	if includeDescriptions && parts.Descriptions != "" {
 		toolPrompt = parts.Descriptions + "\n\n" + toolPrompt
 	} else if !includeDescriptions && parts.Descriptions != "" {
-		toolPrompt = "Available tool descriptions and parameter schemas are attached in DS2API_TOOLS.txt. Treat DS2API_TOOLS.txt as the authoritative list of callable tools and schemas; use only tools and parameters listed there.\n\n" + toolPrompt
+		toolPrompt = "Available tool descriptions and parameter schemas are attached in " + CurrentToolsContextFilename + ". Treat " + CurrentToolsContextFilename + " as the authoritative list of callable tools and schemas; use only tools and parameters listed there.\n\n" + toolPrompt
 	}
 
 	for i := range messages {

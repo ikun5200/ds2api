@@ -112,7 +112,7 @@ DS2API 当前的核心思路，不是把客户端传来的 `messages`、`tools`�
 - Vercel Node 流式路径本轮不迁移，仍使用现有 Node bridge / stream-tool-sieve 实现；后续若变更 Node 流式语义，需要按 `assistantturn` 的 Go canonical 输出语义同步对齐。
 - 客户端传入的 thinking / reasoning 开关会被归一到下游 `thinking_enabled`。Gemini `generationConfig.thinkingConfig.thinkingBudget` 会翻译成同一套 thinking 开关；关闭时即使上游返回 `response/thinking_content`，兼容层也不会把它当作可见正文输出。若最终解析出的模型名带 `-nothinking` 后缀，则会无条件强制关闭 thinking，优先级高于请求体中的 `thinking` / `reasoning` / `reasoning_effort`。未显式关闭时，各 surface 会按解析后的 DeepSeek 模型默认能力开启 thinking，并用各自协议的原生形态暴露：OpenAI Chat 为 `reasoning_content`，OpenAI Responses 为 `response.reasoning.delta` / `reasoning` content，Claude 为 `thinking` block / `thinking_delta`，Gemini 为 `thought: true` part。
 - 对 OpenAI Chat / Responses 的非流式收尾，如果最终可见正文为空，兼容层会优先尝试把思维链中的独立 DSML / XML 工具块当作真实工具调用解析出来。流式链路也会在收尾阶段做同样的 fallback 检测，但不会因为思维链内容去中途拦截或改写流式输出；真正的工具识别始终基于原始上游文本，而不是基于“已经做过可见输出清洗”的版本。最终可见层会剥离已经成功解析成工具调用的完整 leaked DSML / XML `tool_calls` wrapper；如果遇到完整 wrapper 但内部形态不符合可执行工具调用语义（例如 `<param>` 这类 malformed XML 工具壳），流式 sieve 会把该块作为普通文本释放，而不是吞掉或伪造成工具调用。补发结果会作为本轮 assistant 的结构化 `tool_calls` / `function_call` 输出返回，而不是塞进 `content` 文本；如果客户端没有开启 thinking / reasoning，思维链只用于检测，不会作为 `reasoning_content` 或可见正文暴露。只有正文为空且思维链里也没有可执行工具调用时，才继续按空回复错误处理。
-- OpenAI Chat / Responses、Claude Messages、Gemini generateContent 的空回复错误处理之前会默认做一次内部补偿重试：第一次上游完整结束后，如果最终可见正文为空、没有解析到工具调用、也没有已经向客户端流式发出工具调用，并且终止原因不是 `content_filter`，兼容层会复用同一个 `chat_session_id`、账号、token 与工具策略，把原始 completion `prompt` 追加固定后缀 `Previous reply had no visible output. Please regenerate the visible final answer or tool call now.` 后重新提交一次。Go 主路径的非流式重试由 `completionruntime.ExecuteNonStreamWithRetry` 统一处理；流式重试由 `completionruntime.ExecuteStreamWithRetry` 统一处理，各协议 runtime 只负责消费/渲染本协议 SSE framing。重试遵循 DeepSeek 多轮对话协议：从第一次上游 SSE 流中提取 `response_message_id`，并在重试 payload 中设置 `parent_message_id` 为该值，使重试成为同一会话的后续轮次而非断裂的根消息；同时重新获取一次 PoW（若 PoW 获取失败则回退到原始 PoW）。该同账号重试不会重新标准化消息、不会新建 session，也不会向流式客户端插入重试标记；第二次 thinking / reasoning 会按正常增量直接接到第一次之后，并继续使用 overlap trim 去重。若同账号补偿重试后即将返回 429 `upstream_empty_output`，并且当前是托管账号模式，runtime 会在返回 429 前切换到下一个可用账号，新建 `chat_session_id`，使用原始 completion payload 再做一次 fresh retry；该切号重试不携带空回复 prompt 后缀，也不设置上一账号的 `parent_message_id`。如果 current input file 已触发，切号前会在新账号上重新上传同一份 `DS2API_HISTORY.txt`（以及需要时的 `DS2API_TOOLS.txt`），并用新账号可见的 file_id 替换自动生成的旧 file_id；客户端原本传入的其他文件引用保持不变。如果没有可切换账号，或切号后的 fresh retry 仍没有可见正文或工具调用，则继续按原错误返回：无任何输出为 503 `upstream_unavailable`，有 reasoning 但没有可见正文或工具调用为 429 `upstream_empty_output`。若任一尝试触发空 `content_filter`，不做补偿重试并保持 `content_filter` 错误。Vercel Node 流式路径通过 Go 内部 prepare / pow / switch 端点获取初始 payload、重试 PoW 和切号 fresh retry payload，因此同样会重新上传 current-input 自动文件并替换为新账号 file_id。
+- OpenAI Chat / Responses、Claude Messages、Gemini generateContent 的空回复错误处理之前会默认做一次内部补偿重试：第一次上游完整结束后，如果最终可见正文为空、没有解析到工具调用、也没有已经向客户端流式发出工具调用，并且终止原因不是 `content_filter`，兼容层会复用同一个 `chat_session_id`、账号、token 与工具策略，把原始 completion `prompt` 追加固定后缀 `Previous reply had no visible output. Please regenerate the visible final answer or tool call now.` 后重新提交一次。Go 主路径的非流式重试由 `completionruntime.ExecuteNonStreamWithRetry` 统一处理；流式重试由 `completionruntime.ExecuteStreamWithRetry` 统一处理，各协议 runtime 只负责消费/渲染本协议 SSE framing。重试遵循 DeepSeek 多轮对话协议：从第一次上游 SSE 流中提取 `response_message_id`，并在重试 payload 中设置 `parent_message_id` 为该值，使重试成为同一会话的后续轮次而非断裂的根消息；同时重新获取一次 PoW（若 PoW 获取失败则回退到原始 PoW）。该同账号重试不会重新标准化消息、不会新建 session，也不会向流式客户端插入重试标记；第二次 thinking / reasoning 会按正常增量直接接到第一次之后，并继续使用 overlap trim 去重。若同账号补偿重试后即将返回 429 `upstream_empty_output`，并且当前是托管账号模式，runtime 会在返回 429 前切换到下一个可用账号，新建 `chat_session_id`，使用原始 completion payload 再做一次 fresh retry；该切号重试不携带空回复 prompt 后缀，也不设置上一账号的 `parent_message_id`。如果 current input file 已触发，切号前会在新账号上重新上传同一份 `HISTORY.txt`（以及需要时的 `TOOLS.txt`），并用新账号可见的 file_id 替换自动生成的旧 file_id；客户端原本传入的其他文件引用保持不变。如果没有可切换账号，或切号后的 fresh retry 仍没有可见正文或工具调用，则继续按原错误返回：无任何输出为 503 `upstream_unavailable`，有 reasoning 但没有可见正文或工具调用为 429 `upstream_empty_output`。若任一尝试触发空 `content_filter`，不做补偿重试并保持 `content_filter` 错误。Vercel Node 流式路径通过 Go 内部 prepare / pow / switch 端点获取初始 payload、重试 PoW 和切号 fresh retry payload，因此同样会重新上传 current-input 自动文件并替换为新账号 file_id。
 
 - 非流式 OpenAI Chat / Responses、Claude Messages、Gemini generateContent 在最终可见正文渲染阶段，会把 DeepSeek 搜索返回中的 `[citation:N]` / `[reference:N]` 标记替换成对应 Markdown 链接。`citation` 标记按一基序号解析；`reference` 标记只有在同一段正文中出现 `[reference:0]`（允许冒号后有空格）时才按零基序号映射，并且不会影响同段正文里的 `citation` 标记。
 - 流式输出仍默认隐藏 `[citation:N]` / `[reference:N]` 这类上游内部标记，避免分片输出中泄漏尚未完成映射的引用占位符。
@@ -166,7 +166,7 @@ OpenAI Chat / Responses 在标准化后、current input file 之前，会默认�
 1. 把每个 tool 的名称、描述、参数 schema 序列化成文本。
 2. 拼成 `You have access to these tools:` 大段说明。
 3. 再附上统一的 DSML tool call 外壳格式约束。
-4. 普通直传请求会把“工具描述 + 格式约束”一起并入 system prompt；如果 `current_input_file` 触发，则工具描述/schema 会单独上传成 `DS2API_TOOLS.txt`，live prompt 和 system tool 格式提示都会明确要求模型把 `DS2API_TOOLS.txt` 当作可调用工具和参数 schema 的权威来源。
+4. 普通直传请求会把“工具描述 + 格式约束”一起并入 system prompt；如果 `current_input_file` 触发，则工具描述/schema 会单独上传成 `TOOLS.txt`，live prompt 和 system tool 格式提示都会明确要求模型把 `TOOLS.txt` 当作可调用工具和参数 schema 的权威来源。
 
 工具调用正例现在优先示范半角管道符 DSML 风格：`<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`。
 兼容层仍接受旧式纯 `<tool_calls>` wrapper，并会容错若干 DSML 标签变体，包括短横线形式 `<dsml-tool-calls>` / `<dsml-invoke>` / `<dsml-parameter>`、下划线形式 `<dsml_tool_calls>` / `<dsml_invoke>` / `<dsml_parameter>`，以及其他前缀分隔形态如 `<vendor|tool_calls>` / `<vendor_tool_calls>` / `<vendor - tool_calls>`；标签壳扫描还会把全角 ASCII 漂移归一化，例如 `<ｄＳＭＬ|tool_calls>` 与全角 `＞` 结束符，也会容错 CJK 尖括号、全角感叹号或顿号分隔符、弯引号属性值、PascalCase 本地名和属性尾部分隔符漂移，例如 `<DSM|parameter name="command"|>...〈/DSM|parameter〉`、`<！DSML！invoke name=“Bash”>`、`<、DSML、tool_calls>`、`<DSmartToolCalls>`、`<DSMLtool_calls※>`。更一般地，Go / Node tag 扫描以固定本地标签名 `tool_calls` / `invoke` / `parameter` 为准，标签名前或标签名后的非结构性协议分隔符都会在解析入口剥离，例如 `<DSML␂tool_calls>`、`<proto💥tool_calls>` 这类控制符或非 ASCII 分隔符漂移也会归一化回现有 XML 标签后继续走同一套 parser；结构性字符如 `<` / `>` / `/` / `=` / 引号、空白和 ASCII 字母数字不会被当作这类分隔符。进入现有 DSML rewrite / XML parse 之前，Go / Node 还会先对“已经识别成工具标签壳的 candidate span”做一次窄 canonicalization：只折叠 wrapper / `invoke` / `parameter` / `name` / `CDATA` / `DSML` 及其壳层分隔符里的 confusable 字符，清理零宽 / BOM / 控制类干扰，并把引号、空白、dash / underscore 变体等统一回可解析的工具语法。这个阶段不会广义改写普通正文、参数内容、Markdown 行内 code span、CDATA 里的示例文本或其他非工具 XML。CDATA 开头也使用同一类扫描式容错，`<![CDATA[` / `<！[CDATA[` / `<、[CDATA[` 都会作为参数原文容器处理。但提示词会优先要求模型输出官方 DSML 标签，并强调不能只输出 closing wrapper 而漏掉 opening tag。需要注意：这是“兼容 DSML 外壳，内部仍以 XML 解析语义为准”，不是原生 DSML 全链路实现。解析器会先截获非 Markdown 代码上下文中的疑似工具 wrapper，完整解析失败或工具语义无效时再按普通文本放行。
@@ -209,7 +209,7 @@ assistant 的 reasoning 会变成一个显式标签块：
 
 对最终返回给客户端的 assistant 轮次，reasoning 不会因为本轮输出了工具调用而被丢弃。OpenAI Chat 会在同一个 assistant message 上同时返回 `reasoning_content` 和 `tool_calls`；OpenAI Responses 会先返回一个包含 `reasoning` content 的 assistant message item，再返回后续 `function_call` item；Claude / Gemini 也会在各自原生 thinking / thought 结构后继续返回 tool_use / functionCall。
 
-对进入后续 prompt / `DS2API_HISTORY.txt` 的历史轮次，兼容层也会把同一轮工具调用前的 reasoning 绑定到 assistant tool call 历史上。OpenAI Chat 原生 `reasoning_content + tool_calls` 会直接保留；OpenAI Responses 若以 `reasoning` message item 后接 `function_call` item 的形式回放历史，会在归一化时合并为同一个 assistant 历史块；Claude 的 `thinking` block 会绑定到后续 `tool_use`；Gemini 的 `thought: true` part 会绑定到后续 `functionCall`。最终 prompt 中的顺序固定为 `[reasoning_content]...[/reasoning_content]`，再接 DSML tool call 外壳。
+对进入后续 prompt / `HISTORY.txt` 的历史轮次，兼容层也会把同一轮工具调用前的 reasoning 绑定到 assistant tool call 历史上。OpenAI Chat 原生 `reasoning_content + tool_calls` 会直接保留；OpenAI Responses 若以 `reasoning` message item 后接 `function_call` item 的形式回放历史，会在归一化时合并为同一个 assistant 历史块；Claude 的 `thinking` block 会绑定到后续 `tool_use`；Gemini 的 `thought: true` part 会绑定到后续 `functionCall`。最终 prompt 中的顺序固定为 `[reasoning_content]...[/reasoning_content]`，再接 DSML tool call 外壳。
 
 ### 7.2 历史 tool_calls 保留方式
 
@@ -264,7 +264,7 @@ OpenAI 的文件上传现在不再是“只传文件本体”的通用路径，�
 
 - `/v1/files` 这类独立文件上传入口
 - Chat / Responses 的 inline 图片、附件上传
-- current input file 触发时生成的 `DS2API_HISTORY.txt` 上下文文件
+- current input file 触发时生成的 `HISTORY.txt` 上下文文件
 
 也就是说，文件上传和完成请求的 `model_type` 现在是一致的：完成 payload 里仍然是 `model_type`，上传文件则会在 DeepSeek 上传阶段携带同样的模型类型信息。
 
@@ -279,7 +279,7 @@ OpenAI 的文件上传现在不再是“只传文件本体”的通用路径，�
 
 兼容层现在只保留 `current_input_file` 这一种拆分方式；旧的 `history_split` 配置字段已移除，读取旧配置时会忽略它且不会再写回。
 
-- `current_input_file` 默认开启；它在统一 completion runtime 入口全局生效，用于把“完整上下文”合并进 `DS2API_HISTORY.txt` 上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，runtime 会上传一个文件名为 `DS2API_HISTORY.txt` 的上下文文件。文件内容会先经过各协议入口的标准化，再序列化成按轮次编号的 `DS2API_HISTORY.txt` 风格 transcript，带有 `# DS2API_HISTORY.txt` 标题和 `=== N. ROLE ===` 分段；如果当前请求声明了可用工具，还会把工具名称、描述和参数 schema 单独上传成 `DS2API_TOOLS.txt`，带有 `# DS2API_TOOLS.txt` 标题。live prompt 中则会给出一个 continuation 语气的 user 消息，引导模型从 `DS2API_HISTORY.txt` 的最新状态继续推进，并在有工具文件时明确可用工具 schema 位于 `DS2API_TOOLS.txt`；system prompt 也会在统一 DSML 工具格式约束前说明 `DS2API_TOOLS.txt` 是可调用工具和 schema 的权威来源，同时保留本轮工具选择策略，避免把任务拉回起点。
+- `current_input_file` 默认开启；它在统一 completion runtime 入口全局生效，用于把“完整上下文”合并进 `HISTORY.txt` 上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，runtime 会上传一个文件名为 `HISTORY.txt` 的上下文文件。文件内容会先经过各协议入口的标准化，再序列化成按轮次编号的 `HISTORY.txt` 风格 transcript，带有 `# HISTORY.txt` 标题和 `=== N. ROLE ===` 分段；如果当前请求声明了可用工具，还会把工具名称、描述和参数 schema 单独上传成 `TOOLS.txt`，带有 `# TOOLS.txt` 标题。live prompt 中则会给出一个 continuation 语气的 user 消息，引导模型从 `HISTORY.txt` 的最新状态继续推进，并在有工具文件时明确可用工具 schema 位于 `TOOLS.txt`；system prompt 也会在统一 DSML 工具格式约束前说明 `TOOLS.txt` 是可调用工具和 schema 的权威来源，同时保留本轮工具选择策略，避免把任务拉回起点。
 - 如果 `current_input_file.enabled=false`，请求会直接透传，不上传任何拆分上下文文件。
 - 即使触发 `current_input_file` 后 live prompt 被缩短，对客户端回包里的上下文 token 统计，仍会沿用**拆分前的完整 prompt 语义**做计数，而不是按缩短后的占位 prompt 计算；否则会把真实上下文显著算小。
 
@@ -292,11 +292,11 @@ OpenAI 的文件上传现在不再是“只传文件本体”的通用路径，�
 - 全局 completion runtime 应用点：
   [internal/completionruntime/nonstream.go](../internal/completionruntime/nonstream.go)
 
-当前输入转文件启用并触发时，上传的历史文件真实文件名是 `DS2API_HISTORY.txt`，文件内容是完整 `messages` 上下文；它会使用 OpenAI-compatible 的消息/transcript 序列化规则和 DeepSeek 角色标记，再按轮次编号成 `DS2API_HISTORY.txt` 风格的 transcript（不再注入文件边界标签）：
+当前输入转文件启用并触发时，上传的历史文件真实文件名是 `HISTORY.txt`，文件内容是完整 `messages` 上下文；它会使用 OpenAI-compatible 的消息/transcript 序列化规则和 DeepSeek 角色标记，再按轮次编号成 `HISTORY.txt` 风格的 transcript（不再注入文件边界标签）：
 
 ```text
-[uploaded filename]: DS2API_HISTORY.txt
-# DS2API_HISTORY.txt
+[uploaded filename]: HISTORY.txt
+# HISTORY.txt
 Prior conversation history and tool progress.
 
 === 1. SYSTEM ===
@@ -312,11 +312,11 @@ Prior conversation history and tool progress.
 ...
 ```
 
-如果当前请求带有工具，runtime 同时上传 `DS2API_TOOLS.txt`：
+如果当前请求带有工具，runtime 同时上传 `TOOLS.txt`：
 
 ```text
-[uploaded filename]: DS2API_TOOLS.txt
-# DS2API_TOOLS.txt
+[uploaded filename]: TOOLS.txt
+# TOOLS.txt
 Available tool descriptions and parameter schemas for this request.
 
 You have access to these tools:
@@ -326,7 +326,7 @@ Description: ...
 Parameters: ...
 ```
 
-开启后，请求的 live prompt 不再直接内联完整上下文，也不再内联大段工具 schema；它保留一个 user role 的短提示，提示模型基于已提供上下文直接回答最新请求，并在有工具时引用 `DS2API_TOOLS.txt`。上传后的 `DS2API_HISTORY.txt` file_id 会排在 `ref_file_ids` 最前；如果存在 `DS2API_TOOLS.txt`，它的 file_id 紧随其后；客户端已有的其他 file_id 保持在后面。上下文 token 统计会包含上传的历史文件、工具文件和 live prompt。自动生成的 current-input 文件引用会被记录为 runtime 状态；如果托管账号模式切号 fresh retry，runtime 会重新上传这些自动文件，而不是把上一账号的 file_id 交给新账号。
+开启后，请求的 live prompt 不再直接内联完整上下文，也不再内联大段工具 schema；它保留一个 user role 的短提示，提示模型基于已提供上下文直接回答最新请求，并在有工具时引用 `TOOLS.txt`。上传后的 `HISTORY.txt` file_id 会排在 `ref_file_ids` 最前；如果存在 `TOOLS.txt`，它的 file_id 紧随其后；客户端已有的其他 file_id 保持在后面。上下文 token 统计会包含上传的历史文件、工具文件和 live prompt。自动生成的 current-input 文件引用会被记录为 runtime 状态；如果托管账号模式切号 fresh retry，runtime 会重新上传这些自动文件，而不是把上一账号的 file_id 交给新账号。
 
 ## 10. 各协议入口的差异
 
@@ -336,7 +336,7 @@ Parameters: ...
 
 - `developer` 会映射到 `system`
 - Responses `instructions` 会 prepend 为 system message
-- 普通直传时 `tools` 会注入 system prompt；`current_input_file` 触发时工具描述/schema 会拆成 `DS2API_TOOLS.txt`，system prompt 保留格式/策略规则并明确要求模型从 `DS2API_TOOLS.txt` 获取可调用工具和 schema
+- 普通直传时 `tools` 会注入 system prompt；`current_input_file` 触发时工具描述/schema 会拆成 `TOOLS.txt`，system prompt 保留格式/策略规则并明确要求模型从 `TOOLS.txt` 获取可调用工具和 schema
 - `attachments` / `input_file` / inline 文件会进入 `ref_file_ids`
 - current input file 在统一 completion runtime 入口全局生效
 
@@ -346,7 +346,7 @@ Parameters: ...
 
 - top-level `system` 优先作为系统提示
 - `tool_use` / `tool_result` 会被转换成统一的 assistant/tool 历史语义
-- 普通直传时 `tools` 同样会被并进 system prompt；`current_input_file` 触发时会沿用统一的 `DS2API_TOOLS.txt` 拆分上传路径
+- 普通直传时 `tools` 同样会被并进 system prompt；`current_input_file` 触发时会沿用统一的 `TOOLS.txt` 拆分上传路径
 - 常规执行通过 `internal/httpapi/claude/handler_messages.go` 转到 OpenAI chat 路径，模型 alias 会先解析成 DeepSeek 原生模型
 - 当前代码里没有像 OpenAI 那样完整的 `ref_file_ids` 附件链路
 
@@ -356,7 +356,7 @@ Parameters: ...
 
 - `systemInstruction`、`contents.parts`、`functionCall`、`functionResponse` 会先归一
 - tools 会转成 OpenAI 风格 function schema
-- prompt 构建复用 OpenAI 的 `promptcompat.BuildOpenAIPromptForAdapter`，`current_input_file` 触发时也会使用统一的 `DS2API_TOOLS.txt` 拆分上传路径
+- prompt 构建复用 OpenAI 的 `promptcompat.BuildOpenAIPromptForAdapter`，`current_input_file` 触发时也会使用统一的 `TOOLS.txt` 拆分上传路径
 - 未识别的非文本 part 会被安全序列化进 prompt，并对二进制/疑似 base64 内容做省略或截断处理
 
 也就是说，Gemini 在“最终 prompt 语义”上，尽量和 OpenAI 保持一致。
@@ -375,7 +375,7 @@ Parameters: ...
 
 ```json
 {
-  "prompt": "<|begin▁of▁sentence|><|System|>原 system / developer\n\nTOOL CALL FORMAT — FOLLOW EXACTLY: ...<|end▁of▁instructions|><|User|>Continue from the latest state in the attached DS2API_HISTORY.txt context. Treat it as the current working state and answer the latest user request directly. Available tool descriptions and parameter schemas are attached in DS2API_TOOLS.txt; use only those tools and follow the tool-call format rules in this prompt.<|Assistant|>",
+  "prompt": "<|begin▁of▁sentence|><|System|>原 system / developer\n\nTOOL CALL FORMAT — FOLLOW EXACTLY: ...<|end▁of▁instructions|><|User|>Continue from the latest state in the attached HISTORY.txt context. Treat it as the current working state and answer the latest user request directly. Available tool descriptions and parameter schemas are attached in TOOLS.txt; use only those tools and follow the tool-call format rules in this prompt.<|Assistant|>",
   "ref_file_ids": [
     "file-ds2api-history",
     "file-ds2api-tools",
@@ -391,7 +391,7 @@ Parameters: ...
 
 - 大部分结构化语义被压进 `prompt`
 - 文件保持文件
-- 需要时把完整上下文拆进 `DS2API_HISTORY.txt` 上下文文件，并按轮次编号成 transcript
+- 需要时把完整上下文拆进 `HISTORY.txt` 上下文文件，并按轮次编号成 transcript
 
 ## 12. 修改时必须同步本文档的场景
 
@@ -404,7 +404,7 @@ Parameters: ...
 - tool result 注入方式变更
 - tool prompt 模板或 tool_choice 约束变更
 - inline 文件上传 / 文件引用收集规则变更
-- current input file 触发条件、上传格式、`DS2API_HISTORY.txt` transcript 结构变更
+- current input file 触发条件、上传格式、`HISTORY.txt` transcript 结构变更
 - 旧 `history_split` 字段忽略/清理行为变更
 - completion payload 字段语义变更
 - Claude / Gemini 对这套统一语义的复用关系变更
