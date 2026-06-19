@@ -301,6 +301,12 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `DS2API_RAW_STREAM_SAMPLE_ROOT` | Raw stream sample root for saving/reading samples | `tests/raw_stream_samples` |
 | `DS2API_STATIC_ADMIN_DIR` | WebUI static asset directory | `static/admin` |
 | `DS2API_AUTO_BUILD_WEBUI` | Whether local startup auto-builds missing WebUI assets (`1/true/yes/on` or `0/false/no/off`) | Enabled outside Vercel |
+| `DS2API_DEEPSEEK_CLIENT_VERSION` | Override the DeepSeek upstream `x-client-version` and default UA version | Built-in shared constants |
+| `DS2API_DEEPSEEK_USER_AGENT` | Override the DeepSeek upstream `User-Agent` | Derived from built-in client metadata |
+| `DS2API_DEEPSEEK_ACCEPT_LANGUAGE` | Override the DeepSeek upstream `Accept-Language` | `zh-CN,zh;q=0.9` |
+| `DS2API_DEEPSEEK_CLIENT_LOCALE` | Override the DeepSeek upstream `x-client-locale` | `zh_CN` |
+| `DS2API_DEEPSEEK_DEVICE_ID` | Override the `device_id` sent during DeepSeek login | Stable account-derived value |
+| `DS2API_DEEPSEEK_DEVICE_SEED` | Local salt used by the default `device_id` derivation | Empty |
 | `VERCEL_TOKEN` | Vercel sync token | — |
 | `VERCEL_PROJECT_ID` | Vercel project ID | — |
 | `VERCEL_TEAM_ID` | Vercel team ID | — |

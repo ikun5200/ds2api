@@ -13,6 +13,7 @@ const DEFAULT_CLIENT = Object.freeze({
 const DEFAULT_BASE_HEADERS = Object.freeze({
   Host: 'chat.deepseek.com',
   Accept: 'application/json',
+  'Accept-Language': 'zh-CN,zh;q=0.9',
   'Content-Type': 'application/json',
   'accept-charset': 'UTF-8',
 });
@@ -36,15 +37,25 @@ function asNonEmptyString(value) {
   return typeof value === 'string' && value !== '' ? value : '';
 }
 
+function envString(name) {
+  return asNonEmptyString(process.env[name] || '').trim();
+}
+
 function normalizeClient(raw) {
   const client = raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
-  return {
+  const out = {
     name: asNonEmptyString(client.name) || DEFAULT_CLIENT.name,
     platform: asNonEmptyString(client.platform) || DEFAULT_CLIENT.platform,
     version: asNonEmptyString(client.version),
     androidApiLevel: asNonEmptyString(client.android_api_level) || DEFAULT_CLIENT.androidApiLevel,
     locale: asNonEmptyString(client.locale) || DEFAULT_CLIENT.locale,
   };
+  out.name = envString('DS2API_DEEPSEEK_CLIENT_NAME') || out.name;
+  out.platform = (envString('DS2API_DEEPSEEK_CLIENT_PLATFORM') || out.platform).toLowerCase();
+  out.version = envString('DS2API_DEEPSEEK_CLIENT_VERSION') || out.version;
+  out.androidApiLevel = envString('DS2API_DEEPSEEK_ANDROID_API_LEVEL') || out.androidApiLevel;
+  out.locale = envString('DS2API_DEEPSEEK_CLIENT_LOCALE') || out.locale;
+  return out;
 }
 
 function buildBaseHeaders(parsed, client) {
@@ -66,6 +77,18 @@ function buildBaseHeaders(parsed, client) {
   }
   if (client.locale) {
     baseHeaders['x-client-locale'] = client.locale;
+  }
+  const userAgent = envString('DS2API_DEEPSEEK_USER_AGENT');
+  if (userAgent) {
+    baseHeaders['User-Agent'] = userAgent;
+  }
+  const acceptLanguage = envString('DS2API_DEEPSEEK_ACCEPT_LANGUAGE');
+  if (acceptLanguage) {
+    baseHeaders['Accept-Language'] = acceptLanguage;
+  }
+  const locale = envString('DS2API_DEEPSEEK_CLIENT_LOCALE');
+  if (locale) {
+    baseHeaders['x-client-locale'] = locale;
   }
   return baseHeaders;
 }

@@ -4,6 +4,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strings"
 )
 
 const (
@@ -23,10 +25,11 @@ const (
 )
 
 var defaultStaticBaseHeaders = map[string]string{
-	"Host":           "chat.deepseek.com",
-	"Accept":         "application/json",
-	"Content-Type":   "application/json",
-	"accept-charset": "UTF-8",
+	"Host":            "chat.deepseek.com",
+	"Accept":          "application/json",
+	"Accept-Language": "zh-CN,zh;q=0.9",
+	"Content-Type":    "application/json",
+	"accept-charset":  "UTF-8",
 }
 
 var defaultSkipContainsPatterns = []string{
@@ -77,8 +80,9 @@ func init() {
 
 func applySharedConstants(cfg sharedConstants) {
 	client := normalizeClientConstants(cfg.Client)
+	applyClientEnvOverrides(&client)
 	ClientVersion = client.Version
-	BaseHeaders = buildBaseHeaders(client, cfg.BaseHeaders)
+	BaseHeaders = applyBaseHeaderEnvOverrides(buildBaseHeaders(client, cfg.BaseHeaders))
 	SkipContainsPatterns = cloneStringSlice(defaultSkipContainsPatterns)
 	if len(cfg.SkipContainsPattern) > 0 {
 		SkipContainsPatterns = cloneStringSlice(cfg.SkipContainsPattern)
@@ -103,6 +107,44 @@ func normalizeClientConstants(in clientConstants) clientConstants {
 		in.Locale = "zh_CN"
 	}
 	return in
+}
+
+func applyClientEnvOverrides(client *clientConstants) {
+	if client == nil {
+		return
+	}
+	if v := envString("DS2API_DEEPSEEK_CLIENT_NAME"); v != "" {
+		client.Name = v
+	}
+	if v := envString("DS2API_DEEPSEEK_CLIENT_PLATFORM"); v != "" {
+		client.Platform = strings.ToLower(v)
+	}
+	if v := envString("DS2API_DEEPSEEK_CLIENT_VERSION"); v != "" {
+		client.Version = v
+	}
+	if v := envString("DS2API_DEEPSEEK_ANDROID_API_LEVEL"); v != "" {
+		client.AndroidAPILevel = v
+	}
+	if v := envString("DS2API_DEEPSEEK_CLIENT_LOCALE"); v != "" {
+		client.Locale = v
+	}
+}
+
+func applyBaseHeaderEnvOverrides(headers map[string]string) map[string]string {
+	out := cloneStringMap(headers)
+	setHeaderFromEnv(out, "User-Agent", "DS2API_DEEPSEEK_USER_AGENT")
+	setHeaderFromEnv(out, "Accept-Language", "DS2API_DEEPSEEK_ACCEPT_LANGUAGE")
+	setHeaderFromEnv(out, "x-client-locale", "DS2API_DEEPSEEK_CLIENT_LOCALE")
+	return out
+}
+
+func setHeaderFromEnv(headers map[string]string, key string, envName string) {
+	if headers == nil {
+		return
+	}
+	if v := envString(envName); v != "" {
+		headers[key] = v
+	}
 }
 
 func buildBaseHeaders(client clientConstants, overrides map[string]string) map[string]string {
@@ -130,6 +172,10 @@ func buildBaseHeaders(client clientConstants, overrides map[string]string) map[s
 		out["x-client-locale"] = client.Locale
 	}
 	return out
+}
+
+func envString(name string) string {
+	return strings.TrimSpace(os.Getenv(name))
 }
 
 func cloneStringMap(in map[string]string) map[string]string {

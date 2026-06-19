@@ -54,3 +54,51 @@ func TestClientHeadersDerivedFromSharedVersion(t *testing.T) {
 		t.Fatalf("unexpected derived client version=%q", headers["x-client-version"])
 	}
 }
+
+func TestSharedConstantsSupportEnvironmentOverrides(t *testing.T) {
+	prevClientVersion := ClientVersion
+	prevBaseHeaders := cloneStringMap(BaseHeaders)
+	prevSkipContainsPatterns := cloneStringSlice(SkipContainsPatterns)
+	prevSkipExactPathSet := make(map[string]struct{}, len(SkipExactPathSet))
+	for k, v := range SkipExactPathSet {
+		prevSkipExactPathSet[k] = v
+	}
+	t.Cleanup(func() {
+		ClientVersion = prevClientVersion
+		BaseHeaders = prevBaseHeaders
+		SkipContainsPatterns = prevSkipContainsPatterns
+		SkipExactPathSet = prevSkipExactPathSet
+	})
+
+	t.Setenv("DS2API_DEEPSEEK_CLIENT_VERSION", "8.7.6")
+	t.Setenv("DS2API_DEEPSEEK_USER_AGENT", "CustomDeepSeek/8.7.6 Android/36")
+	t.Setenv("DS2API_DEEPSEEK_ACCEPT_LANGUAGE", "en-US,en;q=0.9")
+	t.Setenv("DS2API_DEEPSEEK_CLIENT_LOCALE", "en_US")
+
+	cfg := sharedConstants{
+		Client: clientConstants{
+			Name:            "DeepSeek",
+			Platform:        "android",
+			Version:         "1.0.0",
+			AndroidAPILevel: "35",
+			Locale:          "zh_CN",
+		},
+		BaseHeaders: map[string]string{
+			"Accept": "application/json",
+		},
+	}
+	applySharedConstants(cfg)
+
+	if ClientVersion != "8.7.6" {
+		t.Fatalf("unexpected client version=%q", ClientVersion)
+	}
+	if BaseHeaders["User-Agent"] != "CustomDeepSeek/8.7.6 Android/36" {
+		t.Fatalf("unexpected user agent=%q", BaseHeaders["User-Agent"])
+	}
+	if BaseHeaders["Accept-Language"] != "en-US,en;q=0.9" {
+		t.Fatalf("unexpected accept language=%q", BaseHeaders["Accept-Language"])
+	}
+	if BaseHeaders["x-client-locale"] != "en_US" {
+		t.Fatalf("unexpected locale=%q", BaseHeaders["x-client-locale"])
+	}
+}

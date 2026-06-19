@@ -2,22 +2,25 @@ package client
 
 import (
 	"context"
-	dsprotocol "ds2api/internal/deepseek/protocol"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
+	"os"
 	"strings"
 	"unicode"
 
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
+	dsprotocol "ds2api/internal/deepseek/protocol"
 )
 
 func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) {
 	clients := c.requestClientsForAccount(acc)
 	payload := map[string]any{
 		"password":  strings.TrimSpace(acc.Password),
-		"device_id": "deepseek_to_api",
+		"device_id": loginDeviceID(acc),
 		"os":        "android",
 	}
 	if email := strings.TrimSpace(acc.Email); email != "" {
@@ -48,6 +51,23 @@ func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) 
 		return "", errors.New("missing login token")
 	}
 	return token, nil
+}
+
+func loginDeviceID(acc config.Account) string {
+	if override := strings.TrimSpace(os.Getenv("DS2API_DEEPSEEK_DEVICE_ID")); override != "" {
+		return override
+	}
+	identifier := strings.ToLower(strings.TrimSpace(acc.Identifier()))
+	if identifier == "" {
+		identifier = strings.ToLower(strings.TrimSpace(acc.Email + "|" + acc.Mobile + "|" + acc.Name))
+	}
+	seed := strings.TrimSpace(os.Getenv("DS2API_DEEPSEEK_DEVICE_SEED"))
+	material := strings.Join([]string{
+		seed,
+		identifier,
+	}, "\n")
+	sum := sha256.Sum256([]byte(material))
+	return hex.EncodeToString(sum[:16])
 }
 
 func (c *Client) CreateSession(ctx context.Context, a *auth.RequestAuth, maxAttempts int) (string, error) {

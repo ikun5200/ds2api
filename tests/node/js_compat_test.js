@@ -26,6 +26,44 @@ test('js shared constants derive client headers from shared json', () => {
   assert.equal(deepseekConstants.BASE_HEADERS['Content-Type'], 'application/json');
 });
 
+test('js shared constants support DeepSeek request identity env overrides', () => {
+  const modulePath = require.resolve('../../internal/js/shared/deepseek-constants.js');
+  const originalModule = require.cache[modulePath];
+  const previous = {
+    DS2API_DEEPSEEK_CLIENT_VERSION: process.env.DS2API_DEEPSEEK_CLIENT_VERSION,
+    DS2API_DEEPSEEK_USER_AGENT: process.env.DS2API_DEEPSEEK_USER_AGENT,
+    DS2API_DEEPSEEK_ACCEPT_LANGUAGE: process.env.DS2API_DEEPSEEK_ACCEPT_LANGUAGE,
+    DS2API_DEEPSEEK_CLIENT_LOCALE: process.env.DS2API_DEEPSEEK_CLIENT_LOCALE,
+  };
+  process.env.DS2API_DEEPSEEK_CLIENT_VERSION = '8.7.6';
+  process.env.DS2API_DEEPSEEK_USER_AGENT = 'CustomDeepSeek/8.7.6 Android/36';
+  process.env.DS2API_DEEPSEEK_ACCEPT_LANGUAGE = 'en-US,en;q=0.9';
+  process.env.DS2API_DEEPSEEK_CLIENT_LOCALE = 'en_US';
+  delete require.cache[modulePath];
+  try {
+    const overridden = require('../../internal/js/shared/deepseek-constants.js');
+    assert.equal(overridden.CLIENT_VERSION, '8.7.6');
+    assert.equal(overridden.BASE_HEADERS['x-client-version'], '8.7.6');
+    assert.equal(overridden.BASE_HEADERS['User-Agent'], 'CustomDeepSeek/8.7.6 Android/36');
+    assert.equal(overridden.BASE_HEADERS['Accept-Language'], 'en-US,en;q=0.9');
+    assert.equal(overridden.BASE_HEADERS['x-client-locale'], 'en_US');
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
+    }
+    delete require.cache[modulePath];
+    if (originalModule) {
+      require.cache[modulePath] = originalModule;
+    } else {
+      require('../../internal/js/shared/deepseek-constants.js');
+    }
+  }
+});
+
 test('js compat: sse fixtures', () => {
   const fixtureDir = path.join(compatRoot, 'fixtures', 'sse_chunks');
   const expectedDir = path.join(compatRoot, 'expected');
