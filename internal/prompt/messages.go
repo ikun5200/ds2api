@@ -139,7 +139,7 @@ func hasOutputIntegrityGuard(msg map[string]any) bool {
 // compact and predictable for downstream parsers.
 func formatRoleBlock(marker, text, endMarker string) string {
 	out := marker + text
-	if strings.TrimSpace(endMarker) != "" {
+	if endMarker != "" {
 		out += endMarker
 	}
 	return out

@@ -68,6 +68,7 @@ if [[ -z "$jobs" ]]; then
   fi
 fi
 
+go get ds2api/internal/chathistory
 go mod download
 
 mkdir -p dist

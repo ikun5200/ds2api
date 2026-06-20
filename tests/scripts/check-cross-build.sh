@@ -47,6 +47,7 @@ fi
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
+go get ds2api/internal/chathistory
 go mod download
 
 if [[ "$jobs" -le 1 ]]; then

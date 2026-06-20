@@ -12,6 +12,7 @@ export GOCACHE="${GOCACHE:-${ROOT_DIR}/.tmp/go-build-cache}"
 export GOLANGCI_LINT_CACHE="${GOLANGCI_LINT_CACHE:-${ROOT_DIR}/.tmp/golangci-lint-cache}"
 mkdir -p "$GOCACHE" "$GOLANGCI_LINT_CACHE"
 
+go get ds2api/internal/chathistory
 go mod download
 
 bootstrap_golangci_lint() {

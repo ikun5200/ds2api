@@ -13,7 +13,8 @@ ARG TARGETOS
 ARG TARGETARCH
 ARG BUILD_VERSION
 COPY go.mod go.sum* ./
-RUN go mod download
+RUN go mod download github.com/go-sql-driver/mysql github.com/jackc/pgx/v5 \
+    && go mod download
 COPY . .
 RUN set -eux; \
     GOOS="${TARGETOS:-$(go env GOOS)}"; \

@@ -7,5 +7,6 @@ cd "$ROOT_DIR"
 export GOCACHE="${GOCACHE:-${ROOT_DIR}/.tmp/go-build-cache}"
 mkdir -p "$GOCACHE"
 
+go get ds2api/internal/chathistory
 go mod download
 go test ./... "$@"
