@@ -68,6 +68,8 @@ if [[ -z "$jobs" ]]; then
   fi
 fi
 
+go mod download
+
 mkdir -p dist
 
 if [[ "$jobs" -le 1 ]]; then

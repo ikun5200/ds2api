@@ -12,6 +12,8 @@ export GOCACHE="${GOCACHE:-${ROOT_DIR}/.tmp/go-build-cache}"
 export GOLANGCI_LINT_CACHE="${GOLANGCI_LINT_CACHE:-${ROOT_DIR}/.tmp/golangci-lint-cache}"
 mkdir -p "$GOCACHE" "$GOLANGCI_LINT_CACHE"
 
+go mod download
+
 bootstrap_golangci_lint() {
   local version_no_v os arch artifact archive_url tmp_dir
   version_no_v="${BOOTSTRAP_VERSION#v}"

@@ -47,6 +47,8 @@ fi
 rm -rf "$OUT_DIR"
 mkdir -p "$OUT_DIR"
 
+go mod download
+
 if [[ "$jobs" -le 1 ]]; then
   for target in "${DS2API_RELEASE_TARGETS[@]}"; do
     read -r goos goarch goarm label <<< "$target"

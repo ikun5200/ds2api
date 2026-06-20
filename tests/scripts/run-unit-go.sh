@@ -7,4 +7,5 @@ cd "$ROOT_DIR"
 export GOCACHE="${GOCACHE:-${ROOT_DIR}/.tmp/go-build-cache}"
 mkdir -p "$GOCACHE"
 
+go mod download
 go test ./... "$@"
