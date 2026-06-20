@@ -301,8 +301,8 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # 个人账号可留空
 | `DS2API_RAW_STREAM_SAMPLE_ROOT` | raw stream 样本保存/读取根目录 | `tests/raw_stream_samples` |
 | `DS2API_STATIC_ADMIN_DIR` | WebUI 静态资源目录 | `static/admin` |
 | `DS2API_AUTO_BUILD_WEBUI` | 本地启动时是否自动构建缺失的 WebUI（`1/true/yes/on` 或 `0/false/no/off`） | 非 Vercel 默认开启 |
-| `DS2API_DEEPSEEK_CLIENT_VERSION` | 覆盖发往 DeepSeek 的 `x-client-version` 与默认 UA 版本 | 内置共享常量 |
-| `DS2API_DEEPSEEK_USER_AGENT` | 覆盖发往 DeepSeek 的 `User-Agent` | 由内置客户端信息派生 |
+| `DS2API_DEEPSEEK_CLIENT_VERSION` | 覆盖发往 DeepSeek 的 `x-client-version` 与 `x-app-version` 基线 | 内置网页端共享常量 |
+| `DS2API_DEEPSEEK_USER_AGENT` | 覆盖发往 DeepSeek 的 `User-Agent` | 内置 Chrome/Web UA |
 | `DS2API_DEEPSEEK_ACCEPT_LANGUAGE` | 覆盖发往 DeepSeek 的 `Accept-Language` | `zh-CN,zh;q=0.9` |
 | `DS2API_DEEPSEEK_CLIENT_LOCALE` | 覆盖发往 DeepSeek 的 `x-client-locale` | `zh_CN` |
 | `DS2API_DEEPSEEK_DEVICE_ID` | 覆盖登录时发送给 DeepSeek 的 `device_id` | 按账号稳定派生 |

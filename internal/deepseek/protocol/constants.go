@@ -10,6 +10,8 @@ import (
 
 const (
 	DeepSeekHost                 = "chat.deepseek.com"
+	DeepSeekOrigin               = "https://chat.deepseek.com"
+	DeepSeekBaseReferer          = "https://chat.deepseek.com/"
 	DeepSeekLoginURL             = "https://chat.deepseek.com/api/v0/users/login"
 	DeepSeekCreateSessionURL     = "https://chat.deepseek.com/api/v0/chat_session/create"
 	DeepSeekCreatePowURL         = "https://chat.deepseek.com/api/v0/chat/create_pow_challenge"
@@ -26,10 +28,9 @@ const (
 
 var defaultStaticBaseHeaders = map[string]string{
 	"Host":            "chat.deepseek.com",
-	"Accept":          "application/json",
+	"Accept":          "*/*",
 	"Accept-Language": "zh-CN,zh;q=0.9",
 	"Content-Type":    "application/json",
-	"accept-charset":  "UTF-8",
 }
 
 var defaultSkipContainsPatterns = []string{
@@ -98,9 +99,9 @@ func normalizeClientConstants(in clientConstants) clientConstants {
 		in.Name = "DeepSeek"
 	}
 	if in.Platform == "" {
-		in.Platform = "android"
+		in.Platform = "web"
 	}
-	if in.AndroidAPILevel == "" {
+	if in.AndroidAPILevel == "" && strings.EqualFold(in.Platform, "android") {
 		in.AndroidAPILevel = "35"
 	}
 	if in.Locale == "" {
@@ -155,9 +156,9 @@ func buildBaseHeaders(client clientConstants, overrides map[string]string) map[s
 		}
 		out[k] = v
 	}
-	if client.Name != "" && client.Version != "" {
+	if client.Platform == "android" && client.Name != "" && client.Version != "" {
 		userAgent := client.Name + "/" + client.Version
-		if client.Platform == "android" && client.AndroidAPILevel != "" {
+		if client.AndroidAPILevel != "" {
 			userAgent += " Android/" + client.AndroidAPILevel
 		}
 		out["User-Agent"] = userAgent
@@ -167,11 +168,22 @@ func buildBaseHeaders(client clientConstants, overrides map[string]string) map[s
 	}
 	if client.Version != "" {
 		out["x-client-version"] = client.Version
+		if client.Platform == "web" || out["x-app-version"] != "" {
+			out["x-app-version"] = client.Version
+		}
 	}
 	if client.Locale != "" {
 		out["x-client-locale"] = client.Locale
 	}
 	return out
+}
+
+func SessionReferer(sessionID string) string {
+	sessionID = strings.TrimSpace(sessionID)
+	if sessionID == "" {
+		return DeepSeekBaseReferer
+	}
+	return DeepSeekOrigin + "/a/chat/s/" + sessionID
 }
 
 func envString(name string) string {

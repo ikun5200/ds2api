@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 
+	dsprotocol "ds2api/internal/deepseek/protocol"
+
 	"github.com/andybalholm/brotli"
 )
 
@@ -37,6 +39,13 @@ func preview(b []byte) string {
 func (c *Client) jsonHeaders(headers map[string]string) map[string]string {
 	out := cloneStringMap(headers)
 	out["Content-Type"] = "application/json"
+	return out
+}
+
+func withDeepSeekWebPageHeaders(headers map[string]string, sessionID string) map[string]string {
+	out := cloneStringMap(headers)
+	out["Origin"] = dsprotocol.DeepSeekOrigin
+	out["Referer"] = dsprotocol.SessionReferer(sessionID)
 	return out
 }
 

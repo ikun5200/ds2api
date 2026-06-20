@@ -56,6 +56,7 @@ func (c *Client) callContinue(ctx context.Context, a *auth.RequestAuth, sessionI
 	clients := c.requestClientsForAuth(ctx, a)
 	headers := c.authHeaders(a.DeepSeekToken)
 	headers["x-ds-pow-response"] = powResp
+	headers = withDeepSeekWebPageHeaders(headers, sessionID)
 	payload := map[string]any{
 		"chat_session_id":    sessionID,
 		"message_id":         responseMessageID,

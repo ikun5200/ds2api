@@ -22,7 +22,10 @@ test('js shared constants derive client headers from shared json', () => {
   const client = shared.client;
   assert.equal(deepseekConstants.CLIENT_VERSION, client.version);
   assert.equal(deepseekConstants.BASE_HEADERS['x-client-version'], client.version);
-  assert.equal(deepseekConstants.BASE_HEADERS['User-Agent'], `${client.name}/${client.version} Android/${client.android_api_level}`);
+  assert.equal(deepseekConstants.BASE_HEADERS['x-client-platform'], 'web');
+  assert.equal(deepseekConstants.BASE_HEADERS['x-app-version'], client.version);
+  assert.equal(deepseekConstants.BASE_HEADERS['User-Agent'], shared.base_headers['User-Agent']);
+  assert.match(deepseekConstants.BASE_HEADERS['User-Agent'], /Chrome\/149\.0\.0\.0/);
   assert.equal(deepseekConstants.BASE_HEADERS['Content-Type'], 'application/json');
 });
 
@@ -44,6 +47,7 @@ test('js shared constants support DeepSeek request identity env overrides', () =
     const overridden = require('../../internal/js/shared/deepseek-constants.js');
     assert.equal(overridden.CLIENT_VERSION, '8.7.6');
     assert.equal(overridden.BASE_HEADERS['x-client-version'], '8.7.6');
+    assert.equal(overridden.BASE_HEADERS['x-app-version'], '8.7.6');
     assert.equal(overridden.BASE_HEADERS['User-Agent'], 'CustomDeepSeek/8.7.6 Android/36');
     assert.equal(overridden.BASE_HEADERS['Accept-Language'], 'en-US,en;q=0.9');
     assert.equal(overridden.BASE_HEADERS['x-client-locale'], 'en_US');

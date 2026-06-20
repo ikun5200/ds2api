@@ -14,12 +14,18 @@ func TestSharedConstantsLoaded(t *testing.T) {
 	if ClientVersion != client.Version {
 		t.Fatalf("unexpected client version=%q", ClientVersion)
 	}
-	wantUserAgent := client.Name + "/" + client.Version + " Android/" + client.AndroidAPILevel
+	wantUserAgent := cfg.BaseHeaders["User-Agent"]
 	if BaseHeaders["User-Agent"] != wantUserAgent {
 		t.Fatalf("unexpected user agent=%q", BaseHeaders["User-Agent"])
 	}
-	if BaseHeaders["x-client-platform"] != "android" {
+	if BaseHeaders["x-client-platform"] != "web" {
 		t.Fatalf("unexpected base header x-client-platform=%q", BaseHeaders["x-client-platform"])
+	}
+	if BaseHeaders["x-app-version"] != ClientVersion {
+		t.Fatalf("unexpected base header x-app-version=%q", BaseHeaders["x-app-version"])
+	}
+	if BaseHeaders["x-client-bundle-id"] != "com.deepseek.chat" {
+		t.Fatalf("unexpected base header x-client-bundle-id=%q", BaseHeaders["x-client-bundle-id"])
 	}
 	if BaseHeaders["x-client-version"] != ClientVersion {
 		t.Fatalf("unexpected base header x-client-version=%q", BaseHeaders["x-client-version"])
@@ -55,6 +61,24 @@ func TestClientHeadersDerivedFromSharedVersion(t *testing.T) {
 	}
 }
 
+func TestWebClientHeadersPreserveSharedBrowserUserAgent(t *testing.T) {
+	client := normalizeClientConstants(clientConstants{
+		Name:     "DeepSeek",
+		Platform: "web",
+		Version:  "2.0.0",
+		Locale:   "zh_CN",
+	})
+	headers := buildBaseHeaders(client, map[string]string{
+		"User-Agent": "Mozilla/5.0 Chrome/149.0.0.0 Safari/537.36",
+	})
+	if headers["User-Agent"] != "Mozilla/5.0 Chrome/149.0.0.0 Safari/537.36" {
+		t.Fatalf("unexpected web user agent=%q", headers["User-Agent"])
+	}
+	if headers["x-client-platform"] != "web" {
+		t.Fatalf("unexpected web platform=%q", headers["x-client-platform"])
+	}
+}
+
 func TestSharedConstantsSupportEnvironmentOverrides(t *testing.T) {
 	prevClientVersion := ClientVersion
 	prevBaseHeaders := cloneStringMap(BaseHeaders)
@@ -84,7 +108,8 @@ func TestSharedConstantsSupportEnvironmentOverrides(t *testing.T) {
 			Locale:          "zh_CN",
 		},
 		BaseHeaders: map[string]string{
-			"Accept": "application/json",
+			"Accept":        "application/json",
+			"x-app-version": "1.0.0",
 		},
 	}
 	applySharedConstants(cfg)
@@ -94,6 +119,9 @@ func TestSharedConstantsSupportEnvironmentOverrides(t *testing.T) {
 	}
 	if BaseHeaders["User-Agent"] != "CustomDeepSeek/8.7.6 Android/36" {
 		t.Fatalf("unexpected user agent=%q", BaseHeaders["User-Agent"])
+	}
+	if BaseHeaders["x-app-version"] != "8.7.6" {
+		t.Fatalf("unexpected app version=%q", BaseHeaders["x-app-version"])
 	}
 	if BaseHeaders["Accept-Language"] != "en-US,en;q=0.9" {
 		t.Fatalf("unexpected accept language=%q", BaseHeaders["Accept-Language"])

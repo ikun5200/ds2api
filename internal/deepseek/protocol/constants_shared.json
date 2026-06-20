@@ -1,17 +1,23 @@
 {
   "client": {
     "name": "DeepSeek",
-    "platform": "android",
-    "version": "2.0.5",
-    "android_api_level": "35",
+    "platform": "web",
+    "version": "2.0.0",
+    "android_api_level": "",
     "locale": "zh_CN"
   },
   "base_headers": {
     "Host": "chat.deepseek.com",
-    "Accept": "application/json",
+    "Accept": "*/*",
     "Accept-Language": "zh-CN,zh;q=0.9",
     "Content-Type": "application/json",
-    "accept-charset": "UTF-8"
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/149.0.0.0 Safari/537.36",
+    "sec-ch-ua": "\"Google Chrome\";v=\"149\", \"Chromium\";v=\"149\", \"Not)A;Brand\";v=\"24\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"macOS\"",
+    "x-app-version": "2.0.0",
+    "x-client-bundle-id": "com.deepseek.chat",
+    "x-client-timezone-offset": "28800"
   },
   "skip_contains_patterns": [
     "quasi_status",

@@ -17,6 +17,8 @@ func (c *Client) CallCompletion(ctx context.Context, a *auth.RequestAuth, payloa
 	clients := c.requestClientsForAuth(ctx, a)
 	headers := c.authHeaders(a.DeepSeekToken)
 	headers["x-ds-pow-response"] = powResp
+	sessionID, _ := payload["chat_session_id"].(string)
+	headers = withDeepSeekWebPageHeaders(headers, sessionID)
 	captureSession := c.capture.Start("deepseek_completion", dsprotocol.DeepSeekCompletionURL, a.AccountID, payload)
 	resp, err := c.streamPostOnce(ctx, clients.stream, dsprotocol.DeepSeekCompletionURL, headers, payload)
 	if err != nil {

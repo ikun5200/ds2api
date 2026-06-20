@@ -5,17 +5,16 @@ const path = require('path');
 
 const DEFAULT_CLIENT = Object.freeze({
   name: 'DeepSeek',
-  platform: 'android',
-  androidApiLevel: '35',
+  platform: 'web',
+  androidApiLevel: '',
   locale: 'zh_CN',
 });
 
 const DEFAULT_BASE_HEADERS = Object.freeze({
   Host: 'chat.deepseek.com',
-  Accept: 'application/json',
+  Accept: '*/*',
   'Accept-Language': 'zh-CN,zh;q=0.9',
   'Content-Type': 'application/json',
-  'accept-charset': 'UTF-8',
 });
 
 const DEFAULT_SKIP_PATTERNS = Object.freeze([
@@ -55,6 +54,9 @@ function normalizeClient(raw) {
   out.version = envString('DS2API_DEEPSEEK_CLIENT_VERSION') || out.version;
   out.androidApiLevel = envString('DS2API_DEEPSEEK_ANDROID_API_LEVEL') || out.androidApiLevel;
   out.locale = envString('DS2API_DEEPSEEK_CLIENT_LOCALE') || out.locale;
+  if (out.platform === 'android' && !out.androidApiLevel) {
+    out.androidApiLevel = '35';
+  }
   return out;
 }
 
@@ -63,10 +65,8 @@ function buildBaseHeaders(parsed, client) {
     ? parsed.base_headers
     : {};
   const baseHeaders = { ...DEFAULT_BASE_HEADERS, ...rawBaseHeaders };
-  if (client.name && client.version) {
-    const androidSuffix = client.platform === 'android' && client.androidApiLevel
-      ? ` Android/${client.androidApiLevel}`
-      : '';
+  if (client.platform === 'android' && client.name && client.version) {
+    const androidSuffix = client.androidApiLevel ? ` Android/${client.androidApiLevel}` : '';
     baseHeaders['User-Agent'] = `${client.name}/${client.version}${androidSuffix}`;
   }
   if (client.platform) {
@@ -74,6 +74,9 @@ function buildBaseHeaders(parsed, client) {
   }
   if (client.version) {
     baseHeaders['x-client-version'] = client.version;
+    if (client.platform === 'web' || baseHeaders['x-app-version']) {
+      baseHeaders['x-app-version'] = client.version;
+    }
   }
   if (client.locale) {
     baseHeaders['x-client-locale'] = client.locale;

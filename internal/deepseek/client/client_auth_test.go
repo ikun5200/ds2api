@@ -1,9 +1,13 @@
 package client
 
 import (
+	"context"
+	"io"
+	"net/http"
 	"strings"
 	"testing"
 
+	"ds2api/internal/auth"
 	"ds2api/internal/config"
 )
 
@@ -64,5 +68,36 @@ func TestLoginDeviceIDSupportsExplicitOverride(t *testing.T) {
 	got := loginDeviceID(config.Account{Email: "user@example.com"})
 	if got != "device-override" {
 		t.Fatalf("expected override device id, got %q", got)
+	}
+}
+
+func TestCreateSessionUsesWebEmptyRequestBody(t *testing.T) {
+	var seenBody string
+	client := &Client{
+		regular: doerFunc(func(req *http.Request) (*http.Response, error) {
+			bodyBytes, _ := io.ReadAll(req.Body)
+			seenBody = string(bodyBytes)
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(`{
+					"code":0,
+					"data":{"biz_code":0,"biz_data":{"chat_session":{"id":"session-web"}}}
+				}`)),
+				Request: req,
+			}, nil
+		}),
+		maxRetries: 1,
+	}
+
+	got, err := client.CreateSession(context.Background(), &auth.RequestAuth{DeepSeekToken: "token"}, 1)
+	if err != nil {
+		t.Fatalf("CreateSession returned error: %v", err)
+	}
+	if got != "session-web" {
+		t.Fatalf("expected session-web, got %q", got)
+	}
+	if seenBody != "{}" {
+		t.Fatalf("expected empty web session body {}, got %q", seenBody)
 	}
 }

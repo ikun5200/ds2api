@@ -35,6 +35,7 @@ const {
 
 const DEEPSEEK_COMPLETION_URL = 'https://chat.deepseek.com/api/v0/chat/completion';
 const DEEPSEEK_CONTINUE_URL = 'https://chat.deepseek.com/api/v0/chat/continue';
+const DEEPSEEK_ORIGIN = 'https://chat.deepseek.com';
 const EMPTY_OUTPUT_RETRY_SUFFIX = 'Previous reply had no visible output. Please regenerate the visible final answer or tool call now.';
 const EMPTY_OUTPUT_RETRY_MAX_ATTEMPTS = 1;
 const AUTO_CONTINUE_MAX_ROUNDS = 8;
@@ -114,12 +115,19 @@ async function handleVercelStream(req, res, rawBody, payload) {
       return currentPowHeader;
     };
 
+    const deepSeekReferer = (bodyPayload) => {
+      const sessionID = typeof bodyPayload?.chat_session_id === 'string' ? bodyPayload.chat_session_id.trim() : '';
+      return sessionID ? `${DEEPSEEK_ORIGIN}/a/chat/s/${sessionID}` : `${DEEPSEEK_ORIGIN}/`;
+    };
+
     const fetchDeepSeekStream = async (url, bodyPayload, powHeader) => {
       try {
         return await fetch(url, {
           method: 'POST',
           headers: {
             ...BASE_HEADERS,
+            Origin: DEEPSEEK_ORIGIN,
+            Referer: deepSeekReferer(bodyPayload),
             authorization: `Bearer ${deepseekToken}`,
             'x-ds-pow-response': powHeader,
           },
