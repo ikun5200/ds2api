@@ -50,6 +50,7 @@ var defaultSkipExactPaths = []string{
 
 var ClientVersion string
 var BaseHeaders = map[string]string{}
+var LoginHeaders = map[string]string{}
 var SkipContainsPatterns = cloneStringSlice(defaultSkipContainsPatterns)
 var SkipExactPathSet = toStringSet(defaultSkipExactPaths)
 
@@ -84,6 +85,10 @@ func applySharedConstants(cfg sharedConstants) {
 	applyClientEnvOverrides(&client)
 	ClientVersion = client.Version
 	BaseHeaders = applyBaseHeaderEnvOverrides(buildBaseHeaders(client, cfg.BaseHeaders))
+	LoginHeaders = applyBaseHeaderEnvOverrides(buildBaseHeaders(loginClientConstants(client.Locale), map[string]string{
+		"Accept":         "application/json",
+		"accept-charset": "UTF-8",
+	}))
 	SkipContainsPatterns = cloneStringSlice(defaultSkipContainsPatterns)
 	if len(cfg.SkipContainsPattern) > 0 {
 		SkipContainsPatterns = cloneStringSlice(cfg.SkipContainsPattern)
@@ -92,6 +97,21 @@ func applySharedConstants(cfg sharedConstants) {
 	if len(cfg.SkipExactPaths) > 0 {
 		SkipExactPathSet = toStringSet(cfg.SkipExactPaths)
 	}
+}
+
+func loginClientConstants(locale string) clientConstants {
+	client := clientConstants{
+		Name:            "DeepSeek",
+		Platform:        "android",
+		Version:         "2.0.5",
+		AndroidAPILevel: "35",
+		Locale:          locale,
+	}
+	if client.Locale == "" {
+		client.Locale = "zh_CN"
+	}
+	applyClientEnvOverrides(&client)
+	return normalizeClientConstants(client)
 }
 
 func normalizeClientConstants(in clientConstants) clientConstants {

@@ -33,6 +33,15 @@ func TestSharedConstantsLoaded(t *testing.T) {
 	if BaseHeaders["Content-Type"] != "application/json" {
 		t.Fatalf("unexpected base header Content-Type=%q", BaseHeaders["Content-Type"])
 	}
+	if LoginHeaders["x-client-platform"] != "android" {
+		t.Fatalf("unexpected login x-client-platform=%q", LoginHeaders["x-client-platform"])
+	}
+	if LoginHeaders["User-Agent"] != "DeepSeek/2.0.5 Android/35" {
+		t.Fatalf("unexpected login user agent=%q", LoginHeaders["User-Agent"])
+	}
+	if LoginHeaders["Accept"] != "application/json" {
+		t.Fatalf("unexpected login Accept=%q", LoginHeaders["Accept"])
+	}
 	if len(SkipContainsPatterns) == 0 {
 		t.Fatal("expected skip contains patterns to be loaded")
 	}
@@ -82,6 +91,7 @@ func TestWebClientHeadersPreserveSharedBrowserUserAgent(t *testing.T) {
 func TestSharedConstantsSupportEnvironmentOverrides(t *testing.T) {
 	prevClientVersion := ClientVersion
 	prevBaseHeaders := cloneStringMap(BaseHeaders)
+	prevLoginHeaders := cloneStringMap(LoginHeaders)
 	prevSkipContainsPatterns := cloneStringSlice(SkipContainsPatterns)
 	prevSkipExactPathSet := make(map[string]struct{}, len(SkipExactPathSet))
 	for k, v := range SkipExactPathSet {
@@ -90,6 +100,7 @@ func TestSharedConstantsSupportEnvironmentOverrides(t *testing.T) {
 	t.Cleanup(func() {
 		ClientVersion = prevClientVersion
 		BaseHeaders = prevBaseHeaders
+		LoginHeaders = prevLoginHeaders
 		SkipContainsPatterns = prevSkipContainsPatterns
 		SkipExactPathSet = prevSkipExactPathSet
 	})
@@ -128,5 +139,11 @@ func TestSharedConstantsSupportEnvironmentOverrides(t *testing.T) {
 	}
 	if BaseHeaders["x-client-locale"] != "en_US" {
 		t.Fatalf("unexpected locale=%q", BaseHeaders["x-client-locale"])
+	}
+	if LoginHeaders["x-client-platform"] != "android" {
+		t.Fatalf("unexpected login platform=%q", LoginHeaders["x-client-platform"])
+	}
+	if LoginHeaders["x-client-version"] != "8.7.6" {
+		t.Fatalf("unexpected login version=%q", LoginHeaders["x-client-version"])
 	}
 }

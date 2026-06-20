@@ -9,6 +9,7 @@ import (
 
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
+	dsprotocol "ds2api/internal/deepseek/protocol"
 )
 
 func TestExtractCreateSessionIDSupportsLegacyShape(t *testing.T) {
@@ -99,5 +100,44 @@ func TestCreateSessionUsesWebEmptyRequestBody(t *testing.T) {
 	}
 	if seenBody != "{}" {
 		t.Fatalf("expected empty web session body {}, got %q", seenBody)
+	}
+}
+
+func TestLoginUsesAndroidLoginHeaders(t *testing.T) {
+	var seenPlatform string
+	var seenUserAgent string
+	var seenAccept string
+	client := &Client{
+		regular: doerFunc(func(req *http.Request) (*http.Response, error) {
+			seenPlatform = req.Header.Get("x-client-platform")
+			seenUserAgent = req.Header.Get("User-Agent")
+			seenAccept = req.Header.Get("Accept")
+			return &http.Response{
+				StatusCode: http.StatusOK,
+				Header:     make(http.Header),
+				Body: io.NopCloser(strings.NewReader(`{
+					"code":0,
+					"data":{"biz_code":0,"biz_data":{"user":{"token":"login-token"}}}
+				}`)),
+				Request: req,
+			}, nil
+		}),
+	}
+
+	got, err := client.Login(context.Background(), config.Account{Email: "user@example.com", Password: "pass"})
+	if err != nil {
+		t.Fatalf("Login returned error: %v", err)
+	}
+	if got != "login-token" {
+		t.Fatalf("expected login-token, got %q", got)
+	}
+	if seenPlatform != "android" {
+		t.Fatalf("login x-client-platform=%q want android", seenPlatform)
+	}
+	if seenUserAgent != dsprotocol.LoginHeaders["User-Agent"] {
+		t.Fatalf("login User-Agent=%q want %q", seenUserAgent, dsprotocol.LoginHeaders["User-Agent"])
+	}
+	if seenAccept != "application/json" {
+		t.Fatalf("login Accept=%q want application/json", seenAccept)
 	}
 }
