@@ -35,7 +35,7 @@ func (h *Handler) login(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if expireHours <= 0 {
-		expireHours = h.Store.AdminJWTExpireHours()
+		expireHours = authn.JWTExpireHours(h.Store)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"success": true, "token": token, "expires_in": expireHours * 3600})
 }

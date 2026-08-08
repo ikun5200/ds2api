@@ -56,7 +56,7 @@ func jwtSecret(store AdminConfigReader) string {
 	return effectiveAdminKey(store)
 }
 
-func jwtExpireHours(store AdminConfigReader) int {
+func JWTExpireHours(store AdminConfigReader) int {
 	if store != nil {
 		if n := store.AdminJWTExpireHours(); n > 0 {
 			return n
@@ -76,7 +76,7 @@ func CreateJWT(expireHours int) (string, error) {
 
 func CreateJWTWithStore(expireHours int, store AdminConfigReader) (string, error) {
 	if expireHours <= 0 {
-		expireHours = jwtExpireHours(store)
+		expireHours = JWTExpireHours(store)
 	}
 	issuedAt := time.Now().Unix()
 	// If sessions were invalidated in this same second, move iat forward by
