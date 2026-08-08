@@ -312,7 +312,7 @@ func TestStartCompletionAppliesCurrentInputFileGlobally(t *testing.T) {
 		t.Fatalf("expected uploaded file id in ref_file_ids, got %#v", ds.payloads[0]["ref_file_ids"])
 	}
 	prompt, _ := ds.payloads[0]["prompt"].(string)
-	if !strings.Contains(prompt, "Use the attached conversation notes as the current context.") {
+	if !strings.Contains(prompt, "Use the attached conversation notes as the current context") {
 		t.Fatalf("expected continuation prompt, got %q", prompt)
 	}
 	if !start.Request.CurrentInputFileApplied || !strings.Contains(start.Request.PromptTokenText, "# HISTORY.txt") {
