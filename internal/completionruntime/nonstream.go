@@ -61,6 +61,7 @@ func StartCompletion(ctx context.Context, ds DeepSeekCaller, a *auth.RequestAuth
 	if err != nil {
 		return StartResult{Request: stdReq}, authOutputError(a)
 	}
+	a.BindUpstreamAccount()
 	pow, err := ds.GetPow(ctx, a, maxAttempts)
 	if err != nil {
 		return StartResult{SessionID: sessionID, Request: stdReq}, &assistantturn.OutputError{Status: http.StatusUnauthorized, Message: "Failed to get PoW (invalid token or unknown error).", Code: "error"}
@@ -202,7 +203,7 @@ func canRetryOnAlternateAccount(ctx context.Context, a *auth.RequestAuth, outErr
 		return false
 	}
 	*attempted = true
-	return a.SwitchAccount(ctx)
+	return a.SwitchAccountForFreshCompletion(ctx)
 }
 
 func startStandardCompletionOnAlternateAccount(ctx context.Context, ds DeepSeekCaller, a *auth.RequestAuth, stdReq promptcompat.StandardRequest, opts Options, maxAttempts int) (StartResult, *assistantturn.OutputError) {
@@ -215,6 +216,7 @@ func startStandardCompletionOnAlternateAccount(ctx context.Context, ds DeepSeekC
 	if err != nil {
 		return StartResult{}, authOutputError(a)
 	}
+	a.BindUpstreamAccount()
 	pow, err := ds.GetPow(ctx, a, maxAttempts)
 	if err != nil {
 		return StartResult{SessionID: sessionID}, &assistantturn.OutputError{Status: http.StatusUnauthorized, Message: "Failed to get PoW (invalid token or unknown error).", Code: "error"}

@@ -25,7 +25,7 @@ test('js shared constants derive client headers from shared json', () => {
   assert.equal(deepseekConstants.BASE_HEADERS['x-client-platform'], 'web');
   assert.equal(deepseekConstants.BASE_HEADERS['x-app-version'], client.version);
   assert.equal(deepseekConstants.BASE_HEADERS['User-Agent'], shared.base_headers['User-Agent']);
-  assert.match(deepseekConstants.BASE_HEADERS['User-Agent'], /Chrome\/149\.0\.0\.0/);
+  assert.match(deepseekConstants.BASE_HEADERS['User-Agent'], /Chrome\/152\.0\.0\.0/);
   assert.equal(deepseekConstants.BASE_HEADERS['Content-Type'], 'application/json');
 });
 

@@ -363,8 +363,8 @@ func TestApplyCurrentInputFileUploadsFullContextFile(t *testing.T) {
 	if upload.Filename != "HISTORY.txt" {
 		t.Fatalf("expected HISTORY.txt upload, got %q", upload.Filename)
 	}
-	if upload.ModelType != "vision" {
-		t.Fatalf("expected vision model type for vision request, got %q", upload.ModelType)
+	if upload.ModelType != "default" {
+		t.Fatalf("expected default model type for legacy vision alias, got %q", upload.ModelType)
 	}
 	uploadedText := string(upload.Data)
 	for _, want := range []string{"# HISTORY.txt", "=== 1. SYSTEM ===", "=== 2. USER ===", "=== 3. ASSISTANT ===", "=== 4. TOOL ===", "=== 5. USER ===", "system instructions", "first user turn", "hidden reasoning", "tool result", "latest user turn", promptcompat.ThinkingInjectionMarker} {
@@ -390,8 +390,9 @@ func TestApplyCurrentInputFileUploadsToolsContextSeparately(t *testing.T) {
 		DS: ds,
 	}
 	req := map[string]any{
-		"model":    "deepseek-v4-flash",
-		"messages": historySplitTestMessages(),
+		"model":            "deepseek-v4-flash",
+		"thinking_enabled": false,
+		"messages":         historySplitTestMessages(),
 		"tools": []any{
 			map[string]any{
 				"type": "function",
@@ -416,6 +417,11 @@ func TestApplyCurrentInputFileUploadsToolsContextSeparately(t *testing.T) {
 	}
 	if len(ds.uploadCalls) != 2 {
 		t.Fatalf("expected history and tools uploads, got %d", len(ds.uploadCalls))
+	}
+	for _, upload := range ds.uploadCalls {
+		if upload.ThinkingEnabled == nil || *upload.ThinkingEnabled {
+			t.Fatalf("%s upload must preserve disabled thinking", upload.Filename)
+		}
 	}
 	if ds.uploadCalls[0].Filename != "HISTORY.txt" {
 		t.Fatalf("expected first upload to be HISTORY.txt, got %q", ds.uploadCalls[0].Filename)

@@ -27,62 +27,23 @@ type ModelAliasReader interface {
 	ModelAliases() map[string]string
 }
 
+// DefaultDeepSeekModel is the single model advertised by the API.
+const DefaultDeepSeekModel = "deepseek-flash"
+
 const noThinkingModelSuffix = "-nothinking"
 
-var deepSeekBaseModels = []ModelInfo{
-	{ID: "deepseek-v4-flash", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-v4-pro", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-v4-flash-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-v4-pro-search", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
-	{ID: "deepseek-v4-vision", Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
+// Only the current upstream model is advertised. Historical model names remain
+// accepted below so existing clients can retain their thinking/search defaults.
+var DeepSeekModels = []ModelInfo{
+	{ID: DefaultDeepSeekModel, Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
 }
 
 var OllamaCapabilitiesModels = []OllamaCapabilitiesModelInfo{
-	{ID: "deepseek-v4-flash", Capabilities: []string{"tools", "thinking"}},
-	{ID: "deepseek-v4-pro", Capabilities: []string{"tools", "thinking"}},
-	{ID: "deepseek-v4-flash-search", Capabilities: []string{"tools", "thinking"}},
-	{ID: "deepseek-v4-pro-search", Capabilities: []string{"tools", "thinking"}},
-	{ID: "deepseek-v4-vision", Capabilities: []string{"tools", "thinking", "vision"}},
-	{ID: "deepseek-v4-flash-nothinking", Capabilities: []string{"tools"}},
-	{ID: "deepseek-v4-pro-nothinking", Capabilities: []string{"tools"}},
-	{ID: "deepseek-v4-flash-search-nothinking", Capabilities: []string{"tools"}},
-	{ID: "deepseek-v4-pro-search-nothinking", Capabilities: []string{"tools"}},
-	{ID: "deepseek-v4-vision-nothinking", Capabilities: []string{"tools", "vision"}},
+	{ID: DefaultDeepSeekModel, Capabilities: []string{"tools", "thinking", "vision"}},
 }
 
-var DeepSeekModels = appendNoThinkingVariants(deepSeekBaseModels)
 var OllamaModels = mapToOllamaModels(DeepSeekModels)
-var claudeBaseModels = []ModelInfo{
-	// Current aliases
-	{ID: "claude-opus-4-6", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-sonnet-4-6", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-haiku-4-5", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-
-	// Claude 4.x snapshots and prior aliases kept for compatibility
-	{ID: "claude-sonnet-4-5", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-opus-4-1", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-opus-4-1-20250805", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-opus-4-0", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-opus-4-20250514", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-sonnet-4-5-20250929", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-sonnet-4-0", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-sonnet-4-20250514", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-haiku-4-5-20251001", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-
-	// Claude 3.x (legacy/deprecated snapshots and aliases)
-	{ID: "claude-3-7-sonnet-latest", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-3-7-sonnet-20250219", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-3-5-sonnet-latest", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-3-5-sonnet-20240620", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-3-5-sonnet-20241022", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-3-opus-20240229", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-3-sonnet-20240229", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-3-5-haiku-latest", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-3-5-haiku-20241022", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-	{ID: "claude-3-haiku-20240307", Object: "model", Created: 1715635200, OwnedBy: "anthropic"},
-}
-
-var ClaudeModels = appendNoThinkingVariants(claudeBaseModels)
+var ClaudeModels = DeepSeekModels
 
 func GetModelConfig(model string) (thinking bool, search bool, ok bool) {
 	baseModel, noThinking := splitNoThinkingModel(model)
@@ -90,7 +51,7 @@ func GetModelConfig(model string) (thinking bool, search bool, ok bool) {
 		return false, false, false
 	}
 	switch baseModel {
-	case "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-vision":
+	case DefaultDeepSeekModel, "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-vision":
 		return !noThinking, false, true
 	case "deepseek-v4-flash-search", "deepseek-v4-pro-search":
 		return !noThinking, true, true
@@ -100,17 +61,11 @@ func GetModelConfig(model string) (thinking bool, search bool, ok bool) {
 }
 
 func GetModelType(model string) (modelType string, ok bool) {
-	baseModel, _ := splitNoThinkingModel(model)
-	switch baseModel {
-	case "deepseek-v4-flash", "deepseek-v4-flash-search":
-		return "default", true
-	case "deepseek-v4-pro", "deepseek-v4-pro-search":
-		return "expert", true
-	case "deepseek-v4-vision":
-		return "vision", true
-	default:
+	if !IsSupportedDeepSeekModel(model) {
 		return "", false
 	}
+	// Thinking, web search, files, and images all use the current flash model.
+	return "default", true
 }
 
 func IsSupportedDeepSeekModel(model string) bool {
@@ -261,16 +216,10 @@ func OpenAIModelsResponse() map[string]any {
 }
 
 func OpenAIModelByID(store ModelAliasReader, id string) (ModelInfo, bool) {
-	canonical, ok := ResolveModel(store, id)
-	if !ok {
+	if _, ok := ResolveModel(store, id); !ok {
 		return ModelInfo{}, false
 	}
-	for _, model := range DeepSeekModels {
-		if model.ID == canonical {
-			return model, true
-		}
-	}
-	return ModelInfo{}, false
+	return DeepSeekModels[0], true
 }
 
 func OllamaModelsResponse() map[string]any {
@@ -278,16 +227,10 @@ func OllamaModelsResponse() map[string]any {
 }
 
 func OllamaModelByID(store ModelAliasReader, id string) (OllamaCapabilitiesModelInfo, bool) {
-	canonical, ok := ResolveModel(store, id)
-	if !ok {
+	if _, ok := ResolveModel(store, id); !ok {
 		return OllamaCapabilitiesModelInfo{}, false
 	}
-	for _, model := range OllamaCapabilitiesModels {
-		if model.ID == canonical {
-			return model, true
-		}
-	}
-	return OllamaCapabilitiesModelInfo{}, false
+	return OllamaCapabilitiesModels[0], true
 }
 
 func ClaudeModelsResponse() map[string]any {
@@ -303,16 +246,6 @@ func ClaudeModelsResponse() map[string]any {
 	return resp
 }
 
-func appendNoThinkingVariants(models []ModelInfo) []ModelInfo {
-	out := make([]ModelInfo, 0, len(models)*2)
-	for _, model := range models {
-		out = append(out, model)
-		variant := model
-		variant.ID = withNoThinkingVariant(model.ID, true)
-		out = append(out, variant)
-	}
-	return out
-}
 func mapToOllamaModels(models []ModelInfo) []OllamaModelInfo {
 	out := make([]OllamaModelInfo, 0, len(models))
 	for _, model := range models {

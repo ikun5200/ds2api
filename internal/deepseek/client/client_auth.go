@@ -2,8 +2,6 @@ package client
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -17,33 +15,48 @@ import (
 )
 
 func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) {
+	deviceID := loginDeviceID(acc)
+	if deviceID == "" {
+		return "", errors.New("DeepSeek login requires a website-issued device_id; run node scripts/deepseek-device.mjs and set the account device_id or DS2API_DEEPSEEK_DEVICE_ID")
+	}
 	clients := c.requestClientsForAccount(acc)
+	platform := dsprotocol.LoginHeaders["x-client-platform"]
+	if platform == "" {
+		platform = "web"
+	}
 	payload := map[string]any{
-		"password":  strings.TrimSpace(acc.Password),
-		"device_id": loginDeviceID(acc),
-		"os":        "android",
+		"email":     "",
+		"mobile":    "",
+		"area_code": "",
+		"password":  acc.Password,
+		"device_id": deviceID,
+		"os":        platform,
 	}
 	if email := strings.TrimSpace(acc.Email); email != "" {
 		payload["email"] = email
 	} else if mobile := strings.TrimSpace(acc.Mobile); mobile != "" {
 		loginMobile, areaCode := normalizeMobileForLogin(mobile)
+		if loginMobile == "" {
+			return "", errors.New("invalid login mobile")
+		}
 		payload["mobile"] = loginMobile
 		payload["area_code"] = areaCode
 	} else {
 		return "", errors.New("missing email/mobile")
 	}
-	resp, err := c.postJSON(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekLoginURL, dsprotocol.LoginHeaders, payload)
+	resp, status, err := c.postJSONWithStatus(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekLoginURL, dsprotocol.LoginHeaders, payload)
 	if err != nil {
 		return "", err
 	}
-	code := intFrom(resp["code"])
-	if code != 0 {
-		return "", fmt.Errorf("login failed: %v", resp["msg"])
+	code, bizCode, msg, bizMsg := extractResponseStatus(resp)
+	if status != http.StatusOK || code != 0 || bizCode != 0 {
+		message := failureMessage(msg, bizMsg, "upstream rejected login")
+		if strings.Contains(strings.ToUpper(message), "RISK_DEVICE_DETECTED") {
+			message += "; renew the website device verification and update device_id (node scripts/deepseek-device.mjs)"
+		}
+		return "", fmt.Errorf("login failed (HTTP %d, code %d, biz_code %d): %s", status, code, bizCode, message)
 	}
 	data, _ := resp["data"].(map[string]any)
-	if intFrom(data["biz_code"]) != 0 {
-		return "", fmt.Errorf("login failed: %v", data["biz_msg"])
-	}
 	bizData, _ := data["biz_data"].(map[string]any)
 	user, _ := bizData["user"].(map[string]any)
 	token, _ := user["token"].(string)
@@ -57,17 +70,7 @@ func loginDeviceID(acc config.Account) string {
 	if override := strings.TrimSpace(os.Getenv("DS2API_DEEPSEEK_DEVICE_ID")); override != "" {
 		return override
 	}
-	identifier := strings.ToLower(strings.TrimSpace(acc.Identifier()))
-	if identifier == "" {
-		identifier = strings.ToLower(strings.TrimSpace(acc.Email + "|" + acc.Mobile + "|" + acc.Name))
-	}
-	seed := strings.TrimSpace(os.Getenv("DS2API_DEEPSEEK_DEVICE_SEED"))
-	material := strings.Join([]string{
-		seed,
-		identifier,
-	}, "\n")
-	sum := sha256.Sum256([]byte(material))
-	return hex.EncodeToString(sum[:16])
+	return strings.TrimSpace(acc.DeviceID)
 }
 
 func (c *Client) CreateSession(ctx context.Context, a *auth.RequestAuth, maxAttempts int) (string, error) {
@@ -291,10 +294,10 @@ func extractResponseStatus(resp map[string]any) (code int, bizCode int, msg stri
 	return code, bizCode, msg, bizMsg
 }
 
-func normalizeMobileForLogin(raw string) (mobile string, areaCode any) {
+func normalizeMobileForLogin(raw string) (mobile string, areaCode string) {
 	s := strings.TrimSpace(raw)
 	if s == "" {
-		return "", nil
+		return "", ""
 	}
 	hasPlus := strings.HasPrefix(s, "+")
 	var b strings.Builder
@@ -306,10 +309,13 @@ func normalizeMobileForLogin(raw string) (mobile string, areaCode any) {
 	}
 	digits := b.String()
 	if digits == "" {
-		return "", nil
+		return "", ""
 	}
 	if (hasPlus || strings.HasPrefix(digits, "86")) && strings.HasPrefix(digits, "86") && len(digits) == 13 {
-		return digits[2:], nil
+		return digits[2:], "+86"
 	}
-	return digits, nil
+	if len(digits) == 11 && strings.HasPrefix(digits, "1") && !hasPlus {
+		return digits, "+86"
+	}
+	return digits, ""
 }

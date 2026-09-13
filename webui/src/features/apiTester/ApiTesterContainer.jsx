@@ -7,69 +7,6 @@ import { useChatStreamClient } from './useChatStreamClient'
 import ConfigPanel from './ConfigPanel'
 import ChatPanel from './ChatPanel'
 
-function describeModel(t, modelID) {
-    const noThinking = modelID.endsWith('-nothinking')
-
-    let description = t('apiTester.models.generic')
-    if (modelID.includes('vision')) {
-        description = t('apiTester.models.vision')
-    } else if (modelID.includes('pro-search')) {
-        description = t('apiTester.models.proSearch')
-    } else if (modelID.includes('pro')) {
-        description = t('apiTester.models.pro')
-    } else if (modelID.includes('flash-search')) {
-        description = t('apiTester.models.flashSearch')
-    } else if (modelID.includes('flash')) {
-        description = t('apiTester.models.flash')
-    }
-
-    if (noThinking) {
-        return `${description} · ${t('apiTester.models.noThinking')}`
-    }
-    return description
-}
-
-function decorateModel(t, modelID) {
-    const isVision = modelID.includes('vision')
-    const isSearch = modelID.includes('search')
-    const isPro = modelID.includes('pro')
-
-    if (isVision && isSearch) {
-        return {
-            id: modelID,
-            name: modelID,
-            icon: 'ImageIcon',
-            desc: describeModel(t, modelID),
-            color: 'text-fuchsia-600',
-        }
-    }
-    if (isVision) {
-        return {
-            id: modelID,
-            name: modelID,
-            icon: 'ImageIcon',
-            desc: describeModel(t, modelID),
-            color: 'text-violet-500',
-        }
-    }
-    if (isSearch) {
-        return {
-            id: modelID,
-            name: modelID,
-            icon: 'SearchIcon',
-            desc: describeModel(t, modelID),
-            color: isPro ? 'text-cyan-600' : 'text-cyan-500',
-        }
-    }
-    return {
-        id: modelID,
-        name: modelID,
-        icon: isPro ? 'Cpu' : 'MessageSquare',
-        desc: describeModel(t, modelID),
-        color: isPro ? 'text-amber-600' : 'text-amber-500',
-    }
-}
-
 export default function ApiTesterContainer({ config, onMessage, authFetch }) {
     const { t } = useI18n()
     const [availableModelIDs, setAvailableModelIDs] = useState([])
@@ -78,6 +15,10 @@ export default function ApiTesterContainer({ config, onMessage, authFetch }) {
     const {
         model,
         setModel,
+        thinkingEnabled,
+        setThinkingEnabled,
+        searchEnabled,
+        setSearchEnabled,
         message,
         setMessage,
         attachedFiles,
@@ -112,6 +53,7 @@ export default function ApiTesterContainer({ config, onMessage, authFetch }) {
     const trimmedApiKey = apiKey.trim()
     const defaultKey = configuredKeys[0] || ''
     const effectiveKey = trimmedApiKey || defaultKey
+    const usesManagedKey = configuredKeys.includes(effectiveKey)
     const customKeyActive = trimmedApiKey !== ''
     const customKeyManaged = customKeyActive && configuredKeys.includes(trimmedApiKey)
 
@@ -128,7 +70,7 @@ export default function ApiTesterContainer({ config, onMessage, authFetch }) {
                 const modelIDs = Array.isArray(data?.data)
                     ? data.data
                         .map((item) => String(item?.id || '').trim())
-                        .filter(Boolean)
+                        .filter((id) => id === 'deepseek-flash')
                     : []
                 if (!disposed) {
                     setAvailableModelIDs(modelIDs)
@@ -152,7 +94,11 @@ export default function ApiTesterContainer({ config, onMessage, authFetch }) {
     }, [authFetch])
 
     const models = useMemo(
-        () => availableModelIDs.map((modelID) => decorateModel(t, modelID)),
+        () => [...new Set(availableModelIDs)].map((modelID) => ({
+            id: modelID,
+            name: modelID,
+            desc: t('apiTester.models.flash'),
+        })),
         [availableModelIDs, t]
     )
 
@@ -172,8 +118,11 @@ export default function ApiTesterContainer({ config, onMessage, authFetch }) {
         t,
         onMessage,
         model,
+        thinkingEnabled,
+        searchEnabled,
         message,
         effectiveKey,
+        usesManagedKey,
         selectedAccount,
         streamingMode,
         attachedFiles,
@@ -194,6 +143,10 @@ export default function ApiTesterContainer({ config, onMessage, authFetch }) {
                 models={models}
                 model={model}
                 setModel={setModel}
+                thinkingEnabled={thinkingEnabled}
+                setThinkingEnabled={setThinkingEnabled}
+                searchEnabled={searchEnabled}
+                setSearchEnabled={setSearchEnabled}
                 modelsLoaded={modelsLoaded}
                 streamingMode={streamingMode}
                 setStreamingMode={setStreamingMode}
@@ -216,8 +169,10 @@ export default function ApiTesterContainer({ config, onMessage, authFetch }) {
                 setAttachedFiles={setAttachedFiles}
                 setSelectedAccount={setSelectedAccount}
                 effectiveKey={effectiveKey}
+                usesManagedKey={usesManagedKey}
                 selectedAccount={selectedAccount}
                 model={model}
+                thinkingEnabled={thinkingEnabled}
                 onMessage={onMessage}
                 response={response}
                 isStreaming={isStreaming}

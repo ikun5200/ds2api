@@ -20,11 +20,12 @@ import (
 )
 
 type UploadFileRequest struct {
-	Filename    string
-	ContentType string
-	Purpose     string
-	ModelType   string
-	Data        []byte
+	Filename        string
+	ContentType     string
+	Purpose         string
+	ModelType       string
+	Data            []byte
+	ThinkingEnabled *bool
 }
 
 type UploadFileResult struct {
@@ -35,6 +36,7 @@ type UploadFileResult struct {
 	Purpose    string
 	AccountID  string
 	IsImage    bool
+	TokenUsage int
 	Raw        map[string]any
 	RawHeaders http.Header
 }
@@ -56,15 +58,17 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 	}
 	purpose := strings.TrimSpace(req.Purpose)
 	modelType := strings.ToLower(strings.TrimSpace(req.ModelType))
+	thinkingEnabled := req.ThinkingEnabled == nil || *req.ThinkingEnabled
 	body, contentTypeHeader, err := buildUploadMultipartBody(filename, contentType, req.Data)
 	if err != nil {
 		return nil, err
 	}
 	capturePayload := map[string]any{
-		"filename":     filename,
-		"content_type": contentType,
-		"purpose":      purpose,
-		"bytes":        len(req.Data),
+		"filename":         filename,
+		"content_type":     contentType,
+		"purpose":          purpose,
+		"bytes":            len(req.Data),
+		"thinking_enabled": thinkingEnabled,
 	}
 	if modelType != "" {
 		capturePayload["model_type"] = modelType
@@ -92,6 +96,9 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 		headers["x-ds-pow-response"] = powHeader
 		headers["x-file-size"] = strconv.Itoa(len(req.Data))
 		headers["x-thinking-enabled"] = "1"
+		if !thinkingEnabled {
+			headers["x-thinking-enabled"] = "0"
+		}
 		headers = withDeepSeekWebPageHeaders(headers, "")
 		resp, err := c.doUpload(ctx, clients.regular, clients.fallback, dsprotocol.DeepSeekUploadFileURL, headers, body)
 		if err != nil {
@@ -102,7 +109,9 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 			resp.Body = captureSession.WrapBody(resp.Body, resp.StatusCode)
 		}
 		payloadBytes, readErr := readResponseBody(resp)
-		_ = resp.Body.Close()
+		if err := resp.Body.Close(); err != nil {
+			config.Logger.Warn("[upload_file] failed to close response body", "error", err)
+		}
 		if readErr != nil {
 			powHeader = ""
 			attempts++
@@ -254,6 +263,9 @@ func extractUploadFileResult(resp map[string]any) *UploadFileResult {
 		}
 		if result.Bytes == 0 {
 			result.Bytes = firstPositiveInt64(m, "bytes", "size", "file_size")
+		}
+		if result.TokenUsage == 0 {
+			result.TokenUsage = int(firstPositiveInt64(m, "token_usage"))
 		}
 	}
 	return result

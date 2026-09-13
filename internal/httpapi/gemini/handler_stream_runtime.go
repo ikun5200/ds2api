@@ -69,8 +69,9 @@ type geminiStreamRuntime struct {
 	rc       *http.ResponseController
 	canFlush bool
 
-	model       string
-	finalPrompt string
+	model         string
+	finalPrompt   string
+	refFileTokens int
 
 	thinkingEnabled       bool
 	searchEnabled         bool
@@ -107,6 +108,7 @@ func (h *Handler) handleStreamGenerateContentWithRetry(w http.ResponseWriter, r 
 	rc := http.NewResponseController(w)
 	_, canFlush := w.(http.Flusher)
 	runtime := newGeminiStreamRuntime(w, rc, canFlush, model, finalPrompt, thinkingEnabled, searchEnabled, stripReferenceMarkersEnabled(), toolNames, toolsRaw, historySession)
+	runtime.refFileTokens = stdReq.RefFileTokens
 
 	completionruntime.ExecuteStreamWithRetry(r.Context(), h.DS, a, resp, payload, pow, completionruntime.StreamRetryOptions{
 		Surface:          "gemini.generate_content",
@@ -314,6 +316,7 @@ func (s *geminiStreamRuntime) finalize(deferEmptyOutput bool) bool {
 	}, assistantturn.BuildOptions{
 		Model:                 s.model,
 		Prompt:                s.finalPrompt,
+		RefFileTokens:         s.refFileTokens,
 		SearchEnabled:         s.searchEnabled,
 		StripReferenceMarkers: s.stripReferenceMarkers,
 		ToolNames:             s.toolNames,

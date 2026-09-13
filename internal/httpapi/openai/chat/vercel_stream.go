@@ -86,6 +86,7 @@ func (h *Handler) handleVercelStreamPrepare(w http.ResponseWriter, r *http.Reque
 		}
 		return
 	}
+	a.BindUpstreamAccount()
 	powHeader, err := h.DS.GetPow(r.Context(), a, 3)
 	if err != nil {
 		writeOpenAIError(w, http.StatusUnauthorized, "Failed to get PoW (invalid token or unknown error).")
@@ -223,7 +224,7 @@ func (h *Handler) handleVercelStreamSwitch(w http.ResponseWriter, r *http.Reques
 		return
 	}
 	a := lease.Auth
-	if !a.UseConfigToken || !a.SwitchAccount(r.Context()) {
+	if !a.UseConfigToken || !a.SwitchAccountForFreshCompletion(r.Context()) {
 		writeOpenAIErrorWithCode(w, http.StatusTooManyRequests, "Upstream account hit a rate limit and returned reasoning without visible output.", "upstream_empty_output")
 		return
 	}
@@ -243,6 +244,7 @@ func (h *Handler) handleVercelStreamSwitch(w http.ResponseWriter, r *http.Reques
 		writeOpenAIError(w, http.StatusUnauthorized, "Account token is invalid. Please re-login the account in admin.")
 		return
 	}
+	a.BindUpstreamAccount()
 	powHeader, err := h.DS.GetPow(r.Context(), a, 3)
 	if err != nil {
 		writeOpenAIError(w, http.StatusUnauthorized, "Failed to get PoW (invalid token or unknown error).")

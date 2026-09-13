@@ -17,6 +17,7 @@ import (
 	"ds2api/internal/completionruntime"
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/requestbody"
+	"ds2api/internal/inputfiles"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
 	"ds2api/internal/sse"
@@ -79,6 +80,12 @@ func (h *Handler) handleGeminiDirect(w http.ResponseWriter, r *http.Request, str
 		return true
 	}
 	defer h.Auth.Release(a)
+	stdReq, err = (&inputfiles.Service{Store: h.Store, DS: h.DS}).Apply(r.Context(), a, stdReq)
+	if err != nil {
+		status, message := inputfiles.MapError(err)
+		writeGeminiError(w, status, message)
+		return true
+	}
 	stdReq, err = h.applyCurrentInputFile(r.Context(), a, stdReq)
 	if err != nil {
 		status, message := mapCurrentInputFileError(err)
@@ -157,6 +164,7 @@ func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, stream 
 		return true
 	}
 	translatedReq := translatorcliproxy.ToOpenAI(sdktranslator.FormatGemini, routeModel, raw, stream)
+	translatedReq = preserveGeminiProxyAttachments(translatedReq, req)
 	if !strings.Contains(string(translatedReq), `"stream"`) {
 		var reqMap map[string]any
 		if json.Unmarshal(translatedReq, &reqMap) == nil {
@@ -242,15 +250,15 @@ func applyGeminiThinkingPolicyToOpenAIRequest(translated []byte, original map[st
 	if err := json.Unmarshal(translated, &req); err != nil {
 		return translated
 	}
-	enabled, ok := resolveGeminiThinkingOverride(original)
-	if !ok {
-		return translated
+	modes := geminiModeRequest(original)
+	if enabled, ok := util.ResolveThinkingOverride(modes); ok {
+		typ := "disabled"
+		if enabled {
+			typ = "enabled"
+		}
+		req["thinking"] = map[string]any{"type": typ}
 	}
-	typ := "disabled"
-	if enabled {
-		typ = "enabled"
-	}
-	req["thinking"] = map[string]any{"type": typ}
+	promptcompat.PreserveModeOverrides(req, modes)
 	out, err := json.Marshal(req)
 	if err != nil {
 		return translated
@@ -280,7 +288,8 @@ func resolveGeminiThinkingOverride(req map[string]any) (bool, bool) {
 	if !ok {
 		return false, false
 	}
-	return budget > 0, true
+	// A budget of -1 means dynamic thinking in Gemini; only zero disables it.
+	return budget != 0, true
 }
 
 func numericAny(raw any) (float64, bool) {

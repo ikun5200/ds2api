@@ -19,30 +19,33 @@
   ],
   "accounts": [
     {
-      "_comment": "邮箱登录方式",
+      "_comment": "邮箱登录方式；密码登录前配置官网签发 device_id 或 DS2API_DEEPSEEK_DEVICE_ID",
       "name": "主账号",
       "remark": "优先用于生产流量",
       "email": "example1@example.com",
-      "password": "your-password-1"
+      "password": "your-password-1",
+      "device_id": ""
     },
     {
-      "_comment": "邮箱登录方式 - 账号2",
+      "_comment": "邮箱登录方式 - 账号2；密码登录前配置官网签发 device_id 或 DS2API_DEEPSEEK_DEVICE_ID",
       "name": "备用账号",
       "email": "example2@example.com",
       "password": "your-password-2",
-      "disabled": true
+      "disabled": true,
+      "device_id": ""
     },
     {
-      "_comment": "手机号登录方式（中国大陆）",
+      "_comment": "手机号登录方式（中国大陆）；密码登录前配置官网签发 device_id 或 DS2API_DEEPSEEK_DEVICE_ID",
       "mobile": "12345678901",
-      "password": "your-password-3"
+      "password": "your-password-3",
+      "device_id": ""
     }
   ],
   "model_aliases": {
-    "gpt-4o": "deepseek-v4-flash",
-    "gpt-5.5": "deepseek-v4-flash",
-    "gpt-5.3-codex": "deepseek-v4-pro",
-    "o3": "deepseek-v4-pro"
+    "gpt-4o": "deepseek-flash",
+    "gpt-5.5": "deepseek-flash",
+    "gpt-5.3-codex": "deepseek-flash",
+    "o3": "deepseek-flash"
   },
   "responses": {
     "store_ttl_seconds": 900

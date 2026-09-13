@@ -45,11 +45,12 @@ ds2api/
 │   │   ├── openai/                       # OpenAI HTTP surface
 │   │   │   ├── chat/                     # Chat Completions execution entrypoint
 │   │   │   ├── responses/                # Responses API and response store
-│   │   │   ├── files/                    # Files API and inline-file preprocessing
+│   │   │   ├── files/                    # Files API and shared inputfiles service entrypoint
 │   │   │   ├── embeddings/               # Embeddings API
 │   │   │   ├── history/                  # OpenAI context file handling
 │   │   │   └── shared/                   # OpenAI HTTP errors/models/tool formatting
 │   │   └── requestbody/                  # HTTP body reading and UTF-8/JSON validation helpers
+│   ├── inputfiles/                       # Shared attachment decoding, URL downloads, uploads, deduplication and references/tokens
 │   ├── js/                               # Node runtime related logic
 │   │   ├── chat-stream/                  # Node streaming bridge
 │   │   ├── helpers/                      # JS helper modules

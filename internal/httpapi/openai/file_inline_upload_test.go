@@ -25,6 +25,10 @@ type inlineUploadDSStub struct {
 	completionResp *http.Response
 }
 
+func (m *inlineUploadDSStub) FetchUploadedFile(_ context.Context, _ *auth.RequestAuth, fileID string) (*dsclient.UploadFileResult, error) {
+	return &dsclient.UploadFileResult{ID: fileID, Status: "SUCCESS"}, nil
+}
+
 func (m *inlineUploadDSStub) CreateSession(_ context.Context, _ *auth.RequestAuth, _ int) (string, error) {
 	if strings.TrimSpace(m.createSession) == "" {
 		return "session-id", nil
@@ -171,8 +175,8 @@ func TestChatCompletionsUploadsInlineFilesBeforeCompletion(t *testing.T) {
 	if len(ds.uploadCalls) != 1 {
 		t.Fatalf("expected 1 upload call, got %d", len(ds.uploadCalls))
 	}
-	if ds.uploadCalls[0].ModelType != "vision" {
-		t.Fatalf("expected vision model type for vision request, got %q", ds.uploadCalls[0].ModelType)
+	if ds.uploadCalls[0].ModelType != "default" {
+		t.Fatalf("expected default model type for legacy vision alias, got %q", ds.uploadCalls[0].ModelType)
 	}
 	if ds.completionReq == nil {
 		t.Fatal("expected completion payload to be captured")
@@ -202,8 +206,8 @@ func TestResponsesUploadsInlineFilesBeforeCompletion(t *testing.T) {
 	if len(ds.uploadCalls) != 1 {
 		t.Fatalf("expected 1 upload call, got %d", len(ds.uploadCalls))
 	}
-	if ds.uploadCalls[0].ModelType != "expert" {
-		t.Fatalf("expected expert model type for pro request, got %q", ds.uploadCalls[0].ModelType)
+	if ds.uploadCalls[0].ModelType != "default" {
+		t.Fatalf("expected default model type for legacy pro alias, got %q", ds.uploadCalls[0].ModelType)
 	}
 	refIDs, _ := ds.completionReq["ref_file_ids"].([]any)
 	if len(refIDs) != 1 || refIDs[0] != "file-inline-1" {
@@ -323,5 +327,35 @@ func TestVercelPrepareUploadsInlineFilesBeforeLeasePayload(t *testing.T) {
 	refIDs, _ := payload["ref_file_ids"].([]any)
 	if len(refIDs) != 1 || refIDs[0] != "file-inline-1" {
 		t.Fatalf("unexpected payload ref_file_ids: %#v", payload["ref_file_ids"])
+	}
+}
+
+type managedAttachmentAuth struct {
+	streamStatusAuthStub
+	a *auth.RequestAuth
+}
+
+func (s managedAttachmentAuth) Determine(*http.Request) (*auth.RequestAuth, error) { return s.a, nil }
+
+func TestOpenAIExternalFileReferencesPinCompletionAccount(t *testing.T) {
+	for _, path := range []string{"/v1/chat/completions", "/v1/responses"} {
+		t.Run(path, func(t *testing.T) {
+			a := &auth.RequestAuth{UseConfigToken: true, AccountID: "account-one", DeepSeekToken: "token", CallerID: "caller:test"}
+			ds := &inlineUploadDSStub{}
+			h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: managedAttachmentAuth{a: a}, DS: ds}
+			router := chi.NewRouter()
+			registerOpenAITestRoutes(router, h)
+			body := `{"model":"deepseek-flash","ref_file_ids":["file-existing"],"messages":[{"role":"user","content":"describe"}],"input":"describe"}`
+			req := httptest.NewRequest(http.MethodPost, path, strings.NewReader(body))
+			req.Header.Set("Authorization", "Bearer direct-token")
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK || a.TargetAccount != "account-one" {
+				t.Fatalf("external file reference must pin the account: status=%d target=%q body=%s", rec.Code, a.TargetAccount, rec.Body.String())
+			}
+			if len(ds.uploadCalls) != 0 || ds.completionReq == nil {
+				t.Fatal("existing reference should proceed directly to completion")
+			}
+		})
 	}
 }

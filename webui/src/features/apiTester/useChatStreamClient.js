@@ -1,13 +1,16 @@
 import { useCallback } from 'react'
 
-import { getAttachedFileAccountIds } from './fileAccountBinding'
+import { getAttachedFileAccountIds, hasAttachmentCredentialMismatch } from './fileAccountBinding'
 
 export function useChatStreamClient({
     t,
     onMessage,
     model,
+    thinkingEnabled,
+    searchEnabled,
     message,
     effectiveKey,
+    usesManagedKey = false,
     selectedAccount,
     streamingMode,
     attachedFiles,
@@ -50,6 +53,9 @@ export function useChatStreamClient({
     }, [t])
 
     const resolveAttachmentAccount = useCallback(() => {
+        if (hasAttachmentCredentialMismatch(attachedFiles, effectiveKey, usesManagedKey)) {
+            return { accountId: '', error: t('apiTester.fileCredentialMismatch') }
+        }
         const ids = getAttachedFileAccountIds(attachedFiles)
         if (ids.length > 1) {
             return {
@@ -61,7 +67,7 @@ export function useChatStreamClient({
             accountId: ids[0] || '',
             error: '',
         }
-    }, [attachedFiles, t])
+    }, [attachedFiles, effectiveKey, usesManagedKey, t])
 
     const extractStreamError = useCallback((json) => {
         const error = json?.error
@@ -130,6 +136,8 @@ export function useChatStreamClient({
 
             const body = {
                 model,
+                thinking_enabled: thinkingEnabled,
+                search_enabled: searchEnabled,
                 messages: [{ role: 'user', content: message }],
                 stream: streamingMode,
             }
@@ -263,6 +271,8 @@ export function useChatStreamClient({
         extractStreamError,
         message,
         model,
+        thinkingEnabled,
+        searchEnabled,
         onMessage,
         resolveAttachmentAccount,
         selectedAccount,

@@ -52,36 +52,54 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 		return stdReq, errors.New("current user input file produced empty transcript")
 	}
 	toolsText, _ := promptcompat.BuildOpenAIToolsContextTranscript(stdReq.ToolsRaw, stdReq.ToolChoice)
+	contextFiles := 1
+	if strings.TrimSpace(toolsText) != "" {
+		contextFiles++
+	}
+	if len(stdReq.RefFileIDs)+contextFiles > promptcompat.MaxRefFileIDs {
+		// Keep the complete inline context when automatic files would displace
+		// client attachments or exceed DeepSeek's per-message reference limit.
+		return stdReq, nil
+	}
 	modelType := "default"
 	if resolvedType, ok := config.GetModelType(stdReq.ResolvedModel); ok {
 		modelType = resolvedType
 	}
 	result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-		Filename:    currentInputFilename,
-		ContentType: currentInputContentType,
-		Purpose:     currentInputPurpose,
-		ModelType:   modelType,
-		Data:        []byte(fileText),
+		Filename:        currentInputFilename,
+		ContentType:     currentInputContentType,
+		Purpose:         currentInputPurpose,
+		ModelType:       modelType,
+		ThinkingEnabled: &stdReq.Thinking,
+		Data:            []byte(fileText),
 	}, 3)
 	if err != nil {
 		return stdReq, fmt.Errorf("upload current user input file: %w", err)
+	}
+	if result == nil {
+		return stdReq, errors.New("upload current user input file returned no metadata")
 	}
 	fileID := strings.TrimSpace(result.ID)
 	if fileID == "" {
 		return stdReq, errors.New("upload current user input file returned empty file id")
 	}
+	a.BindUpstreamAccount()
 
 	toolFileID := ""
 	if strings.TrimSpace(toolsText) != "" {
 		result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-			Filename:    currentToolsFilename,
-			ContentType: currentInputContentType,
-			Purpose:     currentInputPurpose,
-			ModelType:   modelType,
-			Data:        []byte(toolsText),
+			Filename:        currentToolsFilename,
+			ContentType:     currentInputContentType,
+			Purpose:         currentInputPurpose,
+			ModelType:       modelType,
+			ThinkingEnabled: &stdReq.Thinking,
+			Data:            []byte(toolsText),
 		}, 3)
 		if err != nil {
 			return stdReq, fmt.Errorf("upload current tools file: %w", err)
+		}
+		if result == nil {
+			return stdReq, errors.New("upload current tools file returned no metadata")
 		}
 		toolFileID = strings.TrimSpace(result.ID)
 		if toolFileID == "" {
@@ -127,32 +145,41 @@ func (s Service) ReuploadAppliedCurrentInputFile(ctx context.Context, a *auth.Re
 		modelType = resolvedType
 	}
 	result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-		Filename:    currentInputFilename,
-		ContentType: currentInputContentType,
-		Purpose:     currentInputPurpose,
-		ModelType:   modelType,
-		Data:        []byte(stdReq.HistoryText),
+		Filename:        currentInputFilename,
+		ContentType:     currentInputContentType,
+		Purpose:         currentInputPurpose,
+		ModelType:       modelType,
+		ThinkingEnabled: &stdReq.Thinking,
+		Data:            []byte(stdReq.HistoryText),
 	}, 3)
 	if err != nil {
 		return stdReq, fmt.Errorf("upload current user input file: %w", err)
+	}
+	if result == nil {
+		return stdReq, errors.New("upload current user input file returned no metadata")
 	}
 	fileID := strings.TrimSpace(result.ID)
 	if fileID == "" {
 		return stdReq, errors.New("upload current user input file returned empty file id")
 	}
+	a.BindUpstreamAccount()
 
 	toolsText, _ := promptcompat.BuildOpenAIToolsContextTranscript(stdReq.ToolsRaw, stdReq.ToolChoice)
 	toolFileID := ""
 	if strings.TrimSpace(toolsText) != "" {
 		result, err := s.DS.UploadFile(ctx, a, dsclient.UploadFileRequest{
-			Filename:    currentToolsFilename,
-			ContentType: currentInputContentType,
-			Purpose:     currentInputPurpose,
-			ModelType:   modelType,
-			Data:        []byte(toolsText),
+			Filename:        currentToolsFilename,
+			ContentType:     currentInputContentType,
+			Purpose:         currentInputPurpose,
+			ModelType:       modelType,
+			ThinkingEnabled: &stdReq.Thinking,
+			Data:            []byte(toolsText),
 		}, 3)
 		if err != nil {
 			return stdReq, fmt.Errorf("upload current tools file: %w", err)
+		}
+		if result == nil {
+			return stdReq, errors.New("upload current tools file returned no metadata")
 		}
 		toolFileID = strings.TrimSpace(result.ID)
 		if toolFileID == "" {

@@ -49,6 +49,18 @@ func TestGetOllamaModelsRoute(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
 	}
+	var payload struct {
+		Models []struct {
+			Name  string `json:"name"`
+			Model string `json:"model"`
+		} `json:"models"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("decode model list: %v", err)
+	}
+	if len(payload.Models) != 1 || payload.Models[0].Name != "deepseek-flash" || payload.Models[0].Model != "deepseek-flash" {
+		t.Fatalf("expected only deepseek-flash, got %s", rec.Body.String())
+	}
 }
 
 func TestGetOllamaModelRoute(t *testing.T) {
@@ -57,7 +69,7 @@ func TestGetOllamaModelRoute(t *testing.T) {
 	registerOllamaTestRoutes(r, h)
 
 	t.Run("direct", func(t *testing.T) {
-		body := `{"model":"deepseek-v4-flash"}`
+		body := `{"model":"deepseek-flash"}`
 		req := httptest.NewRequest(http.MethodPost, "/api/show", strings.NewReader(body))
 		req.Header.Set("Content-Type", "application/json")
 		rec := httptest.NewRecorder()
@@ -69,8 +81,12 @@ func TestGetOllamaModelRoute(t *testing.T) {
 		if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 			t.Fatalf("expected valid json body, got err=%v body=%s", err, rec.Body.String())
 		}
-		if _, ok := payload["id"]; !ok {
-			t.Fatalf("expected response has lowercase id field, body=%s", rec.Body.String())
+		if payload["id"] != "deepseek-flash" {
+			t.Fatalf("expected flash model ID, body=%s", rec.Body.String())
+		}
+		capabilities, ok := payload["capabilities"].([]any)
+		if !ok || len(capabilities) != 3 || capabilities[0] != "tools" || capabilities[1] != "thinking" || capabilities[2] != "vision" {
+			t.Fatalf("unexpected flash capabilities: %#v", payload["capabilities"])
 		}
 		if _, ok := payload["ID"]; ok {
 			t.Fatalf("expected response does not expose uppercase ID field, body=%s", rec.Body.String())

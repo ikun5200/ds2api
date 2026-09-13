@@ -13,6 +13,9 @@ func ResolveThinkingOverride(req map[string]any) (bool, bool) {
 	if req == nil {
 		return false, false
 	}
+	if enabled, ok := parseThinkingSetting(req["thinking_enabled"]); ok {
+		return enabled, true
+	}
 	if enabled, ok := parseThinkingSetting(req["thinking"]); ok {
 		return enabled, true
 	}
@@ -20,6 +23,9 @@ func ResolveThinkingOverride(req map[string]any) (bool, bool) {
 		return enabled, true
 	}
 	if extraBody, ok := req["extra_body"].(map[string]any); ok {
+		if enabled, ok := parseThinkingSetting(extraBody["thinking_enabled"]); ok {
+			return enabled, true
+		}
 		if enabled, ok := parseThinkingSetting(extraBody["thinking"]); ok {
 			return enabled, true
 		}

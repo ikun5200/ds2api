@@ -31,7 +31,7 @@ func ParseDeepSeekSSELine(raw []byte) (map[string]any, bool, bool) {
 }
 
 func shouldSkipPath(path string) bool {
-	if isFragmentStatusPath(path) {
+	if isFragmentStatusPath(path) || isSearchMetadataPath(path) || strings.Contains(path, "token_usage") {
 		return true
 	}
 	if _, ok := dsprotocol.SkipExactPathSet[path]; ok {
@@ -160,6 +160,10 @@ func collectDirectFragments(path string, chunk map[string]any, v any, newType *s
 		if typeName == "" {
 			typeName = fragType
 		}
+		if isMetadataFragmentType(typeName) {
+			*newType = "metadata"
+			continue
+		}
 		switch typeName {
 		case "THINK", "THINKING":
 			*newType = "thinking"
@@ -196,6 +200,10 @@ func updateTypeFromNestedResponse(path string, v any, newType *string) {
 				continue
 			}
 			typeName, _, _ := parseFragmentTypeContent(fm)
+			if isMetadataFragmentType(typeName) {
+				*newType = "metadata"
+				continue
+			}
 			switch typeName {
 			case "THINK", "THINKING":
 				*newType = "thinking"
@@ -302,6 +310,10 @@ func appendWrappedFragments(val map[string]any, partType string, newType *string
 		if typeName == "" {
 			typeName = fragType
 		}
+		if isMetadataFragmentType(typeName) {
+			*newType = "metadata"
+			continue
+		}
 		switch typeName {
 		case "THINK", "THINKING":
 			*newType = "thinking"
@@ -321,8 +333,12 @@ func parseFragmentTypeContent(m map[string]any) (string, string, string) {
 	return strings.ToUpper(typeName), content, strings.ToUpper(typeName)
 }
 
+func isMetadataFragmentType(typeName string) bool {
+	return typeName == "SEARCH" || strings.HasPrefix(typeName, "TOOL_")
+}
+
 func appendContentPart(parts *[]ContentPart, content, kind string) {
-	if content == "" {
+	if content == "" || kind == "metadata" {
 		return
 	}
 	*parts = append(*parts, ContentPart{Text: content, Type: kind})
@@ -413,6 +429,9 @@ func extractContentRecursive(items []any, defaultType string) ([]ContentPart, bo
 		if content, ok := m["content"].(string); ok && content != "" {
 			typeName, _ := m["type"].(string)
 			typeName = strings.ToUpper(typeName)
+			if isMetadataFragmentType(typeName) {
+				continue
+			}
 			switch typeName {
 			case "THINK", "THINKING":
 				parts = append(parts, ContentPart{Text: content, Type: "thinking"})
@@ -447,6 +466,9 @@ func extractContentRecursive(items []any, defaultType string) ([]ContentPart, bo
 					}
 					typeName, _ := x["type"].(string)
 					typeName = strings.ToUpper(typeName)
+					if isMetadataFragmentType(typeName) {
+						continue
+					}
 					switch typeName {
 					case "THINK", "THINKING":
 						parts = append(parts, ContentPart{Text: ct, Type: "thinking"})

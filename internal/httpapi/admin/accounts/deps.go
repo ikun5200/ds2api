@@ -31,6 +31,9 @@ func toAccount(m map[string]any) config.Account {
 func fieldStringOptional(m map[string]any, key string) (string, bool) {
 	return adminshared.FieldStringOptional(m, key)
 }
+func accountDeviceIDOptional(m map[string]any) (string, bool, error) {
+	return adminshared.AccountDeviceIDOptional(m)
+}
 func fieldBoolOptional(m map[string]any, key string) (bool, bool) {
 	return adminshared.FieldBoolOptional(m, key)
 }

@@ -126,6 +126,7 @@ func (s *claudeStreamRuntime) finalize(stopReason string, deferEmptyOutput bool)
 	}, assistantturn.BuildOptions{
 		Model:                 s.model,
 		Prompt:                s.promptTokenText,
+		RefFileTokens:         s.refFileTokens,
 		SearchEnabled:         s.searchEnabled,
 		StripReferenceMarkers: s.stripReferenceMarkers,
 		ToolNames:             s.toolNames,

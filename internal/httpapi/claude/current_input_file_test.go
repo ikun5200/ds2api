@@ -83,6 +83,10 @@ type claudeCurrentInputDS struct {
 	payload map[string]any
 }
 
+func (d *claudeCurrentInputDS) FetchUploadedFile(_ context.Context, _ *auth.RequestAuth, fileID string) (*dsclient.UploadFileResult, error) {
+	return &dsclient.UploadFileResult{ID: fileID, Status: "SUCCESS"}, nil
+}
+
 func (d *claudeCurrentInputDS) CreateSession(context.Context, *auth.RequestAuth, int) (string, error) {
 	return "session-id", nil
 }

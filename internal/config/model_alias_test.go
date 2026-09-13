@@ -13,6 +13,18 @@ func TestResolveModelDirectDeepSeek(t *testing.T) {
 	}
 }
 
+func TestResolveModelFlashAndCustomAlias(t *testing.T) {
+	for _, requested := range []string{"deepseek-flash", "DeepSeek-Flash", "my-flash"} {
+		got, ok := ResolveModel(mockModelAliasReader{"my-flash": "deepseek-flash"}, requested)
+		if !ok || got != "deepseek-flash" {
+			t.Fatalf("ResolveModel(%q) = (%q, %v), want (deepseek-flash, true)", requested, got, ok)
+		}
+	}
+	if thinking, search, ok := GetModelConfig("deepseek-flash"); !ok || !thinking || search {
+		t.Fatalf("unexpected flash defaults: thinking=%v search=%v ok=%v", thinking, search, ok)
+	}
+}
+
 func TestResolveModelDirectDeepSeekNoThinking(t *testing.T) {
 	got, ok := ResolveModel(nil, "deepseek-v4-flash-nothinking")
 	if !ok || got != "deepseek-v4-flash-nothinking" {

@@ -116,7 +116,7 @@ func prepareRawSampleCaptureRequest(store adminshared.ConfigStore, req map[strin
 	}
 
 	if model := strings.TrimSpace(fieldString(payload, "model")); model == "" {
-		payload["model"] = "deepseek-v4-flash"
+		payload["model"] = config.DefaultDeepSeekModel
 	}
 	if _, ok := payload["stream"]; !ok {
 		payload["stream"] = true

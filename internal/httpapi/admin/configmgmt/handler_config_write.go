@@ -17,6 +17,10 @@ func (h *Handler) updateConfig(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "invalid json"})
 		return
 	}
+	if err := validateAccountDeviceIDs(req["accounts"]); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
+		return
+	}
 	old := h.Store.Snapshot()
 	err := h.Store.Update(func(c *config.Config) error {
 		if apiKeys, ok := toAPIKeys(req["api_keys"]); ok {
@@ -51,6 +55,9 @@ func (h *Handler) updateConfig(w http.ResponseWriter, r *http.Request) {
 				if prev, ok := existing[key]; ok {
 					if strings.TrimSpace(acc.Password) == "" {
 						acc.Password = prev.Password
+					}
+					if m["device_id"] == nil {
+						acc.DeviceID = prev.DeviceID
 					}
 				}
 				seen[key] = struct{}{}
@@ -170,6 +177,10 @@ func (h *Handler) batchImport(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "无效的 JSON 格式"})
+		return
+	}
+	if err := validateAccountDeviceIDs(req["accounts"]); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
 	}
 	importedKeys, importedAccounts := 0, 0

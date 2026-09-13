@@ -22,11 +22,7 @@ func NormalizeOpenAIChatRequest(store ConfigReader, req map[string]any, traceID 
 	if !ok {
 		return StandardRequest{}, fmt.Errorf("model %q is not available", model)
 	}
-	defaultThinkingEnabled, searchEnabled, _ := config.GetModelConfig(resolvedModel)
-	thinkingEnabled := util.ResolveThinkingEnabled(req, defaultThinkingEnabled)
-	if config.IsNoThinkingModel(resolvedModel) {
-		thinkingEnabled = false
-	}
+	thinkingEnabled, searchEnabled := ResolveRequestModes(req, resolvedModel)
 	responseModel := strings.TrimSpace(model)
 	if responseModel == "" {
 		responseModel = resolvedModel
@@ -39,28 +35,31 @@ func NormalizeOpenAIChatRequest(store ConfigReader, req map[string]any, traceID 
 	refFileIDs := CollectOpenAIRefFileIDs(req)
 
 	return StandardRequest{
-		Surface:         "openai_chat",
-		RequestedModel:  strings.TrimSpace(model),
-		ResolvedModel:   resolvedModel,
-		ResponseModel:   responseModel,
-		Messages:        messagesRaw,
-		PromptTokenText: finalPrompt,
-		ToolsRaw:        req["tools"],
-		FinalPrompt:     finalPrompt,
+		Surface:                 "openai_chat",
+		RequestedModel:          strings.TrimSpace(model),
+		ResolvedModel:           resolvedModel,
+		ResponseModel:           responseModel,
+		Messages:                messagesRaw,
+		PromptTokenText:         finalPrompt,
+		ToolsRaw:                req["tools"],
+		FinalPrompt:             finalPrompt,
 		PromptPrepareOptions:    prepareOptions,
 		PromptPrepareOptionsSet: true,
-		ToolNames:       toolNames,
-		ToolChoice:      toolPolicy,
-		Stream:          util.ToBool(req["stream"]),
-		Thinking:        thinkingEnabled,
-		Search:          searchEnabled,
-		RefFileIDs:      refFileIDs,
-		RefFileTokens:   estimateInlineFileTokens(req),
-		PassThrough:     passThrough,
+		ToolNames:               toolNames,
+		ToolChoice:              toolPolicy,
+		Stream:                  util.ToBool(req["stream"]),
+		Thinking:                thinkingEnabled,
+		Search:                  searchEnabled,
+		RefFileIDs:              refFileIDs,
+		RefFileTokens:           estimateInlineFileTokens(req),
+		PassThrough:             passThrough,
 	}, nil
 }
 
 func NormalizeOpenAIResponsesRequest(store ConfigReader, req map[string]any, traceID string) (StandardRequest, error) {
+	if err := ValidateResponsesContext(req); err != nil {
+		return StandardRequest{}, err
+	}
 	model, _ := req["model"].(string)
 	model = strings.TrimSpace(model)
 	if model == "" {
@@ -70,11 +69,7 @@ func NormalizeOpenAIResponsesRequest(store ConfigReader, req map[string]any, tra
 	if !ok {
 		return StandardRequest{}, fmt.Errorf("model %q is not available", model)
 	}
-	defaultThinkingEnabled, searchEnabled, _ := config.GetModelConfig(resolvedModel)
-	thinkingEnabled := util.ResolveThinkingEnabled(req, defaultThinkingEnabled)
-	if config.IsNoThinkingModel(resolvedModel) {
-		thinkingEnabled = false
-	}
+	thinkingEnabled, searchEnabled := ResolveRequestModes(req, resolvedModel)
 
 	messagesRaw := ResponsesMessagesFromRequest(req)
 	if len(messagesRaw) == 0 {
@@ -94,24 +89,24 @@ func NormalizeOpenAIResponsesRequest(store ConfigReader, req map[string]any, tra
 	refFileIDs := CollectOpenAIRefFileIDs(req)
 
 	return StandardRequest{
-		Surface:         "openai_responses",
-		RequestedModel:  model,
-		ResolvedModel:   resolvedModel,
-		ResponseModel:   model,
-		Messages:        messagesRaw,
-		PromptTokenText: finalPrompt,
-		ToolsRaw:        req["tools"],
-		FinalPrompt:     finalPrompt,
+		Surface:                 "openai_responses",
+		RequestedModel:          model,
+		ResolvedModel:           resolvedModel,
+		ResponseModel:           model,
+		Messages:                messagesRaw,
+		PromptTokenText:         finalPrompt,
+		ToolsRaw:                req["tools"],
+		FinalPrompt:             finalPrompt,
 		PromptPrepareOptions:    prepareOptions,
 		PromptPrepareOptionsSet: true,
-		ToolNames:       toolNames,
-		ToolChoice:      toolPolicy,
-		Stream:          util.ToBool(req["stream"]),
-		Thinking:        thinkingEnabled,
-		Search:          searchEnabled,
-		RefFileIDs:      refFileIDs,
-		RefFileTokens:   estimateInlineFileTokens(req),
-		PassThrough:     passThrough,
+		ToolNames:               toolNames,
+		ToolChoice:              toolPolicy,
+		Stream:                  util.ToBool(req["stream"]),
+		Thinking:                thinkingEnabled,
+		Search:                  searchEnabled,
+		RefFileIDs:              refFileIDs,
+		RefFileTokens:           estimateInlineFileTokens(req),
+		PassThrough:             passThrough,
 	}, nil
 }
 
@@ -362,6 +357,9 @@ func namesToSet(names []string) map[string]struct{} {
 // as a slightly pessimistic approximation so the returned context token count stays
 // safely above the real value.
 func estimateInlineFileTokens(req map[string]any) int {
+	if tokens, ok := req["_inline_file_tokens"].(int); ok && tokens >= 0 {
+		return tokens
+	}
 	raw, ok := req["_inline_file_bytes"]
 	if !ok {
 		return 0

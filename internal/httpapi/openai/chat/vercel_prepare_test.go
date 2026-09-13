@@ -469,7 +469,7 @@ func TestHandleVercelStreamSwitchReuploadsCurrentInputFile(t *testing.T) {
 			},
 		},
 		RefFileIDs: []string{"file-old", "file-old-tools", "client-file"},
-		Thinking:   true,
+		Thinking:   false,
 	}
 	leaseID := h.holdStreamLease(a, stdReq, "")
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions?__stream_switch=1", strings.NewReader(`{"lease_id":"`+leaseID+`"}`))
@@ -483,6 +483,11 @@ func TestHandleVercelStreamSwitchReuploadsCurrentInputFile(t *testing.T) {
 	}
 	if len(ds.uploadCalls) != 2 {
 		t.Fatalf("expected current input and tools reupload on switched account, got %d", len(ds.uploadCalls))
+	}
+	for _, upload := range ds.uploadCalls {
+		if upload.ThinkingEnabled == nil || *upload.ThinkingEnabled {
+			t.Fatalf("%s reupload must preserve disabled thinking", upload.Filename)
+		}
 	}
 	if ds.uploadCalls[0].Filename != "HISTORY.txt" || ds.uploadCalls[1].Filename != "TOOLS.txt" {
 		t.Fatalf("unexpected reupload filenames: %#v", ds.uploadCalls)

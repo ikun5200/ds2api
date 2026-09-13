@@ -6,7 +6,6 @@ import (
 
 	"ds2api/internal/config"
 	"ds2api/internal/promptcompat"
-	"ds2api/internal/util"
 )
 
 //nolint:unused // kept for native Gemini adapter route compatibility.
@@ -20,11 +19,7 @@ func normalizeGeminiRequest(store ConfigReader, routeModel string, req map[strin
 	if !ok {
 		return promptcompat.StandardRequest{}, fmt.Errorf("model %q is not available", requestedModel)
 	}
-	defaultThinkingEnabled, searchEnabled, _ := config.GetModelConfig(resolvedModel)
-	thinkingEnabled := util.ResolveThinkingEnabled(req, defaultThinkingEnabled)
-	if config.IsNoThinkingModel(resolvedModel) {
-		thinkingEnabled = false
-	}
+	thinkingEnabled, searchEnabled := promptcompat.ResolveRequestModes(geminiModeRequest(req), resolvedModel)
 
 	messagesRaw := geminiMessagesFromRequest(req)
 	if len(messagesRaw) == 0 {
@@ -40,20 +35,21 @@ func normalizeGeminiRequest(store ConfigReader, routeModel string, req map[strin
 	passThrough := collectGeminiPassThrough(req)
 
 	return promptcompat.StandardRequest{
-		Surface:         "google_gemini",
-		RequestedModel:  requestedModel,
-		ResolvedModel:   resolvedModel,
-		ResponseModel:   requestedModel,
-		Messages:        messagesRaw,
-		PromptTokenText: finalPrompt,
-		ToolsRaw:        toolsRaw,
-		FinalPrompt:     finalPrompt,
+		Surface:                 "google_gemini",
+		RequestedModel:          requestedModel,
+		ResolvedModel:           resolvedModel,
+		ResponseModel:           requestedModel,
+		Messages:                messagesRaw,
+		PromptTokenText:         finalPrompt,
+		ToolsRaw:                toolsRaw,
+		FinalPrompt:             finalPrompt,
 		PromptPrepareOptions:    prepareOptions,
 		PromptPrepareOptionsSet: true,
-		ToolNames:       toolNames,
-		Stream:          stream,
-		Thinking:        thinkingEnabled,
-		Search:          searchEnabled,
-		PassThrough:     passThrough,
+		ToolNames:               toolNames,
+		Stream:                  stream,
+		Thinking:                thinkingEnabled,
+		Search:                  searchEnabled,
+		RefFileIDs:              promptcompat.CollectOpenAIRefFileIDs(req),
+		PassThrough:             passThrough,
 	}, nil
 }

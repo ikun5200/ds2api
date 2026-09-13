@@ -3,6 +3,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
+const { createDeepSeekSSEParser } = require('../../internal/js/chat-stream/sse_delta');
 
 const handler = require('../../api/chat-stream.js');
 const { handleVercelStream } = require('../../internal/js/chat-stream/vercel_stream.js');
@@ -914,4 +915,91 @@ test('trimContinuationOverlap preserves short normal tokens and trims long snaps
   const existing = '我们被问到：这是一个很长的续答快照前缀，用来验证去重逻辑不会误伤正常 token。';
   const incoming = `${existing}继续分析`;
   assert.equal(trimContinuationOverlap(existing, incoming), '继续分析');
+});
+
+function collectDeepSeekSSE(lines, thinkingEnabled = true) {
+  const parser = createDeepSeekSSEParser();
+  let currentType = 'text';
+  let text = '';
+  let thinking = '';
+  let finished = false;
+  for (const line of lines) {
+    const parsed = parser.parse(line, thinkingEnabled, currentType);
+    currentType = parsed.newType;
+    for (const part of parsed.parts) {
+      if (part.type === 'thinking') thinking += part.text;
+      else text += part.text;
+    }
+    if (parsed.finished) {
+      finished = true;
+      break;
+    }
+  }
+  return { text, thinking, finished };
+}
+
+test('compressed flash SSE keeps search/file metadata out of reasoning and response', () => {
+  const lines = [
+    'event: ready',
+    'data: {"request_message_id":1,"response_message_id":2,"model_type":"default"}',
+    'event: update_file',
+    'data: {"id":"file-test","status":"SUCCESS","v":"file metadata"}',
+    'data: {"v":{"response":{"fragments":[{"type":"THINK","content":""}],"search_triggered":true}}}',
+    'data: {"p":"response/fragments/-1/content","o":"APPEND","v":"Thinking"}',
+    'data: {"v":"..."}',
+    'data: {"p":"response/fragments","o":"APPEND","v":[{"type":"TOOL_SEARCH","content":"hidden tool content","queries":[],"results":[]}]}',
+    'data: {"p":"response/fragments/-1","o":"BATCH","v":[{"p":"queries","o":"APPEND","v":["query"]},{"v":["more query"]},{"p":"results","v":[{"url":"https://example.com","content":"snippet"}]}]}',
+    'data: {"p":"response/fragments/-1/queries/-1","o":"APPEND","v":"hidden query"}',
+    'data: {"v":" continuation"}',
+    'data: {"p":"response/fragments/-1/content","v":"hidden tool delta"}',
+    'data: {"v":" continuation"}',
+    'data: {"p":"response/fragments/-1/status","o":"SET","v":"FINISHED"}',
+    'data: {"p":"response/fragments","o":"APPEND","v":[{"type":"RESPONSE","content":""}]}',
+    'data: {"p":"response/fragments/-1/content","v":"Answer"}',
+    'data: {"v":"."}',
+    'data: {"p":"response","o":"BATCH","v":[{"p":"accumulated_token_usage","v":"123"},{"v":"456"},{"p":"quasi_status","v":"FINISHED"}]}',
+    'data: {"p":"response/status","o":"SET","v":"FINISHED"}',
+  ];
+  for (const searchType of ['TOOL_SEARCH', 'SEARCH']) {
+    const searchLines = lines.map((line) => line.replace('"type":"TOOL_SEARCH"', `"type":"${searchType}"`));
+    assert.deepEqual(collectDeepSeekSSE(searchLines), { text: 'Answer.', thinking: 'Thinking...', finished: true });
+    assert.deepEqual(collectDeepSeekSSE(searchLines, false), { text: 'Answer.', thinking: '', finished: true });
+  }
+});
+
+test('vercel stream excludes search status fragments from the visible answer and reasoning', async () => {
+  for (const searchType of ['SEARCH', 'TOOL_SEARCH']) {
+    for (const thinkingEnabled of [true, false]) {
+      const { frames } = await runMockVercelStream([
+        'data: {"v":{"response":{"fragments":[{"type":"THINK","content":"plan"}]}}}\n\n',
+        `data: {"p":"response/fragments","o":"APPEND","v":[{"type":"${searchType}","content":"hidden search status"}]}\n\n`,
+        'data: {"p":"response/fragments/-1/content","o":"APPEND","v":" hidden search delta"}\n\n',
+        'data: {"p":"response/fragments","o":"APPEND","v":[{"type":"RESPONSE","content":"visible answer"}]}\n\n',
+        'data: {"p":"response/status","o":"SET","v":"FINISHED"}\n\n',
+      ], { thinking_enabled: thinkingEnabled, search_enabled: true });
+      const deltas = frames.filter((frame) => frame !== '[DONE]').map((frame) => JSON.parse(frame).choices?.[0]?.delta || {});
+      assert.equal(deltas.map((delta) => delta.content || '').join(''), 'visible answer');
+      assert.equal(deltas.map((delta) => delta.reasoning_content || '').join(''), thinkingEnabled ? 'plan' : '');
+    }
+  }
+});
+
+test('compressed BATCH keeps content before the terminal status', () => {
+  const lines = ['data: {"p":"response","o":"BATCH","v":[{"p":"content","o":"APPEND","v":"final"},{"v":" answer"},{"p":"status","o":"SET","v":"FINISHED"}]}'];
+  assert.deepEqual(collectDeepSeekSSE(lines), { text: 'final answer', thinking: '', finished: true });
+});
+
+test('ready and legacy snapshots reset delta state across automatic continuation', () => {
+  for (const boundary of [
+    ['event: close', 'data: {}', 'event: ready', 'data: {"response_message_id":3}'],
+    ['data: {"v":{"response":{"fragments":[{"type":"RESPONSE","content":""}]}}}'],
+  ]) {
+    const lines = [
+      'data: {"p":"response/status","v":"INCOMPLETE"}',
+      ...boundary,
+      'data: {"v":"continued answer"}',
+      'data: {"p":"response/status","v":"FINISHED"}',
+    ];
+    assert.deepEqual(collectDeepSeekSSE(lines), { text: 'continued answer', thinking: '', finished: true });
+  }
 });

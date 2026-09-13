@@ -1,6 +1,7 @@
 package sse
 
 import (
+	"log/slog"
 	"net/http"
 	"strings"
 
@@ -27,7 +28,11 @@ type CollectResult struct {
 // The caller is responsible for closing resp.Body unless closeBody is true.
 func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) CollectResult {
 	if closeBody {
-		defer func() { _ = resp.Body.Close() }()
+		defer func() {
+			if err := resp.Body.Close(); err != nil {
+				slog.Warn("failed to close DeepSeek stream", "error", err)
+			}
+		}()
 	}
 	text := strings.Builder{}
 	thinking := strings.Builder{}
@@ -36,6 +41,7 @@ func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) Co
 	stopped := false
 	collector := newCitationLinkCollector()
 	responseMessageID := 0
+	parser := contentLineParser{}
 	currentType := "text"
 	if thinkingEnabled {
 		currentType = "thinking"
@@ -52,19 +58,9 @@ func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) Co
 		if stopped {
 			return true
 		}
-		result := ParseDeepSeekContentLine(line, thinkingEnabled, currentType)
+		result := parser.parse(line, thinkingEnabled, currentType)
 		currentType = result.NextType
 		if !result.Parsed {
-			return true
-		}
-		if result.Stop {
-			if result.ContentFilter {
-				contentFilter = true
-			}
-			// Keep scanning to collect late-arriving citation metadata lines
-			// that can appear after response/status=FINISHED, but stop as soon
-			// as [DONE] arrives.
-			stopped = true
 			return true
 		}
 		for _, p := range result.Parts {
@@ -79,6 +75,11 @@ func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) Co
 		for _, p := range result.ToolDetectionThinkingParts {
 			trimmed := TrimContinuationOverlap(toolDetectionThinking.String(), p.Text)
 			toolDetectionThinking.WriteString(trimmed)
+		}
+		if result.Stop {
+			contentFilter = result.ContentFilter
+			// Keep scanning for citation metadata after FINISHED until [DONE].
+			stopped = true
 		}
 		return true
 	})

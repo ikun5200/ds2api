@@ -128,7 +128,7 @@ For the full module-by-module architecture and directory responsibilities, see [
 | --- | --- |
 | OpenAI compatible | `GET /v1/models`, `GET /v1/models/{id}`, `POST /v1/chat/completions`, `POST /v1/responses`, `GET /v1/responses/{response_id}`, `POST /v1/embeddings`, `POST /v1/files`, `GET /v1/files/{file_id}` |
 | Claude compatible | `GET /anthropic/v1/models`, `POST /anthropic/v1/messages`, `POST /anthropic/v1/messages/count_tokens` (plus shortcut paths `/v1/messages`, `/messages`) |
-| Gemini compatible | `POST /v1beta/models/{model}:generateContent`, `POST /v1beta/models/{model}:streamGenerateContent` (plus `/v1/models/{model}:*` paths) |
+| Gemini compatible | `GET /v1beta/models`, `POST /v1beta/models/{model}:generateContent`, `POST /v1beta/models/{model}:streamGenerateContent` (plus `/v1/models/{model}:*` paths) |
 | Ollama compatible | `GET /api/version`, `GET /api/tags`, `POST /api/show` |
 | Unified CORS compatibility | `/v1/*`, `/anthropic/*`, `/v1beta/models/*`, `/api/*`, and `/admin/*` share one CORS policy; on Vercel, the Node Runtime for `/v1/chat/completions` mirrors the same relaxed preflight behavior for third-party clients |
 | Multi-account rotation | Auto token refresh, email/mobile dual login |
@@ -154,29 +154,32 @@ OpenAI `/v1/*` routes remain canonical, and DS2API also accepts root shortcuts s
 
 ## Model Support
 
+Verified against [DeepSeek Web](https://chat.deepseek.com/) on 2026-09-11: fast, expert and image understanding now share the `default` lane; the old `expert` and `vision` lanes are disabled. DS2API exposes `deepseek-flash`, with thinking, web search, files and images available together.
+
 ### OpenAI Endpoint (`GET /v1/models`)
 
-| Family | Model ID | thinking | search |
-| --- | --- | --- | --- |
-| default | `deepseek-v4-flash` | enabled by default, request-controlled | ❌ |
-| expert | `deepseek-v4-pro` | enabled by default, request-controlled | ❌ |
-| default | `deepseek-v4-flash-search` | enabled by default, request-controlled | ✅ |
-| expert | `deepseek-v4-pro-search` | enabled by default, request-controlled | ✅ |
-| vision | `deepseek-v4-vision` | enabled by default, request-controlled | ❌ |
+| Upstream type | Only model ID | Thinking | Web search | Attachments |
+| --- | --- | --- | --- | --- |
+| `default` | `deepseek-flash` | On by default; `thinking_enabled` controls it | Off by default; `search_enabled` controls it | Files and images |
 
-Besides native IDs, DS2API also accepts common aliases as input (for example `gpt-4.1`, `gpt-5`, `gpt-5-codex`, `o3`, `claude-*`, `gemini-*`), but `/v1/models` returns normalized DeepSeek native model IDs. The complete alias behavior is documented in [API.en.md](API.en.md#model-alias-resolution) and `config.example.json`.
-Current upstream vision support exposes only the `vision` lane and does not provide a separate search-enabled vision variant.
+New clients should use `deepseek-flash` and select each capability through request fields:
+
+```json
+{
+  "model": "deepseek-flash",
+  "thinking_enabled": true,
+  "search_enabled": true,
+  "messages": [{"role": "user", "content": "Search and explain today's technology news"}]
+}
+```
+
+Both boolean fields also work inside `extra_body`. Existing `thinking`, `reasoning` and `reasoning_effort` options remain compatible. The WebUI API tester has independent thinking/search switches and a file/image upload button. An upload finishing does not overwrite an account selected while it was running; switch back to the attachment owner or remove and upload the files again before sending.
+
+Legacy `deepseek-v4-flash`, `deepseek-v4-pro`, `deepseek-v4-vision` and supported OpenAI / Claude / Gemini aliases remain accepted as request input, but are omitted from model catalogs. Legacy `deepseek-v4-flash-search` / `deepseek-v4-pro-search` retain search-on defaults, which `search_enabled: false` can override; `-nothinking` still forces thinking off. Every accepted name uses `default` for completion and upload requests. See [API.en.md](API.en.md#model-alias-resolution) for the full rules.
 
 ### Claude Endpoint (`GET /anthropic/v1/models`)
 
-| Current common model | Default Mapping |
-| --- | --- |
-| `claude-sonnet-4-6` | `deepseek-v4-flash` |
-| `claude-haiku-4-5` (compatible with `claude-3-5-haiku-latest`) | `deepseek-v4-flash` |
-| `claude-opus-4-6` | `deepseek-v4-pro` |
-
-Override mapping via the global `model_aliases` config.
-Besides the primary aliases above, `/anthropic/v1/models` also returns Claude 4.x snapshots plus historical 3.x IDs and common aliases for legacy client compatibility.
+This catalog also returns only `deepseek-flash`. Requests can use that name directly; existing aliases such as `claude-sonnet-4-6`, `claude-haiku-4-5` and `claude-opus-4-6` remain accepted and use the same upstream lane. `model_aliases` still configures client names, and the legacy `-nothinking` suffix continues to force thinking off.
 
 #### Claude Code integration pitfalls (validated)
 
@@ -187,7 +190,9 @@ Besides the primary aliases above, `/anthropic/v1/models` also returns Claude 4.
 
 ### Gemini Endpoint
 
-The Gemini adapter maps model names to DeepSeek native models via `model_aliases` or exact built-in aliases (covering common `gemini-2.5-*`, `gemini-3*`, and `gemini-pro-vision` names), supporting both `generateContent` and `streamGenerateContent` call patterns with full Tool Calling support (`functionDeclarations` → `functionCall` output). If the Gemini model name has a `-nothinking` suffix, such as `gemini-2.5-pro-nothinking`, it maps to the corresponding forced no-thinking model.
+`GET /v1beta/models` returns only `models/deepseek-flash`. Both `generateContent` and `streamGenerateContent` support this model and Tool Calling (`functionDeclarations` → `functionCall` output). Existing exact aliases such as `gemini-2.5-*` and `gemini-3*` remain compatible; native `generationConfig.thinkingConfig.thinkingBudget` is normalized into the shared thinking switch.
+
+Ollama `GET /api/tags` likewise lists only `deepseek-flash`; `POST /api/show` advertises `tools`, `thinking` and `vision`. Files and images go through a shared upload service and reach DeepSeek as `ref_file_ids`. See [API.en.md](API.en.md) for each protocol's attachment formats.
 
 ## Quick Start
 
@@ -300,6 +305,9 @@ cd ds2api
 # 2. Configure
 cp config.example.json config.json
 # Edit config.json with your DeepSeek account info and API keys
+# Before password login, obtain a device ID on a computer with Chrome/Chromium/Edge and Node.js 22+
+node scripts/deepseek-device.mjs
+# Save the output as the account device_id or DS2API_DEEPSEEK_DEVICE_ID
 
 # 3. Start
 go run ./cmd/ds2api
@@ -318,7 +326,7 @@ The server actually binds to `0.0.0.0:5001`, so devices on the same LAN can usua
 Common fields:
 
 - `keys` / `api_keys`: client API keys; `api_keys` adds `name` and `remark` metadata while `keys` remains compatible.
-- `accounts`: managed DeepSeek accounts, supporting `email` or `mobile` login plus proxy/name/remark metadata and the `disabled` flag.
+- `accounts`: managed DeepSeek accounts, supporting `email` or `mobile` login plus proxy/name/remark metadata and the `disabled` flag. Password login also needs a website-issued `device_id`, supplied per account or through the environment; see [login device verification](docs/DEPLOY.en.md#322-deepseek-login-device-verification).
 - `model_aliases`: one shared alias map for OpenAI / Claude / Gemini model names.
 - `runtime`: account concurrency, queueing, and token refresh behavior, hot-reloadable via Admin Settings.
 - `auto_delete.mode`: remote session cleanup after each request, supporting `none` / `single` / `all`.

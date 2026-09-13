@@ -68,7 +68,7 @@ function dropThinkingParts(parts) {
 function finalizeThinkingParts(parts, thinkingEnabled, newType) {
   const splitResult = splitThinkingParts(parts);
   let finalType = newType;
-  let finalParts = splitResult.parts;
+  let finalParts = splitResult.parts.filter((part) => part.type !== 'metadata');
   if (splitResult.transitioned) {
     finalType = 'text';
   }
@@ -76,6 +76,10 @@ function finalizeThinkingParts(parts, thinkingEnabled, newType) {
     finalParts = dropThinkingParts(finalParts);
   }
   return { parts: finalParts, newType: finalType };
+}
+
+function isMetadataFragmentType(type) {
+  return type === 'SEARCH' || type.startsWith('TOOL_');
 }
 
 function parseChunkForContent(chunk, thinkingEnabled, currentType, stripReferenceMarkers = true) {
@@ -183,16 +187,17 @@ function parseChunkForContent(chunk, thinkingEnabled, currentType, stripReferenc
       }
       const fragType = asString(frag.type).toUpperCase();
       const content = asContentString(frag.content, stripReferenceMarkers);
-      if (!content) {
+      if (isMetadataFragmentType(fragType)) {
+        newType = 'metadata';
         continue;
       }
       if (fragType === 'THINK' || fragType === 'THINKING') {
         newType = 'thinking';
-        parts.push({ text: content, type: 'thinking' });
+        if (content) parts.push({ text: content, type: 'thinking' });
       } else if (fragType === 'RESPONSE') {
         newType = 'text';
-        parts.push({ text: content, type: 'text' });
-      } else {
+        if (content) parts.push({ text: content, type: 'text' });
+      } else if (content) {
         parts.push({ text: content, type: 'text' });
       }
     }
@@ -206,7 +211,9 @@ function parseChunkForContent(chunk, thinkingEnabled, currentType, stripReferenc
       if (item.p === 'fragments' && item.o === 'APPEND' && Array.isArray(item.v)) {
         for (const frag of item.v) {
           const fragType = asString(frag && frag.type).toUpperCase();
-          if (fragType === 'THINK' || fragType === 'THINKING') {
+          if (isMetadataFragmentType(fragType)) {
+            newType = 'metadata';
+          } else if (fragType === 'THINK' || fragType === 'THINKING') {
             newType = 'thinking';
           } else if (fragType === 'RESPONSE') {
             newType = 'text';
@@ -328,17 +335,18 @@ function parseChunkForContent(chunk, thinkingEnabled, currentType, stripReferenc
           continue;
         }
         const content = asContentString(frag.content, stripReferenceMarkers);
-        if (!content) {
+        const t = asString(frag.type).toUpperCase();
+        if (isMetadataFragmentType(t)) {
+          newType = 'metadata';
           continue;
         }
-        const t = asString(frag.type).toUpperCase();
         if (t === 'THINK' || t === 'THINKING') {
           newType = 'thinking';
-          parts.push({ text: content, type: 'thinking' });
+          if (content) parts.push({ text: content, type: 'thinking' });
         } else if (t === 'RESPONSE') {
           newType = 'text';
-          parts.push({ text: content, type: 'text' });
-        } else {
+          if (content) parts.push({ text: content, type: 'text' });
+        } else if (content) {
           parts.push({ text: content, type: partType });
         }
       }
@@ -383,6 +391,7 @@ function extractContentRecursive(items, defaultType, stripReferenceMarkers = tru
     const content = asContentString(it.content, stripReferenceMarkers);
     if (content) {
       const typeName = asString(it.type).toUpperCase();
+      if (isMetadataFragmentType(typeName)) continue;
       if (typeName === 'THINK' || typeName === 'THINKING') {
         parts.push({ text: content, type: 'thinking' });
       } else if (typeName === 'RESPONSE') {
@@ -434,6 +443,7 @@ function extractContentRecursive(items, defaultType, stripReferenceMarkers = tru
         continue;
       }
       const typeName = asString(inner.type).toUpperCase();
+        if (isMetadataFragmentType(typeName)) continue;
       if (typeName === 'THINK' || typeName === 'THINKING') {
         parts.push({ text: ct, type: 'thinking' });
       } else if (typeName === 'RESPONSE') {
@@ -563,6 +573,11 @@ function formatErrorMessage(v) {
 }
 
 function shouldSkipPath(pathValue) {
+  if (pathValue.includes('token_usage')) return true;
+  const path = pathValue.replace(/^response\//, '');
+  if (path === 'search_triggered' || path === 'search_status') return true;
+  const fields = path.split('/');
+  if (fields[0] === 'fragments' && fields.length > 2 && fields[2] !== 'content') return true;
   if (isFragmentStatusPath(pathValue)) {
     return true;
   }

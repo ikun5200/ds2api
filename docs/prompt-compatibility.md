@@ -42,10 +42,11 @@ DS2API 当前的核心思路，不是把客户端传来的 `messages`、`tools`�
 ```text
 客户端请求
   -> HTTP API surface（OpenAI / Claude / Gemini）
-  -> promptcompat 统一消息标准化
+  -> 协议附件/模式字段归一为标准输入
+  -> promptcompat 统一消息标准化与模式解析
   -> tool prompt 注入
   -> DeepSeek 风格 prompt 拼装
-  -> 文件收集 / inline 上传（OpenAI 文件链路）
+  -> inputfiles.Service 统一文件解码、URL 下载、上传与引用收集
   -> current input file（completion runtime 全局入口）
   -> completion payload
   -> 下游网页对话接口
@@ -73,6 +74,10 @@ DS2API 当前的核心思路，不是把客户端传来的 `messages`、`tools`�
   [internal/prompt/tool_calls.go](../internal/prompt/tool_calls.go)
 - 最新 user 思考格式注入：
   [internal/promptcompat/thinking_injection.go](../internal/promptcompat/thinking_injection.go)
+- 共享思考/联网模式解析：
+  [internal/promptcompat/request_modes.go](../internal/promptcompat/request_modes.go)
+- 各协议共享附件服务：
+  [internal/inputfiles/service.go](../internal/inputfiles/service.go)
 - completion payload：
   [internal/promptcompat/standard_request.go](../internal/promptcompat/standard_request.go)
 - Go 输出侧 assistant turn：
@@ -96,12 +101,15 @@ DS2API 当前的核心思路，不是把客户端传来的 `messages`、`tools`�
     "file-other-attachment"
   ],
   "thinking_enabled": true,
-  "search_enabled": false
+  "search_enabled": false,
+  "action": null,
+  "preempt": false
 }
 ```
 
 重点是：
 
+- 2026-09-11 已核对 DeepSeek 网页配置：快速、专家和识图合并到 `default`，旧 `expert` / `vision` 已停用。对外模型目录仅有 `deepseek-flash`；OpenAI / Claude / Ollama 返回该 ID，Gemini `/v1beta/models` 返回 `models/deepseek-flash`。旧 `deepseek-v4-*` 与已支持 alias 只保留输入兼容和模式默认值，完成请求与文件上传最终一律使用 `default`。网页 client 版本更新为 `2.5.0`；共享 completion 组装补齐 `action: null`、`preempt: false`。
 - `prompt` 才是对话上下文主载体。
 - `ref_file_ids` 只承载文件引用，不承载普通文本消息。
 - `tools` 不会作为“原生工具 schema”直接下发给下游，而是被改写进 `prompt`。
@@ -110,9 +118,10 @@ DS2API 当前的核心思路，不是把客户端传来的 `messages`、`tools`�
 - 但 DeepSeek 远端本身支持同一 `chat_session_id` 的跨轮次持续对话。2026-04-27 已用项目内现有 DeepSeek client 做过一次不改业务代码的双轮实测：同一 `chat_session_id` 下，第 1 轮返回 `request_message_id=1` / `response_message_id=2` / 文本 `SESSION_TEST_ONE`；第 2 轮重新获取一次 PoW，并发送 `parent_message_id=2` 后，成功返回 `request_message_id=3` / `response_message_id=4` / 文本 `SESSION_TEST_TWO`。这说明“同远端会话持续聊天”能力存在，且每轮需要携带正确的 parent/message 链接信息，同时重新获取对应轮次可用的 PoW。
 - OpenAI Chat / Responses 原生走统一 OpenAI 标准化与 DeepSeek payload 组装；Claude / Gemini 会尽量复用 OpenAI prompt/tool 语义，其中 Gemini 直接复用 `promptcompat.BuildOpenAIPromptForAdapter`。Go 主服务新增 `completionruntime` 启动层，统一执行 DeepSeek session/PoW/call；输出侧新增 `assistantturn` 语义层：非流式 OpenAI Chat / Responses / Claude / Gemini 会把 DeepSeek SSE 收集结果先归一成同一份 assistant turn，再分别渲染成各协议原生外形；流式 OpenAI Chat / Responses / Claude / Gemini 继续保持各协议实时 SSE framing，但最终收尾的 tool fallback、schema 归一、usage、empty-output / content-filter 错误语义同样由 `assistantturn` 判定。Claude / Gemini 的常规 Go 主路径不再依赖内部 `httptest` 转发到 OpenAI handler；`translatorcliproxy` 仅保留用于 Vercel bridge、后端缺失 fallback 和回归测试，不作为主业务协议转换中心。
 - Vercel Node 流式路径本轮不迁移，仍使用现有 Node bridge / stream-tool-sieve 实现；后续若变更 Node 流式语义，需要按 `assistantturn` 的 Go canonical 输出语义同步对齐。
-- 客户端传入的 thinking / reasoning 开关会被归一到下游 `thinking_enabled`。Gemini `generationConfig.thinkingConfig.thinkingBudget` 会翻译成同一套 thinking 开关；关闭时即使上游返回 `response/thinking_content`，兼容层也不会把它当作可见正文输出。若最终解析出的模型名带 `-nothinking` 后缀，则会无条件强制关闭 thinking，优先级高于请求体中的 `thinking` / `reasoning` / `reasoning_effort`。未显式关闭时，各 surface 会按解析后的 DeepSeek 模型默认能力开启 thinking，并用各自协议的原生形态暴露：OpenAI Chat 为 `reasoning_content`，OpenAI Responses 为 `response.reasoning.delta` / `reasoning` content，Claude 为 `thinking` block / `thinking_delta`，Gemini 为 `thought: true` part。
+- `deepseek-flash` 默认 `thinking_enabled=true`、`search_enabled=false`；两个布尔开关接受顶层或 `extra_body`，其中顶层同名显式字段优先，`false` 不会被当作缺省值覆盖。`thinking` / `reasoning` / `reasoning_effort` 继续兼容。所有协议先归一原生字段，再通过 `promptcompat.ResolveRequestModes` 统一决定模式：Gemini 原生 `generationConfig.thinkingConfig.thinkingBudget=0` 关闭思考，非零值（含动态预算 `-1`）开启；`googleSearch` / `googleSearchRetrieval` 工具声明归一为搜索开启，显式通用开关优先。旧 `deepseek-v4-flash-search` / `deepseek-v4-pro-search` 的默认联网仍可被显式关闭；解析后的模型名若带 `-nothinking`，则无条件强制关闭思考，优先于所有请求字段。
+- 思考关闭时，即使上游返回 `response/thinking_content`，兼容层也不会把它当作可见正文输出。思考开启时按各协议的原生形态暴露：OpenAI Chat 为 `reasoning_content`，OpenAI Responses 为 `response.reasoning.delta` / `reasoning` content，Claude 为 `thinking` block / `thinking_delta`，Gemini 为 `thought: true` part。思考、联网、图片和文件没有互斥关系；Vercel 的准备/桥接路径同样保留显式模式字段。
 - 对 OpenAI Chat / Responses 的非流式收尾，如果最终可见正文为空，兼容层会优先尝试把思维链中的独立 DSML / XML 工具块当作真实工具调用解析出来。流式链路也会在收尾阶段做同样的 fallback 检测，但不会因为思维链内容去中途拦截或改写流式输出；真正的工具识别始终基于原始上游文本，而不是基于“已经做过可见输出清洗”的版本。最终可见层会剥离已经成功解析成工具调用的完整 leaked DSML / XML `tool_calls` wrapper；如果遇到完整 wrapper 但内部形态不符合可执行工具调用语义（例如 `<param>` 这类 malformed XML 工具壳），流式 sieve 会把该块作为普通文本释放，而不是吞掉或伪造成工具调用。补发结果会作为本轮 assistant 的结构化 `tool_calls` / `function_call` 输出返回，而不是塞进 `content` 文本；如果客户端没有开启 thinking / reasoning，思维链只用于检测，不会作为 `reasoning_content` 或可见正文暴露。只有正文为空且思维链里也没有可执行工具调用时，才继续按空回复错误处理。
-- OpenAI Chat / Responses、Claude Messages、Gemini generateContent 的空回复错误处理之前会默认做一次内部补偿重试：第一次上游完整结束后，如果最终可见正文为空、没有解析到工具调用、也没有已经向客户端流式发出工具调用，并且终止原因不是 `content_filter`，兼容层会复用同一个 `chat_session_id`、账号、token 与工具策略，把原始 completion `prompt` 追加固定后缀 `Previous reply had no visible output. Please regenerate the visible final answer or tool call now.` 后重新提交一次。Go 主路径的非流式重试由 `completionruntime.ExecuteNonStreamWithRetry` 统一处理；流式重试由 `completionruntime.ExecuteStreamWithRetry` 统一处理，各协议 runtime 只负责消费/渲染本协议 SSE framing。重试遵循 DeepSeek 多轮对话协议：从第一次上游 SSE 流中提取 `response_message_id`，并在重试 payload 中设置 `parent_message_id` 为该值，使重试成为同一会话的后续轮次而非断裂的根消息；同时重新获取一次 PoW（若 PoW 获取失败则回退到原始 PoW）。该同账号重试不会重新标准化消息、不会新建 session，也不会向流式客户端插入重试标记；第二次 thinking / reasoning 会按正常增量直接接到第一次之后，并继续使用 overlap trim 去重。若同账号补偿重试后即将返回 429 `upstream_empty_output`，并且当前是托管账号模式，runtime 会在返回 429 前切换到下一个可用账号，新建 `chat_session_id`，使用原始 completion payload 再做一次 fresh retry；该切号重试不携带空回复 prompt 后缀，也不设置上一账号的 `parent_message_id`。如果 current input file 已触发，切号前会在新账号上重新上传同一份 `HISTORY.txt`（以及需要时的 `TOOLS.txt`），并用新账号可见的 file_id 替换自动生成的旧 file_id；客户端原本传入的其他文件引用保持不变。如果没有可切换账号，或切号后的 fresh retry 仍没有可见正文或工具调用，则继续按原错误返回：无任何输出为 503 `upstream_unavailable`，有 reasoning 但没有可见正文或工具调用为 429 `upstream_empty_output`。若任一尝试触发空 `content_filter`，不做补偿重试并保持 `content_filter` 错误。Vercel Node 流式路径通过 Go 内部 prepare / pow / switch 端点获取初始 payload、重试 PoW 和切号 fresh retry payload，因此同样会重新上传 current-input 自动文件并替换为新账号 file_id。
+- OpenAI Chat / Responses、Claude Messages、Gemini generateContent 的空回复错误处理之前会默认做一次内部补偿重试：第一次上游完整结束后，如果最终可见正文为空、没有解析到工具调用、也没有已经向客户端流式发出工具调用，并且终止原因不是 `content_filter`，兼容层会复用同一个 `chat_session_id`、账号、token 与工具策略，把原始 completion `prompt` 追加固定后缀 `Previous reply had no visible output. Please regenerate the visible final answer or tool call now.` 后重新提交一次。Go 主路径的非流式重试由 `completionruntime.ExecuteNonStreamWithRetry` 统一处理；流式重试由 `completionruntime.ExecuteStreamWithRetry` 统一处理，各协议 runtime 只负责消费/渲染本协议 SSE framing。重试遵循 DeepSeek 多轮对话协议：从第一次上游 SSE 流中提取 `response_message_id`，并在重试 payload 中设置 `parent_message_id` 为该值，使重试成为同一会话的后续轮次而非断裂的根消息；同时重新获取一次 PoW（若 PoW 获取失败则回退到原始 PoW）。该同账号重试不会重新标准化消息、不会新建 session，也不会向流式客户端插入重试标记；第二次 thinking / reasoning 会按正常增量直接接到第一次之后，并继续使用 overlap trim 去重。若同账号补偿重试后即将返回 429 `upstream_empty_output`，并且当前是托管账号模式，runtime 会在返回 429 前切换到下一个可用账号，新建 `chat_session_id`，使用原始 completion payload 再做一次 fresh retry；该切号重试不携带空回复 prompt 后缀，也不设置上一账号的 `parent_message_id`。含用户附件/外部文件引用的请求会固定当前账号，不参与上述切号重试；同账号 token 刷新仍允许。对可切号的请求，如果 current input file 已触发，切号前会在新账号上重新上传同一份 `HISTORY.txt`（以及需要时的 `TOOLS.txt`），并用新账号可见的 file_id 替换自动生成的旧 file_id；用户附件/外部文件引用不会携带到另一个账号。如果没有可切换账号，或切号后的 fresh retry 仍没有可见正文或工具调用，则继续按原错误返回：无任何输出为 503 `upstream_unavailable`，有 reasoning 但没有可见正文或工具调用为 429 `upstream_empty_output`。若任一尝试触发空 `content_filter`，不做补偿重试并保持 `content_filter` 错误。Vercel Node 流式路径通过 Go 内部 prepare / pow / switch 端点获取初始 payload、重试 PoW 和切号 fresh retry payload，因此同样会重新上传 current-input 自动文件并替换为新账号 file_id。
 
 - 非流式 OpenAI Chat / Responses、Claude Messages、Gemini generateContent 在最终可见正文渲染阶段，会把 DeepSeek 搜索返回中的 `[citation:N]` / `[reference:N]` 标记替换成对应 Markdown 链接。`citation` 标记按一基序号解析；`reference` 标记只有在同一段正文中出现 `[reference:0]`（允许冒号后有空格）时才按零基序号映射，并且不会影响同段正文里的 `citation` 标记。
 - 流式输出仍默认隐藏 `[citation:N]` / `[reference:N]` 这类上游内部标记，避免分片输出中泄漏尚未完成映射的引用占位符。
@@ -169,6 +178,7 @@ OpenAI Chat / Responses 在标准化后、current input file 之前，会默认�
 工具调用正例现在优先示范普通 XML 风格：`<tool_calls>` → `<invoke name="...">` → `<parameter name="...">`。
 兼容层仍接受历史 DSML 标签变体，包括短横线形式 `<dsml-tool-calls>` / `<dsml-invoke>` / `<dsml-parameter>`、下划线形式 `<dsml_tool_calls>` / `<dsml_invoke>` / `<dsml_parameter>`，以及其他前缀分隔形态如 `<vendor|tool_calls>` / `<vendor_tool_calls>` / `<vendor - tool_calls>`；标签壳扫描还会把全角 ASCII 漂移归一化，例如 `<ｄＳＭＬ|tool_calls>` 与全角 `＞` 结束符，也会容错 CJK 尖括号、全角感叹号或顿号分隔符、弯引号属性值、PascalCase 本地名和属性尾部分隔符漂移，例如 `<DSM|parameter name="command"|>...〈/DSM|parameter〉`、`<！DSML！invoke name=“Bash”>`、`<、DSML、tool_calls>`、`<DSmartToolCalls>`、`<DSMLtool_calls※>`。更一般地，Go / Node tag 扫描以固定本地标签名 `tool_calls` / `invoke` / `parameter` 为准，标签名前或标签名后的非结构性协议分隔符都会在解析入口剥离，例如 `<DSML␂tool_calls>`、`<proto💥tool_calls>` 这类控制符或非 ASCII 分隔符漂移也会归一化回现有 XML 标签后继续走同一套 parser；结构性字符如 `<` / `>` / `/` / `=` / 引号、空白和 ASCII 字母数字不会被当作这类分隔符。进入现有 rewrite / XML parse 之前，Go / Node 还会先对“已经识别成工具标签壳的 candidate span”做一次窄 canonicalization：只折叠 wrapper / `invoke` / `parameter` / `name` / `CDATA` / DSML 前缀及其壳层分隔符里的 confusable 字符，清理零宽 / BOM / 控制类干扰，并把引号、空白、dash / underscore 变体等统一回可解析的工具语法。这个阶段不会广义改写普通正文、参数内容、Markdown 行内 code span、CDATA 里的示例文本或其他非工具 XML。CDATA 开头也使用同一类扫描式容错，`<![CDATA[` / `<！[CDATA[` / `<、[CDATA[` 都会作为参数原文容器处理。提示词会优先要求模型输出普通 XML 标签，并强调不能只输出 closing wrapper 而漏掉 opening tag。解析器会先截获非 Markdown 代码上下文中的疑似工具 wrapper，完整解析失败或工具语义无效时再按普通文本放行。
 数组参数使用 `<item>...</item>` 子节点表示；当某个参数体只包含 item 子节点时，Go / Node 解析器会把它还原成数组，避免 `questions` / `options` 这类 schema 中要求 array 的参数被误解析成 `{ "item": ... }` 对象。除此之外，解析器还会回收一些更松散的列表写法，例如 JSON array 字面量或逗号分隔的 JSON 项序列，只要它们足够明确；但 `<item>` 仍然是首选形态。若模型把完整结构化 XML fragment 误包进 CDATA，兼容层会在保护 `content` / `command` 等原文字段的前提下，尝试把非原文字段中的 CDATA XML fragment 还原成 object / array。不过，如果 CDATA 只是单个平面的 XML/HTML 标签，例如 `<b>urgent</b>` 这种行内标记，兼容层会保留原始字符串，不会强行升成 object / array；只有明显表示结构的 CDATA 片段，例如多兄弟节点、嵌套子节点或 `item` 列表，才会触发结构化恢复。对 `command` / `content` 等长文本参数，CDATA 内部的 Markdown fenced DSML / XML 示例会作为原文保护；示例里的 `]]></parameter>` 或 `</tool_calls>` 不会截断外层工具调用，解析器会继续等待围栏外真正的参数 / wrapper 结束标签。
+DeepSeek SSE 的 `SEARCH` 与 `TOOL_SEARCH` / `TOOL_OPEN` / `TOOL_FIND` 片段属于搜索状态和查询结果元数据，不进入正文、reasoning 或工具调用检测；`THINK` 为思考，`RESPONSE` 为正文。这一分类同时适用于 Go 的流式/非流式收集以及 Vercel Node 流式解析。官网在关闭思考的联网回复中可实际使用 `SEARCH`，不能只识别 `TOOL_SEARCH`。
 Go 侧读取 DeepSeek SSE 时不再依赖 `bufio.Scanner` 的固定 2MiB 单行上限；当写文件类工具把很长的 `content` 放在单个 `data:` 行里返回时，非流式收集、流式解析和 auto-continue 透传都会保留完整行，再进入同一套工具解析与序列化流程。
 在 assistant 最终回包阶段，如果某个 tool 参数在声明 schema 中明确是 `string`，兼容层会在把解析后的 `tool_calls` / `function_call` 重新序列化成 OpenAI / Responses / Claude 可见参数前，递归把该路径上的 number / bool / object / array 统一转成字符串；其中 object / array 会压成紧凑 JSON 字符串。这个保护只对 schema 明确声明为 string 的路径生效，不会改写本来就是 `number` / `boolean` / `object` / `array` 的参数。这样可以兼容 DeepSeek 输出了结构化片段、但上游客户端工具 schema 又严格要求字符串参数的场景（例如 `content`、`prompt`、`path`、`taskId` 等）。
 工具 schema 的权威来源始终是**当前请求实际携带的 schema**，而不是同名工具在其他 runtime（Claude Code / OpenCode / Codex 等）里的默认印象。兼容层现在会同时兼容 OpenAI 风格 `function.parameters`、直接工具对象上的 `parameters` / `input_schema`、以及 camelCase 的 `inputSchema` / `schema`，并在最终输出阶段按这份请求内 schema 决定是保留 array/object，还是仅对明确声明为 `string` 的路径做字符串化。该规则同样适用于 Claude 的流式收尾和 Vercel Node 流式 tool-call formatter，避免不同 runtime 因 schema shape 差异而出现同名工具参数类型漂移。
@@ -251,20 +261,42 @@ tool / function role 的结果会作为 `Tool result:` block 进入 prompt。
    例如通过附件、`input_file`、base64、data URL 上传的文件
    这类不会直接内联进 `prompt`，而是进入 `ref_file_ids`。
 
-OpenAI 文件相关实现：
+所有协议共享文件业务逻辑：
 
-- inline/base64/data URL 上传：
+- 标准附件解码、上传、去重和 token 用量：
+  [internal/inputfiles/service.go](../internal/inputfiles/service.go) / [decode.go](../internal/inputfiles/decode.go)
+- 公网 HTTP(S) 下载和地址校验：
+  [internal/inputfiles/remote.go](../internal/inputfiles/remote.go)
+- OpenAI Files / inline 入口：
   [internal/httpapi/openai/files/file_inline_upload.go](../internal/httpapi/openai/files/file_inline_upload.go)
+- Claude / Gemini 原生附件格式归一：
+  [internal/httpapi/claude/attachments.go](../internal/httpapi/claude/attachments.go) / [internal/httpapi/gemini/attachments.go](../internal/httpapi/gemini/attachments.go)
 - 文件 ID 收集：
   [internal/promptcompat/file_refs.go](../internal/promptcompat/file_refs.go)
+- 文件归属与访问校验：
+  [internal/inputfiles/file_ownership.go](../internal/inputfiles/file_ownership.go) / [internal/auth/file_ownership.go](../internal/auth/file_ownership.go)
+- 上游资源账号绑定：
+  [internal/auth/upstream_binding.go](../internal/auth/upstream_binding.go)
 
-OpenAI 的文件上传现在不再是“只传文件本体”的通用路径，而是会先根据请求里的 `model` 解析出 DeepSeek 的上传类型，并把它透传到上传接口的 `x-model-type`。当前可见的上传类型就是 `default` / `expert` / `vision`，其中 vision 请求上传图片时必须带上 `vision`，否则下游容易退回到仅文本或 OCR 语义。这个模型类型会同时用于：
+OpenAI Chat 的 `image_url`、Responses 的 `input_image`、`file` / `input_file` 的 base64 或 data-URL `file_data`、`file_url` 与已有 `file_id`，都会归一为标准附件块。`{"type":"image_file","image_file":{"file_id":"..."}}` 也作为既有图片引用收集，不会重新上传。同一附件块已有 `file_id` 或嵌套 `file.file_id` / `file.id` 时优先验证和复用引用，附带 URL 不触发再次上传；缺少有效来源的 `input_image` / `image_url` / `image_file` 以及明确声明的 `input_file` / `inline_file` / `file` 块会返回 `400`，避免静默忽略附件。
 
-- `/v1/files` 这类独立文件上传入口
-- Chat / Responses 的 inline 图片、附件上传
-- current input file 触发时生成的 `HISTORY.txt` 上下文文件
+Responses 的 `function_call_output` / `tool_result` 只在这些明确类型的 `output` 字段内遍历附件，将工具返回的图片上传并合并进 `ref_file_ids`；普通业务 JSON 的任意 `output` 属性不触发这一特殊遍历。
 
-也就是说，文件上传和完成请求的 `model_type` 现在是一致的：完成 payload 里仍然是 `model_type`，上传文件则会在 DeepSeek 上传阶段携带同样的模型类型信息。
+Claude 的 `image` / `document.source`（base64、URL、file ID，以及 document 的 text source）和 Gemini 的 `inlineData` / `fileData`（含 snake_case）也先转换为同一标准形态，再进入 `inputfiles.Service`；协议适配器只负责格式转换，不再自行拥有上传、去重、引用或 token 计算策略。解码只匹配明确的附件类型或 `file_data` / `image_url` 等标准字段；普通工具结果中的 `name`、`data`、`url` 不能单独触发上传，业务 JSON 继续作为工具历史内容进入 prompt。
+
+Gemini `functionResponse.parts` 中的 `inlineData` / `fileData` 明确附件归一到同一工具消息，`functionResponse.response` 中的普通业务 JSON 保持原语义。Claude / Gemini 在 Vercel 准备和 proxy 路径也保留这套标准附件消息及既有引用，避免外部协议转换丢失文档或图片。
+
+文件和图片现在统一使用 `default`，不再通过 `expert` 或 `vision` 上传。DeepSeek 上游上传请求使用只含 `file` 的 multipart，并携带上传目标 PoW、`x-model-type: default`、`x-file-size` 和 `x-thinking-enabled`。消息内附件，以及 current input file 生成或重传的 `HISTORY.txt` / `TOOLS.txt`，均继承标准请求的思考模式（`true` → `1`，`false` → `0`）。独立 `/v1/files` 可通过 multipart `thinking_enabled` 或 `X-Thinking-Enabled` 请求头指定模式；有效表单值优先，均未提供有效设置时默认开启。WebUI 上传会附带当前思考开关。上传返回 `PENDING` / `PARSING` 时会轮询，直到 `SUCCESS` 等就绪状态后再允许 completion 使用；`FAILED` / `CANCELLED` / `CONTENT_FILTER` / `CONTENT_TOO_LONG` / `CONTENT_EMPTY` 终态立即失败，不再等待轮询超时；完成请求是否思考仍由归一后的 `thinking_enabled` 独立决定。
+
+URL 附件只允许无需附加凭据的公网 HTTP(S)，不传递客户端 API 密钥，拒绝本机、私网、链路本地和保留地址；DNS 连接和每次重定向均会检查目标，最多跟随 4 次重定向，单次下载限时 60 秒。不支持 `file://`、`gs://` 或需 Google Files API 鉴权的地址。每个解码/下载附件为 1 字节至 100 MiB，每请求最多 50 个待上传附件块，且既有引用与新上传 ID 合并去重后总数最多 50；超额返回 `400` 而不会裁掉附件；解码/下载/大小失败映射为客户端 `400`，上传失败映射为 `500`。
+
+同一请求内，以内容、MIME、文件名联合去重上传；收集的 `ref_file_ids` 去重。附件 token 对新上传与既有引用采用同一规则：优先使用上传或访问校验返回的 `token_usage`，缺失时按元数据中的文件字节数 `/ 3` 估算；两类来源合并后按真实 file ID 只计算一次。再次处理已标准化的请求时替换校验后的总量，避免重复累加。已有文件 ID 不会重新上传。独立 `/v1/files`、查询和生成共用文件归属服务：托管上传成功后，真实 `auth.Resolver` 在最多 10,000 条、TTL 24 小时的内存缓存中按 `callerID + fileID` 记录上传账号（成功上传或访问验证会刷新有效期），`file_id` 仍保持上游原值，不编码凭据。复用已知 ID 时先统一归属并选择上传账号，再固定账号；已知引用跨账号或与显式 `TargetAccount` 冲突时返回 `409`。缓存不持久化，也不跨实例共享；重启、过期、异实例或不同调用凭据下的未知 ID 仅通过当前账号的 `FetchUploadedFile` 验证，不进行账号扫描，无法访问则返回 `404` 并要求指定正确账号或重传。直通 Token 模式不借助托管缓存切号。生成前引用未就绪返回 `409`、处理失败返回 `400`；上游访问校验请求失败返回 `502`，已知所属账号不可用返回 `503`，自定义后端缺少校验能力返回 `501`。这些错误均阻止 completion 使用无效附件；独立 GET 文件查询仍可返回 `PENDING` / `FAILED` 状态元数据。
+
+存在内联附件或外部 `ref_file_ids` 时，共享服务固定已验证的所属账号，后续 PoW、session、completion 及自动上下文文件上传只允许同账号 token 刷新；意外切号会报错。独立上传仍可在成功前选择可用账号，并返回 `account_id` 供显式绑定；WebUI 会复用附件绑定账号。
+
+上游资源另有统一账号绑定：`HISTORY.txt` 成功上传后，以及 session 创建成功后，`auth.RequestAuth.BindUpstreamAccount` 绑定资源所属账号。后续 PoW、`TOOLS.txt`、session/completion 的底层重试可以刷新该账号 token，但不得暗中切号并继续使用旧 file/session ID。只有共享 runtime 的 `SwitchAccountForFreshCompletion` 可以显式解开这种资源绑定，换号后重新上传自动文件并创建 session；用户附件或显式 `TargetAccount` 的固定限制仍然有效。账号池通过原子转移并发租约换号；没有候选时保留原租约，候选登录失败时安全回滚。原账号并发已被其他请求占满而无法回滚时，释放失败候选并清空账号和凭据，防止在无租约状态下继续请求或重复释放其他请求的名额。账号配置刷新、禁用或删除账号时，仍在执行的租约继续占用并发名额，直到所属请求释放；更新窗口内也按最新禁用状态过滤账号，避免重置队列后超限或错误扣减其他请求。
+
+WebUI 在内存中按附件对象保存上传凭据归属，凭据不写入可序列化文件元数据、请求或历史。换用不同直通 Token，或在托管与直通模式间切换时，会显示提示并阻止发送及追加混合附件；恢复原凭据或移除并重新上传后才能继续。托管 Key 之间切换仍可复用附件，发送时保留上传账号绑定。上传过程中用户改选账号时，上传完成不会覆盖新选择；若选择与附件归属不一致，发送会被阻止，需要切回上传账号或移除并重传附件。
 
 结论：
 
@@ -278,6 +310,7 @@ OpenAI 的文件上传现在不再是“只传文件本体”的通用路径，�
 兼容层现在只保留 `current_input_file` 这一种拆分方式；旧的 `history_split` 配置字段已移除，读取旧配置时会忽略它且不会再写回。
 
 - `current_input_file` 默认开启；它在统一 completion runtime 入口全局生效，用于把“完整上下文”合并进 `HISTORY.txt` 上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，runtime 会上传一个文件名为 `HISTORY.txt` 的上下文文件。文件内容会先经过各协议入口的标准化，再序列化成按轮次编号的 `HISTORY.txt` 风格 transcript，带有 `# HISTORY.txt` 标题和 `=== N. ROLE ===` 分段；如果当前请求声明了可用工具，还会把工具名称、描述和参数 schema 单独上传成 `TOOLS.txt`，带有 `# TOOLS.txt` 标题。live prompt 中则会给出一个自然的 continuation 语气 user 消息，要求模型使用附件里的对话笔记作为当前上下文并直接回答最新请求；如果有工具文件，会说明工具细节在单独附件中，同时保留本轮工具选择策略，避免把任务拉回起点。
+- 自动 `HISTORY.txt` / `TOOLS.txt` 也计入 `ref_file_ids` 的 50 个上限。追加自动文件将超额时，本次跳过整个自动拆分，保留完整内联 prompt、工具上下文和所有用户附件；例如 49 个已有附件且需要两份自动文件时不会上传自动文件。
 - 如果 `current_input_file.enabled=false`，请求会直接透传，不上传任何拆分上下文文件。
 - 即使触发 `current_input_file` 后 live prompt 被缩短，对客户端回包里的上下文 token 统计，仍会沿用**拆分前的完整 prompt 语义**做计数，而不是按缩短后的占位 prompt 计算；否则会把真实上下文显著算小。
 
@@ -334,8 +367,9 @@ Parameters: ...
 
 - `developer` 会映射到 `system`
 - Responses `instructions` 会 prepend 为 system message
+- 非空 `previous_response_id` 在附件上传/生成前通过 `ValidateResponsesContext` 明确返回 `400`，要求调用方在 `input` 携带完整历史与文件引用，避免静默丢失上一轮图片。`null` / 空字符串视为未传，`GET /v1/responses/{response_id}` 仍可查缓存输出，但缓存不承担状态续接。
 - 普通直传时 `tools` 会注入 system prompt；`current_input_file` 触发时工具描述/schema 会拆成 `TOOLS.txt`，live prompt 用自然语言说明工具细节在单独附件中，同时保留 XML 工具格式/策略规则
-- `attachments` / `input_file` / inline 文件会进入 `ref_file_ids`
+- `attachments` / `input_file` / `input_image` / `image_url` / `image_file` 经过共享附件服务上传或收集引用，最终进入 `ref_file_ids`；Responses 工具结果 `function_call_output` / `tool_result.output` 中的明确附件走同一路径
 - current input file 在统一 completion runtime 入口全局生效
 
 ### 10.2 Claude Messages
@@ -345,8 +379,8 @@ Parameters: ...
 - top-level `system` 优先作为系统提示
 - `tool_use` / `tool_result` 会被转换成统一的 assistant/tool 历史语义
 - 普通直传时 `tools` 同样会被并进 system prompt；`current_input_file` 触发时会沿用统一的 `TOOLS.txt` 拆分上传路径
-- 常规执行通过 `internal/httpapi/claude/handler_messages.go` 转到 OpenAI chat 路径，模型 alias 会先解析成 DeepSeek 原生模型
-- 当前代码里没有像 OpenAI 那样完整的 `ref_file_ids` 附件链路
+- 常规执行在 `internal/httpapi/claude/handler_messages.go` 中构建标准请求，使用共享 completion runtime，再渲染 Claude 输出
+- `image` / `document`（包括 tool_result 中的附件）由适配器归一，上传和 `ref_file_ids` 与 OpenAI 共用 `inputfiles.Service`；Vercel/proxy 路径保留相同的附件与工具历史消息
 
 ### 10.3 Gemini
 
@@ -355,7 +389,8 @@ Parameters: ...
 - `systemInstruction`、`contents.parts`、`functionCall`、`functionResponse` 会先归一
 - tools 会转成 OpenAI 风格 function schema
 - prompt 构建复用 OpenAI 的 `promptcompat.BuildOpenAIPromptForAdapter`，`current_input_file` 触发时也会使用统一的 `TOOLS.txt` 拆分上传路径
-- 未识别的非文本 part 会被安全序列化进 prompt，并对二进制/疑似 base64 内容做省略或截断处理
+- `inlineData` / `fileData`（包括 `functionResponse.parts` 中的明确附件）会先转换为标准附件，交给共享上传服务并进入 `ref_file_ids`；原始二进制/base64 不作为普通 prompt 正文，Vercel/proxy 路径保留相同附件语义
+- 未识别的其他非文本 part 仍安全序列化进 prompt，并对二进制/疑似 base64 内容做省略或截断处理
 
 也就是说，Gemini 在“最终 prompt 语义”上，尽量和 OpenAI 保持一致。
 
@@ -413,6 +448,9 @@ Parameters: ...
 - `internal/promptcompat/prompt_build.go`
 - `internal/promptcompat/message_normalize.go`
 - `internal/promptcompat/tool_prompt.go`
+- `internal/inputfiles/service.go`
+- `internal/inputfiles/decode.go`
+- `internal/inputfiles/remote.go`
 - `internal/httpapi/openai/files/file_inline_upload.go`
 - `internal/promptcompat/file_refs.go`
 - `internal/httpapi/openai/history/current_input_file.go`
@@ -432,6 +470,8 @@ Parameters: ...
 改动这条链路后，至少补齐或检查这些测试：
 
 - `go test ./internal/prompt/...`
+- `go test ./internal/promptcompat/...`
+- `go test ./internal/inputfiles/...`
 - `go test ./internal/httpapi/openai/...`
 - `go test ./internal/httpapi/claude/...`
 - `go test ./internal/httpapi/gemini/...`

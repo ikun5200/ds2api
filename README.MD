@@ -132,7 +132,7 @@ flowchart LR
 | --- | --- |
 | OpenAI 兼容 | `GET /v1/models`、`GET /v1/models/{id}`、`POST /v1/chat/completions`、`POST /v1/responses`、`GET /v1/responses/{response_id}`、`POST /v1/embeddings`、`POST /v1/files`、`GET /v1/files/{file_id}` |
 | Claude 兼容 | `GET /anthropic/v1/models`、`POST /anthropic/v1/messages`、`POST /anthropic/v1/messages/count_tokens`（及快捷路径 `/v1/messages`、`/messages`） |
-| Gemini 兼容 | `POST /v1beta/models/{model}:generateContent`、`POST /v1beta/models/{model}:streamGenerateContent`（及 `/v1/models/{model}:*` 路径） |
+| Gemini 兼容 | `GET /v1beta/models`、`POST /v1beta/models/{model}:generateContent`、`POST /v1beta/models/{model}:streamGenerateContent`（及 `/v1/models/{model}:*` 路径） |
 | Ollama 兼容 | `GET /api/version`、`GET /api/tags`、`POST /api/show` |
 | 统一 CORS 兼容 | `/v1/*`、`/anthropic/*`、`/v1beta/models/*`、`/api/*`、`/admin/*` 统一走同一套 CORS 策略；Vercel 上 `/v1/chat/completions` 的 Node Runtime 也对齐相同放行规则，尽量减少第三方预检请求头限制 |
 | 多账号轮询 | 自动 token 刷新、邮箱/手机号双登录方式 |
@@ -159,37 +159,32 @@ OpenAI `/v1/*` 仍是推荐的规范路径；同时支持 `/models`、`/chat/com
 
 ## 模型支持
 
+2026-09-11 已核对 [DeepSeek 网页端](https://chat.deepseek.com/)：快速、专家和识图能力合并到 `default` 通道，旧 `expert` / `vision` 通道已停用。DS2API 对外统一提供 `deepseek-flash`，思考、联网、文件和图片可组合使用。
+
 ### OpenAI 接口（`GET /v1/models`）
 
-| 模型类型 | 模型 ID | thinking | search |
-| --- | --- | --- | --- |
-| default | `deepseek-v4-flash` | 默认开启，可由请求参数控制 | ❌ |
-| default | `deepseek-v4-flash-nothinking` | 永久关闭，不受请求参数影响 | ❌ |
-| expert | `deepseek-v4-pro` | 默认开启，可由请求参数控制 | ❌ |
-| expert | `deepseek-v4-pro-nothinking` | 永久关闭，不受请求参数影响 | ❌ |
-| default | `deepseek-v4-flash-search` | 默认开启，可由请求参数控制 | ✅ |
-| default | `deepseek-v4-flash-search-nothinking` | 永久关闭，不受请求参数影响 | ✅ |
-| expert | `deepseek-v4-pro-search` | 默认开启，可由请求参数控制 | ✅ |
-| expert | `deepseek-v4-pro-search-nothinking` | 永久关闭，不受请求参数影响 | ✅ |
-| vision | `deepseek-v4-vision` | 默认开启，可由请求参数控制 | ❌ |
-| vision | `deepseek-v4-vision-nothinking` | 永久关闭，不受请求参数影响 | ❌ |
+| 模型类型 | 唯一模型 ID | 思考 | 联网 | 附件 |
+| --- | --- | --- | --- | --- |
+| `default` | `deepseek-flash` | 默认开启，`thinking_enabled` 控制 | 默认关闭，`search_enabled` 控制 | 文件和图片 |
 
-除原生模型外，也支持常见 alias 输入（如 `gpt-4.1`、`gpt-5`、`gpt-5-codex`、`o3`、`claude-*`、`gemini-*` 等），但 `/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID。若 alias 名本身追加 `-nothinking` 后缀，也会映射到对应的强制关思考模型。完整 alias 行为以 [API.md](API.md#模型-alias-解析策略) 和 `config.example.json` 为准。
-当前上游视觉模型只暴露 `vision` 通道，不提供独立的联网搜索视觉变体。
+推荐新客户端固定使用 `deepseek-flash`，通过请求字段独立切换功能：
+
+```json
+{
+  "model": "deepseek-flash",
+  "thinking_enabled": true,
+  "search_enabled": true,
+  "messages": [{"role": "user", "content": "搜索并解释今天的科技新闻"}]
+}
+```
+
+两个布尔字段也可放在 `extra_body` 中；原有 `thinking` / `reasoning` / `reasoning_effort` 写法继续兼容。WebUI「API 测试」提供独立的思考、联网开关与文件/图片上传按钮。上传中改选账号不会被上传结果覆盖；附件与所选账号不匹配时，需切回所属账号或移除重传。
+
+旧 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-v4-vision` 以及已支持的 OpenAI / Claude / Gemini alias 仍可作为请求输入，但不会出现在模型目录中。旧 `deepseek-v4-flash-search` / `deepseek-v4-pro-search` 保留默认联网语义，可用 `search_enabled: false` 关闭；`-nothinking` 后缀仍强制关闭思考。所有兼容名称的实际完成请求和上传类型均为 `default`。完整规则见 [API.md](API.md#模型-alias-解析策略)。
 
 ### Claude 接口（`GET /anthropic/v1/models`）
 
-| 当前常用模型 | 默认映射 |
-| --- | --- |
-| `claude-sonnet-4-6` | `deepseek-v4-flash` |
-| `claude-sonnet-4-6-nothinking` | `deepseek-v4-flash-nothinking` |
-| `claude-haiku-4-5`（兼容 `claude-3-5-haiku-latest`） | `deepseek-v4-flash` |
-| `claude-haiku-4-5-nothinking` | `deepseek-v4-flash-nothinking` |
-| `claude-opus-4-6` | `deepseek-v4-pro` |
-| `claude-opus-4-6-nothinking` | `deepseek-v4-pro-nothinking` |
-
-可通过配置中的 `model_aliases` 覆盖映射关系；若请求模型名带 `-nothinking`，会在最终映射结果上强制追加无思考语义。
-`/anthropic/v1/models` 除上述主别名外，还会返回 Claude 4.x snapshots、3.x 历史模型 ID 与常见 alias，便于旧客户端直接兼容。
+该目录也只返回 `deepseek-flash`。请求可直接使用这一模型名；`claude-sonnet-4-6`、`claude-haiku-4-5`、`claude-opus-4-6` 等已有 alias 继续兼容，均使用同一上游通道。`model_aliases` 仍可配置客户端名称，旧 `-nothinking` 强制关闭思考语义保持不变。
 
 #### Claude Code 接入避坑（实测）
 
@@ -200,7 +195,9 @@ OpenAI `/v1/*` 仍是推荐的规范路径；同时支持 `/models`、`/chat/com
 
 ### Gemini 接口
 
-Gemini 适配器将模型名通过 `model_aliases` 或内置精确 alias 映射到 DeepSeek 原生模型（覆盖 `gemini-2.5-*`、`gemini-3*`、`gemini-pro-vision` 等常见名称），支持 `generateContent` 和 `streamGenerateContent` 两种调用方式，并完整支持 Tool Calling（`functionDeclarations` → `functionCall` 输出）。若 Gemini 模型名带 `-nothinking` 后缀，例如 `gemini-2.5-pro-nothinking`，会映射到对应的强制关闭思考模型。
+`GET /v1beta/models` 返回唯一的 `models/deepseek-flash`。`generateContent` 和 `streamGenerateContent` 均可使用该模型，并支持 Tool Calling（`functionDeclarations` → `functionCall` 输出）。已有 `gemini-2.5-*`、`gemini-3*` 等精确 alias 继续兼容；原生 `generationConfig.thinkingConfig.thinkingBudget` 归一为同一思考开关。
+
+Ollama `GET /api/tags` 同样只列出 `deepseek-flash`；`POST /api/show` 声明 `tools`、`thinking`、`vision` 能力。文件和图片先经过统一上传服务，再作为 `ref_file_ids` 发送给 DeepSeek；各协议的附件格式见 [API.md](API.md)。
 
 ## 快速开始
 
@@ -314,6 +311,9 @@ cd ds2api
 # 2. 配置
 cp config.example.json config.json
 # 编辑 config.json，填入你的 DeepSeek 账号信息和 API key
+# 密码登录前，在安装 Chrome/Chromium/Edge 和 Node.js 22+ 的电脑获取设备标识
+node scripts/deepseek-device.mjs
+# 将输出填入账号的 device_id，或设置 DS2API_DEEPSEEK_DEVICE_ID
 
 # 3. 启动
 go run ./cmd/ds2api
@@ -332,7 +332,7 @@ go run ./cmd/ds2api
 常用字段：
 
 - `keys` / `api_keys`：客户端访问密钥，`api_keys` 支持 `name` 与 `remark` 元信息，`keys` 继续兼容。
-- `accounts`：DeepSeek 托管账号，支持 `email` 或 `mobile` 登录，可配置代理、名称、备注和 `disabled` 禁用状态。
+- `accounts`：DeepSeek 托管账号，支持 `email` 或 `mobile` 登录，可配置代理、名称、备注和 `disabled` 禁用状态。密码登录还需官网签发的 `device_id`，可填在账号中或通过环境变量设置，详见[登录设备验证](docs/DEPLOY.md#322-deepseek-登录设备验证)。
 - `model_aliases`：OpenAI / Claude / Gemini 共用的模型 alias 映射。
 - `runtime`：账号并发、队列与 token 刷新策略，可通过 Admin Settings 热更新。
 - `auto_delete.mode`：请求结束后的远端会话清理策略，支持 `none` / `single` / `all`。

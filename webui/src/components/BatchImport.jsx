@@ -155,7 +155,7 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
                         className="absolute inset-0 w-full h-full p-4 font-mono text-sm bg-background text-foreground resize-none focus:outline-none custom-scrollbar"
                         value={jsonInput}
                         onChange={e => setJsonInput(e.target.value)}
-                        placeholder={'{\n  "keys": ["your-api-key"],\n  "accounts": [\n    {"email": "...", "password": "...", "disabled": false}\n  ]\n}'}
+                        placeholder={'{\n  "keys": ["your-api-key"],\n  "accounts": [\n    {"email": "...", "password": "...", "device_id": "...", "disabled": false}\n  ]\n}'}
                         spellCheck={false}
                     />
                 </div>

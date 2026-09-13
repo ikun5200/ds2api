@@ -33,14 +33,20 @@ func TestSharedConstantsLoaded(t *testing.T) {
 	if BaseHeaders["Content-Type"] != "application/json" {
 		t.Fatalf("unexpected base header Content-Type=%q", BaseHeaders["Content-Type"])
 	}
-	if LoginHeaders["x-client-platform"] != "android" {
+	if LoginHeaders["x-client-platform"] != "web" {
 		t.Fatalf("unexpected login x-client-platform=%q", LoginHeaders["x-client-platform"])
 	}
-	if LoginHeaders["User-Agent"] != "DeepSeek/2.0.5 Android/35" {
+	if LoginHeaders["User-Agent"] != wantUserAgent {
 		t.Fatalf("unexpected login user agent=%q", LoginHeaders["User-Agent"])
 	}
-	if LoginHeaders["Accept"] != "application/json" {
+	if LoginHeaders["Accept"] != "*/*" {
 		t.Fatalf("unexpected login Accept=%q", LoginHeaders["Accept"])
+	}
+	if LoginHeaders["Origin"] != DeepSeekOrigin || LoginHeaders["Referer"] != DeepSeekOrigin+"/sign_in" {
+		t.Fatalf("login headers lack website origin or sign-in referer")
+	}
+	if LoginHeaders["x-client-version"] != ClientVersion {
+		t.Fatalf("login and chat client versions diverged")
 	}
 	if len(SkipContainsPatterns) == 0 {
 		t.Fatal("expected skip contains patterns to be loaded")

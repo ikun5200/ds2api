@@ -14,7 +14,7 @@ func (r *Runner) caseModelsClaude(ctx context.Context, cc *caseContext) error {
 	}
 	cc.assert("status_200", resp.StatusCode == http.StatusOK, fmt.Sprintf("status=%d", resp.StatusCode))
 	ids := extractModelIDs(resp.Body)
-	cc.assert("non_empty", len(ids) > 0, fmt.Sprintf("models=%v", ids))
+	cc.assert("only_deepseek_flash", len(ids) == 1 && ids[0] == "deepseek-flash", fmt.Sprintf("models=%v", ids))
 	return nil
 }
 func (r *Runner) caseAnthropicNonstream(ctx context.Context, cc *caseContext) error {

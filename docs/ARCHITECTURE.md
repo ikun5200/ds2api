@@ -45,11 +45,12 @@ ds2api/
 │   │   ├── openai/                       # OpenAI HTTP surface
 │   │   │   ├── chat/                     # Chat Completions 执行入口
 │   │   │   ├── responses/                # Responses API 与 response store
-│   │   │   ├── files/                    # Files API 与 inline file 预处理
+│   │   │   ├── files/                    # Files API 与共享 inputfiles 服务入口
 │   │   │   ├── embeddings/               # Embeddings API
 │   │   │   ├── history/                  # OpenAI context file handling
 │   │   │   └── shared/                   # OpenAI HTTP 公共错误/模型/工具格式
 │   │   └── requestbody/                  # HTTP 请求体读取与 UTF-8/JSON 校验辅助
+│   ├── inputfiles/                       # 共享附件解码、URL 下载、上传、去重与引用/token 处理
 │   ├── js/                               # Node Runtime 相关逻辑
 │   │   ├── chat-stream/                  # Node 流式输出桥接
 │   │   ├── helpers/                      # JS 辅助函数

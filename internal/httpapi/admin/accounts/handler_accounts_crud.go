@@ -67,6 +67,7 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 			"proxy_id":      acc.ProxyID,
 			"disabled":      acc.Disabled,
 			"has_password":  acc.Password != "",
+			"has_device_id": acc.DeviceID != "",
 			"has_token":     token != "",
 			"token_preview": maskSecretPreview(token),
 			"test_status":   testStatus,
@@ -78,6 +79,10 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) addAccount(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
 	_ = json.NewDecoder(r.Body).Decode(&req)
+	if _, _, err := accountDeviceIDOptional(req); err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
+		return
+	}
 	acc := toAccount(req)
 	if acc.Identifier() == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "需要 email 或 mobile"})
@@ -123,8 +128,13 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 	name, nameOK := fieldStringOptional(req, "name")
 	remark, remarkOK := fieldStringOptional(req, "remark")
 	disabled, disabledOK := fieldBoolOptional(req, "disabled")
+	deviceID, deviceIDOK, err := accountDeviceIDOptional(req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
+		return
+	}
 
-	err := h.Store.Update(func(c *config.Config) error {
+	err = h.Store.Update(func(c *config.Config) error {
 		for i, acc := range c.Accounts {
 			if !accountMatchesIdentifier(acc, identifier) {
 				continue
@@ -137,6 +147,9 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 			}
 			if disabledOK {
 				c.Accounts[i].Disabled = disabled
+			}
+			if deviceIDOK {
+				c.Accounts[i].DeviceID = deviceID
 			}
 			return nil
 		}

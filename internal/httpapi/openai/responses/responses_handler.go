@@ -78,6 +78,10 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 		writeOpenAIError(w, http.StatusBadRequest, "invalid json")
 		return
 	}
+	if err := promptcompat.ValidateResponsesContext(req); err != nil {
+		writeOpenAIError(w, http.StatusBadRequest, err.Error())
+		return
+	}
 	if err := h.preprocessInlineFileInputs(r.Context(), a, req); err != nil {
 		writeOpenAIInlineFileError(w, err)
 		return

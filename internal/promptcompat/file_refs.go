@@ -2,6 +2,9 @@ package promptcompat
 
 import "strings"
 
+// MaxRefFileIDs matches the current DeepSeek web client's max_input_file_count.
+const MaxRefFileIDs = 50
+
 func CollectOpenAIRefFileIDs(req map[string]any) []string {
 	if len(req) == 0 {
 		return nil
@@ -26,7 +29,7 @@ func CollectOpenAIRefFileIDs(req map[string]any) []string {
 				continue
 			}
 		}
-		appendOpenAIRefFileIDs(&out, seen, raw)
+		appendOpenAIRefFileIDs(&out, seen, raw, key == "ref_file_ids" || key == "file_ids" || key == "attachments")
 	}
 	if len(out) == 0 {
 		return nil
@@ -34,19 +37,24 @@ func CollectOpenAIRefFileIDs(req map[string]any) []string {
 	return out
 }
 
-func appendOpenAIRefFileIDs(out *[]string, seen map[string]struct{}, raw any) {
+func appendOpenAIRefFileIDs(out *[]string, seen map[string]struct{}, raw any, allowStringIDs bool) {
 	switch x := raw.(type) {
 	case string:
-		addOpenAIRefFileID(out, seen, x)
+		if allowStringIDs {
+			addOpenAIRefFileID(out, seen, x)
+		}
 	case []string:
-		for _, item := range x {
-			addOpenAIRefFileID(out, seen, item)
+		if allowStringIDs {
+			for _, item := range x {
+				addOpenAIRefFileID(out, seen, item)
+			}
 		}
 	case []any:
 		for _, item := range x {
-			appendOpenAIRefFileIDs(out, seen, item)
+			appendOpenAIRefFileIDs(out, seen, item, allowStringIDs)
 		}
 	case map[string]any:
+		itemType := strings.ToLower(strings.TrimSpace(asString(x["type"])))
 		if fileID := strings.TrimSpace(asString(x["file_id"])); fileID != "" {
 			addOpenAIRefFileID(out, seen, fileID)
 		}
@@ -63,6 +71,12 @@ func appendOpenAIRefFileIDs(out *[]string, seen map[string]struct{}, raw any) {
 				addOpenAIRefFileID(out, seen, fileID)
 			}
 		}
+		if itemType == "image_file" {
+			appendOpenAIRefFileIDs(out, seen, x["image_file"], false)
+		}
+		if itemType == "function_call_output" || itemType == "tool_result" {
+			appendOpenAIRefFileIDs(out, seen, x["output"], false)
+		}
 		// Recurse into potential containers. Note: we do NOT recurse into 'content' or 'input'
 		// if they are plain strings (handled by the top-level switch), but they are usually
 		// nested inside the map branch anyway.
@@ -75,7 +89,7 @@ func appendOpenAIRefFileIDs(out *[]string, seen map[string]struct{}, raw any) {
 						continue
 					}
 				}
-				appendOpenAIRefFileIDs(out, seen, nested)
+				appendOpenAIRefFileIDs(out, seen, nested, key == "ref_file_ids" || key == "file_ids" || key == "attachments")
 			}
 		}
 	}

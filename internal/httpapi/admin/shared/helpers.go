@@ -183,12 +183,14 @@ func toStringSlice(v any) ([]string, bool) {
 func toAccount(m map[string]any) config.Account {
 	email := fieldString(m, "email")
 	mobile := config.NormalizeMobileForStorage(fieldString(m, "mobile"))
+	deviceID, _ := m["device_id"].(string)
 	return config.Account{
 		Name:     fieldString(m, "name"),
 		Remark:   fieldString(m, "remark"),
 		Email:    email,
 		Mobile:   mobile,
 		Password: fieldString(m, "password"),
+		DeviceID: strings.TrimSpace(deviceID),
 		ProxyID:  fieldString(m, "proxy_id"),
 		Disabled: fieldBool(m, "disabled"),
 	}
@@ -366,6 +368,7 @@ func normalizeAccountForStorage(acc config.Account) config.Account {
 	acc.Remark = strings.TrimSpace(acc.Remark)
 	acc.Email = strings.TrimSpace(acc.Email)
 	acc.Mobile = config.NormalizeMobileForStorage(acc.Mobile)
+	acc.DeviceID = strings.TrimSpace(acc.DeviceID)
 	acc.ProxyID = strings.TrimSpace(acc.ProxyID)
 	return acc
 }

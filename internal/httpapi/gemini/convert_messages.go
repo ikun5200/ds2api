@@ -24,6 +24,7 @@ func geminiMessagesFromRequest(req map[string]any) []any {
 
 	contents, _ := req["contents"].([]any)
 	for _, item := range contents {
+		messageStart := len(out)
 		content, ok := item.(map[string]any)
 		if !ok {
 			continue
@@ -142,7 +143,7 @@ func geminiMessagesFromRequest(req map[string]any) []any {
 				if name != "" {
 					msg["name"] = name
 				}
-				out = append(out, msg)
+				out = append(out, attachGeminiFunctionResponseFiles(msg, fnResp))
 				continue
 			}
 
@@ -157,6 +158,7 @@ func geminiMessagesFromRequest(req map[string]any) []any {
 				"reasoning_content": pendingThinking,
 			})
 		}
+		out = attachGeminiMessageFiles(out, messageStart, parts)
 	}
 	return out
 }

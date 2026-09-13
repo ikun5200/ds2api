@@ -88,7 +88,7 @@ func (m *filesRouteDSStub) DeleteAllSessionsForToken(_ context.Context, _ string
 	return nil
 }
 
-func newMultipartUploadRequest(t *testing.T, purpose string, filename string, data []byte, model string) *http.Request {
+func newMultipartUploadRequest(t *testing.T, purpose string, filename string, data []byte, model string, options ...map[string]string) *http.Request {
 	t.Helper()
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
@@ -100,6 +100,13 @@ func newMultipartUploadRequest(t *testing.T, purpose string, filename string, da
 	if model != "" {
 		if err := writer.WriteField("model", model); err != nil {
 			t.Fatalf("write model failed: %v", err)
+		}
+	}
+	for _, fields := range options {
+		for key, value := range fields {
+			if err := writer.WriteField(key, value); err != nil {
+				t.Fatalf("write upload option %s: %v", key, err)
+			}
 		}
 	}
 	part, err := writer.CreateFormFile("file", filename)
@@ -137,8 +144,8 @@ func TestFilesRouteUploadSuccess(t *testing.T) {
 	if ds.lastReq.Purpose != "assistants" {
 		t.Fatalf("expected purpose assistants, got %q", ds.lastReq.Purpose)
 	}
-	if ds.lastReq.ModelType != "vision" {
-		t.Fatalf("expected vision model type, got %q", ds.lastReq.ModelType)
+	if ds.lastReq.ModelType != "default" {
+		t.Fatalf("expected default model type, got %q", ds.lastReq.ModelType)
 	}
 	if string(ds.lastReq.Data) != "hello world" {
 		t.Fatalf("unexpected uploaded data: %q", string(ds.lastReq.Data))
@@ -157,6 +164,57 @@ func TestFilesRouteUploadSuccess(t *testing.T) {
 		t.Fatalf("expected filename notes.txt, got %#v", out["filename"])
 	}
 }
+
+func TestFilesRouteMapsLegacyUploadHeaderToFlash(t *testing.T) {
+	for _, modelType := range []string{"expert", "vision"} {
+		t.Run(modelType, func(t *testing.T) {
+			ds := &filesRouteDSStub{}
+			h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: streamStatusAuthStub{}, DS: ds}
+			router := chi.NewRouter()
+			registerOpenAITestRoutes(router, h)
+			req := newMultipartUploadRequest(t, "assistants", "notes.txt", []byte("hello world"), "")
+			req.Header.Set("X-Model-Type", modelType)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK || ds.lastReq.ModelType != "default" {
+				t.Fatalf("legacy upload hint must use Flash: status=%d model_type=%q", rec.Code, ds.lastReq.ModelType)
+			}
+		})
+	}
+}
+
+func TestFilesRoutePropagatesUploadThinkingOverride(t *testing.T) {
+	for _, tc := range []struct {
+		name, form, header string
+		want               *bool
+	}{
+		{name: "default"},
+		{name: "form disabled", form: "false", want: boolPointer(false)},
+		{name: "header disabled", header: "0", want: boolPointer(false)},
+		{name: "header enabled", header: "1", want: boolPointer(true)},
+		{name: "form takes precedence", form: "true", header: "0", want: boolPointer(true)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			ds := &filesRouteDSStub{}
+			h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: streamStatusAuthStub{}, DS: ds}
+			router := chi.NewRouter()
+			registerOpenAITestRoutes(router, h)
+			req := newMultipartUploadRequest(t, "assistants", "notes.txt", []byte("hello"), "deepseek-flash", map[string]string{"thinking_enabled": tc.form})
+			req.Header.Set("X-Thinking-Enabled", tc.header)
+			rec := httptest.NewRecorder()
+			router.ServeHTTP(rec, req)
+			if rec.Code != http.StatusOK {
+				t.Fatalf("unexpected response: %d %s", rec.Code, rec.Body.String())
+			}
+			got := ds.lastReq.ThinkingEnabled
+			if (got == nil) != (tc.want == nil) || (got != nil && *got != *tc.want) {
+				t.Fatalf("unexpected upload thinking override: got=%v want=%v", got, tc.want)
+			}
+		})
+	}
+}
+
+func boolPointer(value bool) *bool { return &value }
 
 func TestFilesRouteUploadIncludesAccountIDForManagedAccount(t *testing.T) {
 	ds := &filesRouteDSStub{}

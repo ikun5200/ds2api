@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
 export function useApiTesterState({ t }) {
-    const [model, setModel] = useState('deepseek-v4-flash')
+    const [model, setModel] = useState('deepseek-flash')
+    const [thinkingEnabled, setThinkingEnabled] = useState(true)
+    const [searchEnabled, setSearchEnabled] = useState(false)
     const defaultMessage = t('apiTester.defaultMessage')
     const [message, setMessage] = useState(defaultMessage)
     const [apiKey, setApiKey] = useState('')
@@ -26,6 +28,10 @@ export function useApiTesterState({ t }) {
     return {
         model,
         setModel,
+        thinkingEnabled,
+        setThinkingEnabled,
+        searchEnabled,
+        setSearchEnabled,
         message,
         setMessage,
         attachedFiles,

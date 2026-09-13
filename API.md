@@ -42,7 +42,7 @@
 - 适配器层职责收敛为：**请求归一化 → DeepSeek 调用 → 协议形态渲染**，减少历史版本中“同能力多处实现”的分叉。
 - Tool Calling 的解析策略在 Go 与 Node Runtime 间保持一致：推荐模型输出半角管道符 DSML 外壳 `<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`；兼容层也接受 DSML wrapper 别名 `<dsml|tool_calls>`、`<|tool_calls>`、常见 DSML 分隔符漏写形态（如 `<|DSML tool_calls>`）、`DSML` 与工具标签名黏连的常见 typo（如 `<DSMLtool_calls>`）、控制分隔符漂移（如 `<DSML␂tool_calls>` / 原始 STX `\x02`）、CJK 尖括号、全角感叹号、顿号、PascalCase 本地名、弯引号属性值与属性尾部分隔符漂移（如 `<DSM|parameter name="command"|>...〈/DSM|parameter〉` / `<！DSML！invoke name=“Bash”>` / `<、DSML、tool_calls>` / `<DSmartToolCalls>` / `<DSMLtool_calls※>`）、任意协议前缀壳（如 `<proto💥tool_calls>`），以及旧式 canonical XML `<tool_calls>` → `<invoke name="...">` → `<parameter name="...">`。实现上采用结构扫描：只要固定本地标签名是 `tool_calls` / `invoke` / `parameter`，标签名前或标签名后的非结构性分隔符会在解析入口归一化；CDATA 开头也会容错 `<！[CDATA[` / `<、[CDATA[` 这类分隔符漂移；只有 `tool_calls` wrapper 或可修复的缺失 opening wrapper 会进入工具路径，裸 `<invoke>` 不计为已支持语法；流式场景继续执行防泄漏筛分。若参数体本身是合法 JSON 字面量（如 `123`、`true`、`null`、数组或对象），会按结构化值输出，不再一律当作字符串；显式空字符串和纯空白参数会结构化保留为空字符串，是否拒绝缺参由工具执行侧决定；完整但 malformed 的 wrapper 会作为普通文本释放，不会吞掉或伪造成工具调用；若 CDATA 偶发漏闭合，则会在最终 parse / flush 恢复阶段做窄修复，尽量保住已完整包裹的外层工具调用。
 - `Admin API` 将配置与运行时策略分开：`/admin/config*` 管静态配置，`/admin/settings*` 管运行时行为。
-- 当上游返回 thinking-only 响应（模型输出了推理链但无可见文本）时，Go 主路径与 Vercel Node 流式路径都会先自动重试一次：以多轮对话 follow-up 方式追加 prompt 后缀 `"Previous reply had no visible output. Please regenerate the visible final answer or tool call now."` 并设置 `parent_message_id` 在同一 DeepSeek session 内让模型重新输出；同账号重试最大 1 次。若同账号重试后仍即将返回 `429 upstream_empty_output`，托管账号模式会在返回 429 前自动切换到下一个可用账号，新建 session，用原始 payload 再 fresh retry 一次。
+- 当上游返回 thinking-only 响应（模型输出了推理链但无可见文本）时，Go 主路径与 Vercel Node 流式路径都会先自动重试一次：以多轮对话 follow-up 方式追加 prompt 后缀 `"Previous reply had no visible output. Please regenerate the visible final answer or tool call now."` 并设置 `parent_message_id` 在同一 DeepSeek session 内让模型重新输出；同账号重试最大 1 次。若同账号重试后仍即将返回 `429 upstream_empty_output`，未固定账号且不含用户附件/外部文件引用的托管请求，会在返回 429 前切换到下一个可用账号，新建 session，用原始 payload 再 fresh retry 一次。含附件请求固定使用原账号，以保持 file ID 有效。
 - 引用标记处理边界：流式输出默认隐藏 `[citation:N]` / `[reference:N]` 这类上游内部占位符；非流式输出默认把 DeepSeek 搜索引用标记转换为 Markdown 引用链接。
 
 ---
@@ -86,7 +86,7 @@ Vercel 一键部署可先只填 `DS2API_ADMIN_KEY`，部署后在 `/admin` 导�
 - token 在 `config.keys` 中 → **托管账号模式**，自动轮询选择账号
 - token 不在 `config.keys` 中 → **直通 token 模式**，直接作为 DeepSeek token 使用
 
-**可选请求头**：`X-Ds2-Target-Account: <email_or_mobile>` — 指定使用某个托管账号；如果目标账号不存在，或管理账号队列已耗尽，相关业务请求会返回 `429`，当前不会附带 `Retry-After` 头。若账号存在但登录/刷新失败，则返回对应的 `401` 或上游错误。未指定目标账号时，托管账号模式的 completion 空输出 429 会先尝试切到另一个可用账号 fresh retry 一次；指定目标账号或无其他可用账号时不会切号。
+**可选请求头**：`X-Ds2-Target-Account: <email_or_mobile>` — 指定使用某个托管账号；如果目标账号不存在，或管理账号队列已耗尽，相关业务请求会返回 `429`，当前不会附带 `Retry-After` 头。若账号存在但登录/刷新失败，则返回对应的 `401` 或上游错误。未指定目标账号且不含用户附件/外部文件引用时，托管账号模式的 completion 空输出 429 会先尝试切到另一个可用账号 fresh retry 一次；指定目标账号、含附件/文件引用或无其他可用账号时不会切号。
 Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=` 作为凭据来源。
 
 ### Admin 接口（`/admin/*`）
@@ -122,6 +122,7 @@ Gemini 兼容客户端还可以使用 `x-goog-api-key`、`?key=` 或 `?api_key=`
 | POST | `/messages` | 业务 | Claude 消息快捷路径 |
 | POST | `/v1/messages/count_tokens` | 业务 | Claude token 计数快捷路径 |
 | POST | `/messages/count_tokens` | 业务 | Claude token 计数快捷路径 |
+| GET | `/v1beta/models` | 无 | Gemini 模型目录，仅 `models/deepseek-flash` |
 | POST | `/v1beta/models/{model}:generateContent` | 业务 | Gemini 非流式 |
 | POST | `/v1beta/models/{model}:streamGenerateContent` | 业务 | Gemini 流式 |
 | POST | `/v1/models/{model}:generateContent` | 业务 | Gemini 非流式兼容路径 |
@@ -200,37 +201,26 @@ OpenAI `/v1/*` 仍是规范路径。对于只配置 DS2API 根地址的客户端
 
 ### `GET /v1/models`
 
-无需鉴权。返回当前支持的 DeepSeek 原生模型列表。
-
-**响应示例**：
+无需鉴权。仅返回 `deepseek-flash`；思考、联网、文件和图片使用同一模型。
 
 ```json
 {
   "object": "list",
   "data": [
-    {"id": "deepseek-v4-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-flash-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-pro", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-pro-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-flash-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-flash-search-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-pro-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-pro-search-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-vision", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-vision-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []}
+    {"id": "deepseek-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek"}
   ]
 }
 ```
 
-> 说明：`/v1/models` 返回的是规范化后的 DeepSeek 原生模型 ID；常见 alias 仅用于请求入参解析，不会在该接口中单独展开返回。带 `-nothinking` 后缀的模型表示无论请求里是否显式开启 thinking / reasoning，都会强制关闭思考输出。
+2026-09-11 已核对 DeepSeek 网页配置：快速、专家和识图能力已合并到 `default`，旧 `expert` / `vision` 通道停用。OpenAI、Claude、Gemini 和 Ollama 模型目录不再展开旧模型和 alias。
 
 ### 模型 alias 解析策略
 
 对 `chat` / `responses` / `embeddings` 的 `model` 字段采用“宽进严出”：
 
-1. 先匹配 DeepSeek 原生模型。
+1. 先匹配 `deepseek-flash` 或已支持的 `deepseek-v4-*` 历史名称。
 2. 再匹配 `model_aliases` 精确映射。
-3. 如果请求名以 `-nothinking` 结尾，则在最终解析出的规范模型上追加对应的无思考变体。
+3. 如果请求名以 `-nothinking` 结尾，则解析基础模型/alias 后保留强制关闭思考语义。
 4. 仍未命中则返回 `invalid_request_error`。当前不会按未知模型家族做启发式兜底；需要新增兼容名时请通过 `model_aliases` 明确配置。
 
 当前内置默认 alias 来自 `internal/config/models.go`，`config.model_aliases` 会在运行时覆盖或补充同名映射。节选：
@@ -241,10 +231,34 @@ OpenAI `/v1/*` 仍是规范路径。对于只配置 DS2API 根地址的客户端
 - Gemini：`gemini-2.5-pro`、`gemini-2.5-flash`、`gemini-3.1-pro`、`gemini-3-pro`、`gemini-3-flash`、`gemini-3.1-flash-lite`、`gemini-pro-vision`
 - 其他内置精确 alias：`llama-3.1-70b-instruct`、`qwen-max`
 
-上述 alias 若在请求名后追加 `-nothinking` 后缀，也会映射到对应的强制关闭 thinking 版本。
-当前视觉能力仅对应 `deepseek-v4-vision` / `deepseek-v4-vision-nothinking`，不会解析出独立的 `vision-search` 变体。
+旧 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-v4-vision` 及其 `-nothinking` 变体继续接受。旧 `deepseek-v4-flash-search` / `deepseek-v4-pro-search` 和映射到它们的 alias 保留默认联网语义，但显式 `search_enabled: false` 可以关闭。`-nothinking` 则始终强制关闭思考。
+
+这些名称仅用于兼容输入和旧模式默认值；最终 completion 的 `model_type` 与上传的 `x-model-type` 均为 `default`。图片和文件可以与思考、联网同时使用，无需选择 vision 或 search 模型。
 
 退役历史模型（如 `claude-1.*`、`claude-2.*`、`claude-instant-*`、`gpt-3.5*`）会被显式拒绝。
+
+### 思考与联网开关
+
+OpenAI Chat / Responses、Claude Messages、Gemini generateContent 共用以下模式设置：
+
+| 字段 | 类型 | `deepseek-flash` 默认值 | 位置 |
+| --- | --- | --- | --- |
+| `thinking_enabled` | boolean | `true` | 请求顶层或 `extra_body` |
+| `search_enabled` | boolean | `false` | 请求顶层或 `extra_body` |
+
+顶层同名显式字段优先于 `extra_body`；`false` 会保留为关闭指令。原有 `thinking`、`reasoning`、`reasoning_effort` 继续兼容，模型名的 `-nothinking` 强制关闭规则优先于所有请求开关。Gemini 原生 `generationConfig.thinkingConfig.thinkingBudget` 会归一成同一开关：`0` 关闭，非零值（含动态预算 `-1`）开启；显式的通用模式字段优先。
+
+```json
+{
+  "model": "deepseek-flash",
+  "thinking_enabled": true,
+  "search_enabled": true,
+  "messages": [{"role": "user", "content": "结合附件和联网资料回答问题"}],
+  "file_ids": ["<uploaded-file-id>"]
+}
+```
+
+已有文件 ID 来自 `/v1/files`；不带附件时省略 `file_ids`。所有模式通过共享标准请求组装 completion，客户端无需设置上游 `model_type`、`action` 或 `preempt`。
 
 ### `POST /v1/chat/completions`
 
@@ -264,6 +278,8 @@ Content-Type: application/json
 | `model` | string | ✅ | 支持 DeepSeek 原生模型 + 常见 alias（如 `gpt-5.5`、`gpt-5.4-mini`、`gpt-5.3-codex`、`o3`、`claude-opus-4-6`、`claude-sonnet-4-6`、`gemini-2.5-pro`、`gemini-3.1-pro`、`gemini-3-flash` 等）；若模型名带 `-nothinking` 后缀，则强制关闭 thinking / reasoning |
 | `messages` | array | ✅ | OpenAI 风格消息数组 |
 | `stream` | boolean | ❌ | 默认 `false` |
+| `thinking_enabled` | boolean | ❌ | 默认 `true`，也可放在 `extra_body`；`-nothinking` 强制关闭 |
+| `search_enabled` | boolean | ❌ | 默认 `false`，也可放在 `extra_body`；与图片/文件可同时使用 |
 | `tools` | array | ❌ | Function Calling 定义 |
 | `temperature` 等 | any | ❌ | 兼容透传字段（最终效果由上游决定） |
 
@@ -274,7 +290,7 @@ Content-Type: application/json
   "id": "<chat_session_id>",
   "object": "chat.completion",
   "created": 1738400000,
-  "model": "deepseek-v4-pro",
+  "model": "deepseek-flash",
   "choices": [
     {
       "index": 0,
@@ -366,11 +382,13 @@ data: [DONE]
 
 ### `GET /v1/models/{id}`
 
-无需鉴权。入参支持 alias（例如 `gpt-4o`），返回的是映射后的 DeepSeek 模型对象。
+无需鉴权。入参支持已有 alias（例如 `gpt-4o`），返回 `deepseek-flash` 模型对象。
 
 ### `POST /v1/responses`
 
-OpenAI Responses 风格接口，兼容 `input` 或 `messages`。
+OpenAI Responses 风格接口，兼容 `input` 或 `messages`，并支持相同的思考、联网与文件/图片输入。
+
+非空 `previous_response_id` 会在附件上传或生成之前返回 `400`，提示在 `input` 中提供完整对话历史和文件引用，以防旧图片或历史被静默丢弃。`null` / 空字符串视为未传；`GET /v1/responses/{response_id}` 仍可读取缓存输出，但不提供状态续接。
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
@@ -379,6 +397,8 @@ OpenAI Responses 风格接口，兼容 `input` 或 `messages`。
 | `messages` | array | ❌ | 与 `input` 二选一 |
 | `instructions` | string | ❌ | 自动前置为 system 消息 |
 | `stream` | boolean | ❌ | 默认 `false` |
+| `thinking_enabled` | boolean | ❌ | 默认 `true`，也可放在 `extra_body`；`-nothinking` 强制关闭 |
+| `search_enabled` | boolean | ❌ | 默认 `false`，也可放在 `extra_body`；与图片/文件可同时使用 |
 | `tools` | array | ❌ | 与 chat 同样的工具识别与转译策略（含代码块示例豁免） |
 | `tool_choice` | string/object | ❌ | 支持 `auto`/`none`/`required` 与强制函数（`{"type":"function","name":"..."}`） |
 
@@ -446,49 +466,95 @@ data: [DONE]
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
 | `file` | file | ✅ | 上传文件二进制 |
-| `purpose` | string | ❌ | 透传到上游用途字段 |
+| `purpose` | string | ❌ | 文件用途元数据，返回在 `file` 对象中 |
+| `model` | string | ❌ | 推荐 `deepseek-flash`；旧名称/alias 兼容，上传类型统一为 `default` |
+| `thinking_enabled` | boolean/string | ❌ | 独立上传默认 `true`；有效表单值优先于 `X-Thinking-Enabled` 请求头 |
 
 约束与行为：
 
 - 请求必须为 `multipart/form-data`，否则返回 `400`。
 - 请求体总大小上限 **100 MiB**（超限返回 `413`）。
 - 成功返回 OpenAI `file` 对象（`id/object/bytes/filename/purpose/status` 等字段），并附带 `account_id` 便于定位来源账号。
+- 文件和图片均使用 `default` 上游上传通道。DS2API 对 DeepSeek 发送仅含 `file` 的 multipart，并携带 `x-model-type: default`、`x-file-size`、`x-thinking-enabled`（`true` → `1`，`false` → `0`）和上传目标对应的 PoW。
+- 上游可能先返回 `PENDING` / `PARSING`，服务端会等待 `SUCCESS` 等就绪状态再返回文件；`FAILED` / `CANCELLED` / `CONTENT_FILTER` / `CONTENT_TOO_LONG` / `CONTENT_EMPTY` 终态会立即报错，不再等到轮询超时。
+- `file_id` 保持原始上游值，不编码账号或凭据。服务端为同一调用方缓存上传文件的托管账号归属；使用同一调用凭据复用已知 ID 时，可自动选择并固定上传账号。响应仍返回 `account_id`，便于通过 `X-Ds2-Target-Account` 显式指定；WebUI 会沿用该账号。
+- `thinking_enabled` 表单字段或 `X-Thinking-Enabled` 请求头接受 `true/false`、`1/0`、`on/off`、`enabled/disabled`（也兼容 `enable/disable/none`）。优先使用可解析的表单值，其次请求头；均未设置或无法解析时默认开启。WebUI 上传会带上当前思考开关；消息内附件与自动生成的上下文文件直接继承该次生成请求的思考模式。
 
 ### `GET /v1/files/{file_id}`
 
-需要业务鉴权。查询 DeepSeek 上传文件的当前状态，并返回 OpenAI `file` 对象；未找到匹配文件时返回 `404`。
+需要业务鉴权。复用文件归属解析选择账号，查询 DeepSeek 上传状态并返回 OpenAI `file` 对象；当前账号无法访问该文件时返回 `404`，显式目标账号与已知归属冲突时返回 `409`。查询可以返回 `PENDING` / `FAILED` 等状态元数据；只有生成请求要求引用已就绪。
+
+### 消息内的文件和图片
+
+各协议先把附件归一成标准文件块，由共享 `inputfiles.Service` 解码/下载并上传，再将文件 ID 合并到同一 `ref_file_ids`。附件可与 `thinking_enabled: true`、`search_enabled: true` 同时使用。含内联附件或外部文件 ID 的请求先解析并验证文件归属，再固定所属 DeepSeek 账号；后续上传、PoW、session 与 completion 可刷新同账号 token，但不会把既有文件交给另一个账号。
+
+| 协议 | 支持的输入 |
+| --- | --- |
+| OpenAI Chat | `image_url`（字符串或 `{ "url": "..." }`，支持 data URL / 公网 HTTP(S)）；`file` / `input_file` 的 `file_data`（base64 / data URL）、`file_url` 或 `file_id`；也接受嵌套 `file` 对象与 `{"type":"image_file","image_file":{"file_id":"..."}}` 图片引用 |
+| OpenAI Responses | `input_image.image_url`、`input_file.file_data` / `file_url` / `file_id`、`image_file` 引用，以及已有 `attachments` / `file_ids`；`function_call_output` / `tool_result` 的 `output` 中明确的图片/文件块同样上传或收集引用 |
+| Claude Messages | `image` / `document` 的 `source`：`type: "base64"` + `media_type` + `data`，或 `type: "url"` + `url`，或已上传的 `file_id`；`document` 也接受 `type: "text"` + `data` |
+| Gemini | `inlineData` 的 `mimeType` + base64 `data`；`fileData` 的 `mimeType` + 公网 HTTP(S) `fileUri` 或已有 `file_id`；同样接受 `inline_data` / `file_data` / `mime_type` / `file_uri`；`functionResponse.parts` 中相同格式的明确附件也会保留 |
+
+同一附件块中已有 `file_id`（含 `file.file_id` / `file.id`）时，优先校验和使用既有引用，不再下载附带 URL 或重复上传；缺少有效 URL、内联数据或文件 ID 的图片块返回 `400`。
+
+Claude 与 Gemini 的主路径、Vercel 准备/proxy 路径都保留这些图片、文档和既有文件引用，再由共享服务处理。附件识别只针对明确的协议附件块或标准文件字段；普通工具结果的 `name` / `data` / `url`，以及业务 JSON 中同名的 `output`，不会被泛化为文件上传。
+
+独立上传与后续生成、文件查询共用归属处理。托管模式的缓存键为调用方身份与原始 `file_id`，因此同一调用凭据复用已知文件时无需手动传账号头。多个已知文件属于不同账号，或显式 `X-Ds2-Target-Account` 与已知归属不一致时，返回 `409`；不会随机选择一个账号后继续生成。
+
+归属缓存有效期为 **24 小时**（成功上传或访问验证时刷新），每个 Resolver 最多 **10,000 条**，**仅保存在当前进程内存中**。重启、过期、其他实例或其他调用凭据下的未知 ID，只在当前选定账号验证文件是否可访问，不逐账号探测；无法访问时明确返回 `404`，应指定正确的 `X-Ds2-Target-Account` 或重新上传。该机制不承诺跨 Vercel 实例自动恢复归属。直通 Token 模式始终使用调用方提供的 Token，不通过托管归属缓存切换账号。
+
+生成前校验文件时，`404` 表示当前账号未找到匹配文件；尚未就绪返回 `409`，处理失败返回 `400`，上游校验请求失败返回 `502`，已知所属账号不可用返回 `503`，自定义后端不提供文件校验能力返回 `501`。这些情况都会停止生成，不会把无法使用的图片静默省略。
+
+WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托管 Key 与直通 Token 模式之间切换后，界面会提示凭据不匹配，并阻止发送或追加混合附件；切回原凭据可继续使用，也可移除后重新上传。同一托管账号池内切换 Key 仍允许复用附件，并沿用原上传账号。
+
+公网附件 URL 必须无需额外认证即可下载；DS2API 不向该地址转发调用方 API 密钥。下载仅接受 HTTP(S)，拒绝本机、私网、链路本地及保留地址，并在 DNS 连接和重定向时校验；不支持 `file://`、`gs://` 或需要 Google 文件 API 凭据的 URI。每次远程下载最多 60 秒，最多跟随 4 次重定向。
+
+每个内联/URL 附件解码后的大小需为 **1 字节至 100 MiB**，单请求最多 **50 个待上传附件块**，且**已有引用与新上传 ID 合并去重后总数不能超过 50**。超额返回 `400`，不会截掉客户端图片。解码、下载或大小错误返回 `400`，DeepSeek 上传失败返回 `500`；HTTP 请求体仍受相应路由的总大小限制。同一请求内内容、MIME 和文件名相同的附件只上传一次，引用和附件 token 用量也去重。
+
+自动上下文文件也计入 50 个引用的限制。如果追加 `HISTORY.txt` / `TOOLS.txt` 会超额，该请求会保留完整内联 prompt 和全部用户附件，不再上传这组自动文件。例如已有 49 个附件且需要历史与工具两个文件时，会直接使用完整 prompt。
+
+`HISTORY.txt` 上传成功或 DeepSeek session 创建成功后，本次上游资源绑定其所属账号；后续 PoW、`TOOLS.txt` 或 completion 的底层重试只允许刷新同账号 Token。只有共享 runtime 明确执行 fresh completion，才可在未被用户附件/显式目标账号固定的情况下换号，并重新创建 session、上传自动上下文文件。
+
+例如在同一个 OpenAI Chat 请求中使用图片和文本文件（替换图片 base64 占位值）：
+
+```json
+{
+  "model": "deepseek-flash",
+  "thinking_enabled": true,
+  "search_enabled": true,
+  "messages": [{
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "结合图片、笔记和联网资料解释"},
+      {"type": "image_url", "image_url": {"url": "data:image/png;base64,<image-base64>"}},
+      {"type": "file", "file": {"filename": "notes.txt", "file_data": "bm90ZXM="}}
+    ]
+  }]
+}
+```
 
 ---
 
 ## Claude 兼容接口
 
 除标准路径 `/anthropic/v1/*` 外，还支持快捷路径 `/v1/messages`、`/messages`、`/v1/messages/count_tokens`、`/messages/count_tokens`。
-实现上统一走 OpenAI Chat Completions 解析与回译链路，避免多套解析逻辑分叉维护。
+请求先归一为项目标准消息和附件，再复用共享模式、上传与 completion runtime；仅请求/响应外形由协议适配器处理。
 
 ### `GET /anthropic/v1/models`
 
-无需鉴权。
-
-**响应示例**：
+无需鉴权。只列出统一模型；历史 Claude alias 仍可作为消息请求的 `model`。
 
 ```json
 {
   "object": "list",
   "data": [
-    {"id": "claude-sonnet-4-6", "object": "model", "created": 1715635200, "owned_by": "anthropic"},
-    {"id": "claude-sonnet-4-6-nothinking", "object": "model", "created": 1715635200, "owned_by": "anthropic"},
-    {"id": "claude-haiku-4-5", "object": "model", "created": 1715635200, "owned_by": "anthropic"},
-    {"id": "claude-haiku-4-5-nothinking", "object": "model", "created": 1715635200, "owned_by": "anthropic"},
-    {"id": "claude-opus-4-6", "object": "model", "created": 1715635200, "owned_by": "anthropic"},
-    {"id": "claude-opus-4-6-nothinking", "object": "model", "created": 1715635200, "owned_by": "anthropic"}
+    {"id": "deepseek-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek"}
   ],
-  "first_id": "claude-opus-4-6",
-  "last_id": "claude-3-haiku-20240307-nothinking",
+  "first_id": "deepseek-flash",
+  "last_id": "deepseek-flash",
   "has_more": false
 }
 ```
-
-> 说明：示例仅展示部分模型；实际返回除当前主别名外，还包含 Claude 4.x snapshots、3.x 历史模型 ID 与常见别名，并为这些可映射模型额外提供 `-nothinking` 变体。
 
 ### `POST /anthropic/v1/messages`
 
@@ -506,10 +572,12 @@ anthropic-version: 2023-06-01
 
 | 字段 | 类型 | 必填 | 说明 |
 | --- | --- | --- | --- |
-| `model` | string | ✅ | 例如 `claude-sonnet-4-6` / `claude-opus-4-6` / `claude-haiku-4-5`（兼容 `claude-sonnet-4-5`、`claude-3-5-haiku-latest`），并支持历史 Claude 模型 ID；若模型名带 `-nothinking` 后缀，则强制关闭 thinking / reasoning |
+| `model` | string | ✅ | 推荐 `deepseek-flash`；也兼容 `claude-sonnet-4-6` / `claude-opus-4-6` / `claude-haiku-4-5`（兼容 `claude-sonnet-4-5`、`claude-3-5-haiku-latest`），并支持历史 Claude 模型 ID；若模型名带 `-nothinking` 后缀，则强制关闭 thinking / reasoning |
 | `messages` | array | ✅ | Claude 风格消息数组 |
 | `max_tokens` | number | ❌ | 缺省自动补 `8192`；当前实现不会硬性截断上游输出 |
 | `stream` | boolean | ❌ | 默认 `false` |
+| `thinking_enabled` | boolean | ❌ | 默认 `true`，也可放在 `extra_body`；`-nothinking` 强制关闭 |
+| `search_enabled` | boolean | ❌ | 默认 `false`，也可放在 `extra_body`；与图片/文件可同时使用 |
 | `system` | string | ❌ | 可选系统提示 |
 | `tools` | array | ❌ | Claude tool 定义 |
 | `thinking` | object | ❌ | Anthropic thinking 配置；会转译为下游 reasoning 控制，`-nothinking` 模型会忽略 |
@@ -608,12 +676,27 @@ data: {"type":"message_stop"}
 - `/v1/models/{model}:generateContent`（兼容路径）
 - `/v1/models/{model}:streamGenerateContent`（兼容路径）
 
-鉴权方式同业务接口（`Authorization: Bearer <token>` 或 `x-api-key`）。
-实现上统一走 OpenAI Chat Completions 解析与回译链路，避免多套解析逻辑分叉维护。
+生成接口鉴权方式同业务接口；也支持 `x-goog-api-key`、`?key=` / `?api_key=`。模型目录无需鉴权。
+请求先归一为项目标准消息和附件，再复用共享模式、上传与 completion runtime；仅请求/响应外形由协议适配器处理。
+
+### `GET /v1beta/models`
+
+无需鉴权。响应使用 Gemini 模型目录格式：
+
+```json
+{
+  "models": [{
+    "name": "models/deepseek-flash",
+    "baseModelId": "deepseek-flash",
+    "displayName": "DeepSeek Flash",
+    "supportedGenerationMethods": ["generateContent", "streamGenerateContent"]
+  }]
+}
+```
 
 ### `POST /v1beta/models/{model}:generateContent`
 
-请求体兼容 Gemini `contents` / `tools` 字段，模型名可用 alias 自动映射到 DeepSeek 模型；若路径中的模型名带 `-nothinking` 后缀，则最终会映射到对应的无思考模型。
+请求体兼容 Gemini `contents` / `tools` 字段；推荐路径模型 `deepseek-flash`，已有 alias 继续支持，`-nothinking` 仍强制关闭思考。`thinking_enabled` / `search_enabled` 可在顶层或 `extra_body` 设置。原生 `generationConfig.thinkingConfig.thinkingBudget` 为 `0` 时关闭思考，非零（包括 `-1`）时开启。`tools` 中的 `googleSearch` / `googleSearchRetrieval`（也接受 snake_case）开启联网，显式 `search_enabled` 优先。
 
 响应为 Gemini 兼容结构，核心字段包括：
 
@@ -636,6 +719,8 @@ data: {"type":"message_stop"}
 
 ## Ollama 兼容接口
 
+`GET /api/tags` 仅列出 `deepseek-flash`。
+
 - `POST /api/show` 请求体：`{"model":"<model-id>"}`。
 - 响应字段使用小写 `id`（不是 `ID`），并返回 `capabilities` 数组，便于与 Ollama 风格客户端/严格 schema 对齐。
 
@@ -643,8 +728,8 @@ data: {"type":"message_stop"}
 
 ```json
 {
-  "id": "deepseek-v4-flash",
-  "capabilities": ["tools", "thinking"]
+  "id": "deepseek-flash",
+  "capabilities": ["tools", "thinking", "vision"]
 }
 ```
 
@@ -731,13 +816,14 @@ data: {"type":"message_stop"}
       "email": "user@example.com",
       "mobile": "",
       "has_password": true,
+      "has_device_id": true,
       "has_token": true,
       "token_preview": "abcde..."
     }
   ],
   "model_aliases": {
-    "claude-sonnet-4-6": "deepseek-v4-flash",
-    "claude-opus-4-6": "deepseek-v4-pro"
+    "claude-sonnet-4-6": "deepseek-flash",
+    "claude-opus-4-6": "deepseek-flash"
   }
 }
 ```
@@ -768,8 +854,8 @@ data: {"type":"message_stop"}
     {"email": "user@example.com", "password": "pwd", "token": ""}
   ],
   "model_aliases": {
-    "claude-sonnet-4-6": "deepseek-v4-flash",
-    "claude-opus-4-6": "deepseek-v4-pro"
+    "claude-sonnet-4-6": "deepseek-flash",
+    "claude-opus-4-6": "deepseek-flash"
   }
 }
 ```
@@ -901,6 +987,7 @@ data: {"type":"message_stop"}
       "email": "user@example.com",
       "mobile": "",
       "has_password": true,
+      "has_device_id": true,
       "has_token": true,
       "token_preview": "abc...",
       "test_status": "ok"
@@ -916,20 +1003,22 @@ data: {"type":"message_stop"}
 ### `POST /admin/accounts`
 
 ```json
-{"email": "user@example.com", "password": "pwd"}
+{"email": "user@example.com", "password": "pwd", "device_id": "website-issued-device-id"}
 ```
 
 **响应**：`{"success": true, "total_accounts": 6}`
 
 ### `PUT /admin/accounts/{identifier}`
 
-更新指定账号的 `name` / `remark`。路径参数中的 `identifier` 可以是 email 或 mobile，且不可修改。
+更新指定账号的 `name` / `remark` / `disabled` / `device_id`。路径参数中的 `identifier` 可以是 email 或 mobile，且不可修改。
 
 ```json
 {"name": "主账号", "remark": "团队共享"}
 ```
 
 **响应**：`{"success": true, "total_accounts": 6}`
+
+`device_id` 为官网签发的设备标识，用于密码登录。新增、更新和 JSON 批量导入的新账号均支持；批量导入对已存在账号仍按原有规则跳过，不会替换其设备标识。不提供或传 `null` 时保留原值，字符串会去除首尾空白，显式空字符串可清除；非字符串返回 `400`。普通配置/账号列表只返回 `has_device_id`，配置导出和 Vercel 同步保留原值。获取方式见[登录设备验证](docs/DEPLOY.md#322-deepseek-登录设备验证)。管理台编辑输入框留空时不会发送清除操作。
 
 ### `DELETE /admin/accounts/{identifier}`
 
@@ -980,8 +1069,9 @@ data: {"type":"message_stop"}
 | 字段 | 必填 | 说明 |
 | --- | --- | --- |
 | `identifier` | ✅ | email / mobile / token-only 合成标识 |
-| `model` | ❌ | 默认 `deepseek-v4-flash` |
+| `model` | ❌ | 默认 `deepseek-flash` |
 | `message` | ❌ | 空字符串时仅测试会话创建 |
+| `device_id` | ❌ | 仅本次测试使用的设备标识覆盖；持久化需更新账号配置 |
 
 **响应**：
 
@@ -991,7 +1081,7 @@ data: {"type":"message_stop"}
   "success": true,
   "response_time": 1240,
   "message": "API 测试成功（仅会话创建）",
-  "model": "deepseek-v4-flash",
+  "model": "deepseek-flash",
   "session_count": 0,
   "config_writable": true,
   "config_warning": ""
@@ -1064,7 +1154,7 @@ data: {"type":"message_stop"}
 
 | 字段 | 必填 | 默认值 |
 | --- | --- | --- |
-| `model` | ❌ | `deepseek-v4-flash` |
+| `model` | ❌ | `deepseek-flash` |
 | `message` | ❌ | `你好` |
 | `api_key` | ❌ | 配置中第一个 key |
 
@@ -1088,7 +1178,7 @@ data: {"type":"message_stop"}
 | --- | --- | --- | --- |
 | `message` | 否 | `你好` | 便捷单轮用户消息 |
 | `messages` | 否 | 自动由 `message` 生成 | OpenAI 风格消息数组 |
-| `model` | 否 | `deepseek-v4-flash` | 目标模型 |
+| `model` | 否 | `deepseek-flash` | 目标模型 |
 | `stream` | 否 | `true` | 建议保留流式，以记录原始 SSE |
 | `api_key` | 否 | 配置中第一个 key | 调用业务接口使用的 key |
 | `sample_id` | 否 | 自动生成 | 样本目录名 |
@@ -1284,7 +1374,7 @@ Gemini 路由使用 Google 风格错误结构：
 | 状态码 | 说明 |
 | --- | --- |
 | `401` | 鉴权失败（key/token 无效，或 Admin JWT 过期） |
-| `429` | 请求过多（超出并发上限 + 等待队列，或上游账号 thinking-only 后仍无可见输出；托管账号模式会先尝试一次切号 fresh retry；当前不附带 `Retry-After` 头） |
+| `429` | 请求过多（超出并发上限 + 等待队列，或上游账号 thinking-only 后仍无可见输出；未固定账号且不含附件的托管请求会先尝试一次切号 fresh retry；当前不附带 `Retry-After` 头） |
 | `503` | 模型不可用或上游服务异常 |
 
 ---
@@ -1298,7 +1388,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash",
+    "model": "deepseek-flash",
     "messages": [{"role": "user", "content": "你好"}],
     "stream": false
   }'
@@ -1311,7 +1401,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-pro",
+    "model": "deepseek-flash",
     "messages": [{"role": "user", "content": "解释一下量子纠缠"}],
     "stream": true
   }'
@@ -1349,7 +1439,9 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash-search",
+    "model": "deepseek-flash",
+    "thinking_enabled": true,
+    "search_enabled": true,
     "messages": [{"role": "user", "content": "今天的新闻"}],
     "stream": true
   }'
@@ -1362,7 +1454,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash",
+    "model": "deepseek-flash",
     "messages": [{"role": "user", "content": "北京今天天气怎么样？"}],
     "tools": [
       {
@@ -1386,7 +1478,7 @@ curl http://localhost:5001/v1/chat/completions \
 ### Gemini 非流式
 
 ```bash
-curl "http://localhost:5001/v1beta/models/gemini-2.5-pro:generateContent" \
+curl "http://localhost:5001/v1beta/models/deepseek-flash:generateContent" \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1402,7 +1494,7 @@ curl "http://localhost:5001/v1beta/models/gemini-2.5-pro:generateContent" \
 ### Gemini 流式
 
 ```bash
-curl "http://localhost:5001/v1beta/models/gemini-2.5-flash:streamGenerateContent" \
+curl "http://localhost:5001/v1beta/models/deepseek-flash:streamGenerateContent" \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1423,7 +1515,7 @@ curl http://localhost:5001/anthropic/v1/messages \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
-    "model": "claude-sonnet-4-6",
+    "model": "deepseek-flash",
     "max_tokens": 1024,
     "messages": [{"role": "user", "content": "你好"}]
   }'
@@ -1437,7 +1529,7 @@ curl http://localhost:5001/anthropic/v1/messages \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
-    "model": "claude-opus-4-6",
+    "model": "deepseek-flash",
     "max_tokens": 1024,
     "messages": [{"role": "user", "content": "解释相对论"}],
     "stream": true
@@ -1460,7 +1552,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "X-Ds2-Target-Account: user@example.com" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash",
+    "model": "deepseek-flash",
     "messages": [{"role": "user", "content": "你好"}]
   }'
 ```

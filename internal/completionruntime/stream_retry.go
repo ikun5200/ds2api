@@ -147,24 +147,30 @@ func ExecuteStreamWithRetry(ctx context.Context, ds DeepSeekCaller, a *auth.Requ
 }
 
 func startPayloadCompletionOnAlternateAccount(ctx context.Context, ds DeepSeekCaller, a *auth.RequestAuth, payload map[string]any, opts StreamRetryOptions, maxAttempts int) (StartResult, *assistantturn.OutputError) {
+	stdReq := opts.Request
+	rebuildPayload := opts.CurrentInputFile != nil && stdReq.CurrentInputFileApplied
+	if rebuildPayload {
+		var prepErr *assistantturn.OutputError
+		stdReq, prepErr = reuploadCurrentInputFileForAccount(ctx, ds, a, stdReq, Options{CurrentInputFile: opts.CurrentInputFile})
+		if prepErr != nil {
+			return StartResult{}, prepErr
+		}
+	}
 	sessionID, err := ds.CreateSession(ctx, a, maxAttempts)
 	if err != nil {
 		return StartResult{}, authOutputError(a)
 	}
+	a.BindUpstreamAccount()
 	pow, err := ds.GetPow(ctx, a, maxAttempts)
 	if err != nil {
 		return StartResult{SessionID: sessionID}, &assistantturn.OutputError{Status: http.StatusUnauthorized, Message: "Failed to get PoW (invalid token or unknown error).", Code: "error"}
 	}
 	nextPayload := clonePayload(payload)
-	if opts.CurrentInputFile != nil && opts.Request.CurrentInputFileApplied {
-		stdReq, prepErr := reuploadCurrentInputFileForAccount(ctx, ds, a, opts.Request, Options{CurrentInputFile: opts.CurrentInputFile})
-		if prepErr != nil {
-			return StartResult{SessionID: sessionID}, prepErr
-		}
+	if rebuildPayload {
 		nextPayload = stdReq.CompletionPayload(sessionID)
 	}
 	nextPayload["chat_session_id"] = sessionID
-	delete(nextPayload, "parent_message_id")
+	nextPayload["parent_message_id"] = nil
 	resp, err := ds.CallCompletion(ctx, a, nextPayload, pow, maxAttempts)
 	if err != nil {
 		return StartResult{SessionID: sessionID, Payload: nextPayload, Pow: pow}, &assistantturn.OutputError{Status: http.StatusInternalServerError, Message: "Failed to get completion.", Code: "error"}

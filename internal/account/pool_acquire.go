@@ -71,7 +71,7 @@ func (p *Pool) tryAcquire(exclude map[string]bool) (config.Account, bool) {
 			continue
 		}
 		acc, ok := p.store.FindAccount(id)
-		if !ok {
+		if !ok || acc.Disabled {
 			continue
 		}
 		p.inUse[id]++

@@ -7,8 +7,8 @@ func TestNormalizeMobileForLogin_ChinaWithPlus86(t *testing.T) {
 	if mobile != "13800138000" {
 		t.Fatalf("unexpected mobile: %q", mobile)
 	}
-	if areaCode != nil {
-		t.Fatalf("expected nil areaCode, got %#v", areaCode)
+	if areaCode != "+86" {
+		t.Fatalf("expected +86 areaCode, got %#v", areaCode)
 	}
 }
 
@@ -17,8 +17,8 @@ func TestNormalizeMobileForLogin_ChinaWith86Prefix(t *testing.T) {
 	if mobile != "13800138000" {
 		t.Fatalf("unexpected mobile: %q", mobile)
 	}
-	if areaCode != nil {
-		t.Fatalf("expected nil areaCode, got %#v", areaCode)
+	if areaCode != "+86" {
+		t.Fatalf("expected +86 areaCode, got %#v", areaCode)
 	}
 }
 
@@ -27,7 +27,7 @@ func TestNormalizeMobileForLogin_KeepPlainDigits(t *testing.T) {
 	if mobile != "13800138000" {
 		t.Fatalf("unexpected mobile: %q", mobile)
 	}
-	if areaCode != nil {
-		t.Fatalf("expected nil areaCode, got %#v", areaCode)
+	if areaCode != "+86" {
+		t.Fatalf("expected +86 areaCode, got %#v", areaCode)
 	}
 }

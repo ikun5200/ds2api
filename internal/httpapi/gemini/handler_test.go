@@ -54,6 +54,10 @@ type testGeminiDS struct {
 	payloads    []map[string]any
 }
 
+func (m *testGeminiDS) FetchUploadedFile(_ context.Context, _ *auth.RequestAuth, fileID string) (*dsclient.UploadFileResult, error) {
+	return &dsclient.UploadFileResult{ID: fileID, Status: "SUCCESS"}, nil
+}
+
 //nolint:unused // reserved test double for native Gemini DS-call path coverage.
 func (m *testGeminiDS) CreateSession(_ context.Context, _ *auth.RequestAuth, _ int) (string, error) {
 	return "session-id", nil
@@ -459,17 +463,16 @@ func TestGeminiProxyTranslatesInlineImageToOpenAIDataURL(t *testing.T) {
 		t.Fatalf("expected one translated message, got %#v", openAI.seenReq)
 	}
 	msg, _ := messages[0].(map[string]any)
-	content, _ := msg["content"].([]any)
-	if len(content) != 2 {
-		t.Fatalf("expected translated content blocks, got %#v", msg)
+	attachments, _ := msg["attachments"].([]any)
+	if len(attachments) != 1 {
+		t.Fatalf("expected normalized attachment block, got %#v", msg)
 	}
-	imageBlock, _ := content[1].(map[string]any)
-	if strings.TrimSpace(asString(imageBlock["type"])) != "image_url" {
-		t.Fatalf("expected image_url block, got %#v", imageBlock)
+	imageBlock, _ := attachments[0].(map[string]any)
+	if imageBlock["type"] != "input_image" || imageBlock["image_url"] != "data:image/png;base64,QUJDRA==" {
+		t.Fatalf("expected preserved image bytes, got %#v", imageBlock)
 	}
-	imageURL, _ := imageBlock["image_url"].(map[string]any)
-	if !strings.HasPrefix(strings.TrimSpace(asString(imageURL["url"])), "data:image/png;base64,") {
-		t.Fatalf("expected translated data url, got %#v", imageBlock)
+	if content, _ := msg["content"].(string); !strings.Contains(content, "hello") || strings.Contains(content, "QUJDRA==") {
+		t.Fatalf("expected prompt-visible text without binary data, got %q", content)
 	}
 }
 

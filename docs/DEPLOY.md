@@ -305,8 +305,8 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # 个人账号可留空
 | `DS2API_DEEPSEEK_USER_AGENT` | 覆盖发往 DeepSeek 的 `User-Agent` | 内置 Chrome/Web UA |
 | `DS2API_DEEPSEEK_ACCEPT_LANGUAGE` | 覆盖发往 DeepSeek 的 `Accept-Language` | `zh-CN,zh;q=0.9` |
 | `DS2API_DEEPSEEK_CLIENT_LOCALE` | 覆盖发往 DeepSeek 的 `x-client-locale` | `zh_CN` |
-| `DS2API_DEEPSEEK_DEVICE_ID` | 覆盖登录时发送给 DeepSeek 的 `device_id` | 按账号稳定派生 |
-| `DS2API_DEEPSEEK_DEVICE_SEED` | 参与默认 `device_id` 派生的本地盐值 | 空 |
+| `DS2API_DEEPSEEK_DEVICE_ID` | 全局覆盖官网签发的登录设备标识；未设置时读取账号 `device_id` | 空 |
+| `DS2API_BROWSER_PATH` | 本地设备验证助手使用的 Chrome / Chromium / Edge 可执行文件路径，服务端不使用 | 自动查找 |
 | `VERCEL_TOKEN` | Vercel 同步 token | — |
 | `VERCEL_PROJECT_ID` | Vercel 项目 ID | — |
 | `VERCEL_TEAM_ID` | Vercel 团队 ID | — |
@@ -390,6 +390,38 @@ DS2API_DATABASE_CONN_MAX_LIFETIME_SECONDS=300
 - Vercel 的 `/tmp` 是临时目录，冷启动后可能丢失历史记录；如果你希望 Vercel 上长期保留 Chat history，应使用外部 PostgreSQL 或 MySQL/MariaDB。
 - 外部存储连接串通常包含账号密码，请放在部署平台的环境变量/密钥配置里，不要提交到仓库。
 - 如果数据库连接失败，启动时会记录 Chat history 不可用，业务接口仍可工作，但管理台响应记录功能会受影响。
+
+### 3.2.2 DeepSeek 登录设备验证
+
+DeepSeek 密码登录使用官网 Web 请求格式，并要求官网设备服务签发的 `device_id`。旧版根据账号生成的 32 位哈希不能代替设备验证；`DS2API_DEEPSEEK_DEVICE_SEED` 不再用于生成登录标识。已有有效 DeepSeek token 和直通 token 请求仍可使用；首次密码登录及后续密码刷新需要有效设备标识。
+
+在安装了 **Node.js 22+** 和 **Chrome / Chromium / Edge** 的电脑中，从仓库目录运行：
+
+```bash
+node scripts/deepseek-device.mjs
+# 可选：保存到权限为 0600 的新文件；不会覆盖已有文件
+node scripts/deepseek-device.mjs --output .tmp/deepseek-device-id
+```
+
+助手使用独立临时浏览器配置打开真实 DeepSeek 登录页，等待官网 SDK 完成设备注册，输出签发的标识后关闭该浏览器并清理临时配置；不需要输入账号密码。不自动处理需要人工完成的验证，超时或注册失败会明确报错。找不到浏览器时，可通过 `DS2API_BROWSER_PATH` 指定浏览器可执行文件完整路径。
+
+将输出填入管理台“添加账号 / 编辑账号”的“登录设备标识”，或配置 JSON：
+
+```json
+{
+  "accounts": [
+    {
+      "email": "user@example.com",
+      "password": "your-password",
+      "device_id": "paste-the-website-issued-device-id-here"
+    }
+  ]
+}
+```
+
+也可设置全局 `DS2API_DEEPSEEK_DEVICE_ID`，其优先级高于单个账号 `device_id`。Docker / Vercel 可以使用在本地浏览器取得的值，服务端不需要运行 Chrome 或新增浏览器服务。账号字段会随配置保存、导入导出和 Vercel 同步保留；账号列表只显示是否已配置，编辑框留空会保留原值。
+
+后续登录和 token 刷新由 Go 直接请求 DeepSeek。若服务返回 `RISK_DEVICE_DETECTED`，重新运行助手并替换设备标识后再测试账号；程序会保留具体上游错误并提示更新设备验证。设备有效性由上游决定，不承诺永久有效，也不会把临时浏览器登录成功当成程序密码登录成功。
 
 ### 3.3 运行时行为配置（通过 Admin API 设置）
 
@@ -702,7 +734,7 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5001/admin
 curl http://127.0.0.1:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
-  -d '{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hello"}]}'
+  -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"hello"}]}'
 ```
 
 ---

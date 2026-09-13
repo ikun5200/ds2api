@@ -11,7 +11,8 @@ const {
 } = require('../helpers/stream-tool-sieve');
 const { BASE_HEADERS } = require('../shared/deepseek-constants');
 const { writeOpenAIError, openAIErrorType } = require('./error_shape');
-const { parseChunkForContent, isCitation } = require('./sse_parse');
+const { isCitation } = require('./sse_parse');
+const { createDeepSeekSSEParser } = require('./sse_delta');
 const { buildUsage } = require('./token_usage');
 const {
   resolveToolcallPolicy,
@@ -276,6 +277,7 @@ async function handleVercelStream(req, res, rawBody, payload) {
       // eslint-disable-next-line no-constant-condition
       while (true) {
         reader = currentResponse.body.getReader();
+        const sseParser = createDeepSeekSSEParser();
         buffered = '';
         let streamEnded = false;
         try {
@@ -294,26 +296,10 @@ async function handleVercelStream(req, res, rawBody, payload) {
             buffered = lines.pop() || '';
 
             for (const rawLine of lines) {
-              const line = rawLine.trim();
-              if (!line.startsWith('data:')) {
-                continue;
+              const parsed = sseParser.parse(rawLine, thinkingEnabled, currentType, stripReferenceMarkers);
+              for (const chunk of parsed.chunks) {
+                observeContinueState(continueState, chunk);
               }
-              const dataStr = line.slice(5).trim();
-              if (!dataStr) {
-                continue;
-              }
-              if (dataStr === '[DONE]') {
-                streamEnded = true;
-                break;
-              }
-              let chunk;
-              try {
-                chunk = JSON.parse(dataStr);
-              } catch (_err) {
-                continue;
-              }
-              observeContinueState(continueState, chunk);
-              const parsed = parseChunkForContent(chunk, thinkingEnabled, currentType, stripReferenceMarkers);
               if (!parsed.parsed) {
                 continue;
               }
@@ -323,10 +309,6 @@ async function handleVercelStream(req, res, rawBody, payload) {
               }
               if (parsed.contentFilter) {
                 return { terminal: await finish(outputText.trim() === '' ? 'content_filter' : 'stop'), retryable: false };
-              }
-              if (parsed.finished) {
-                streamEnded = true;
-                break;
               }
 
               for (const p of parsed.parts) {
@@ -384,7 +366,8 @@ async function handleVercelStream(req, res, rawBody, payload) {
                   }
                 }
               }
-              if (streamEnded) {
+              if (parsed.finished) {
+                streamEnded = true;
                 break;
               }
             }

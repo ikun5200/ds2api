@@ -26,6 +26,10 @@ func ParseDeepSeekContentLine(raw []byte, thinkingEnabled bool, currentType stri
 	if done {
 		return LineResult{Parsed: true, Stop: true, NextType: currentType}
 	}
+	return parseDeepSeekContentChunk(chunk, thinkingEnabled, currentType)
+}
+
+func parseDeepSeekContentChunk(chunk map[string]any, thinkingEnabled bool, currentType string) LineResult {
 	if errObj, hasErr := chunk["error"]; hasErr {
 		return LineResult{
 			Parsed:       true,

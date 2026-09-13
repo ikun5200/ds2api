@@ -140,7 +140,7 @@ func TestUploadFileUsesUploadTargetPowAndMultipartHeaders(t *testing.T) {
 		Filename:    "demo.txt",
 		ContentType: "text/plain",
 		Purpose:     "assistants",
-		ModelType:   "vision",
+		ModelType:   "default",
 		Data:        []byte("hello"),
 	}, 1)
 	if err != nil {
@@ -169,8 +169,8 @@ func TestUploadFileUsesUploadTargetPowAndMultipartHeaders(t *testing.T) {
 	if seenFileSize != "5" {
 		t.Fatalf("expected x-file-size=5, got %q", seenFileSize)
 	}
-	if seenModelType != "vision" {
-		t.Fatalf("expected x-model-type=vision, got %q", seenModelType)
+	if seenModelType != "default" {
+		t.Fatalf("expected x-model-type=default, got %q", seenModelType)
 	}
 	if !strings.HasPrefix(seenContentType, "multipart/form-data; boundary=") {
 		t.Fatalf("expected multipart content type, got %q", seenContentType)
@@ -180,16 +180,16 @@ func TestUploadFileUsesUploadTargetPowAndMultipartHeaders(t *testing.T) {
 	}
 }
 
-func TestUploadFileWaitsForProcessedFetchFiles(t *testing.T) {
+func TestUploadFileWaitsForWebSuccessAndTokenUsage(t *testing.T) {
 	oldSleep := fileReadySleep
 	fileReadySleep = func(time.Duration) {}
 	defer func() { fileReadySleep = oldSleep }()
 
 	challengeHash := powpkg.DeepSeekHashV1([]byte(powpkg.BuildPrefix("salt", 1712345678) + "42"))
 	powResponse := `{"code":0,"msg":"ok","data":{"biz_code":0,"biz_data":{"challenge":{"algorithm":"DeepSeekHashV1","challenge":"` + hex.EncodeToString(challengeHash[:]) + `","salt":"salt","expire_at":1712345678,"difficulty":1000,"signature":"sig","target_path":"` + dsprotocol.DeepSeekUploadTargetPath + `"}}}}`
-	uploadResponse := `{"code":0,"msg":"ok","data":{"biz_code":0,"biz_data":{"file":{"file_id":"file_789","filename":"demo.txt","bytes":5,"status":"PENDING","purpose":"assistants","is_image":false}}}}`
-	pendingFetchResponse := `{"code":0,"msg":"ok","data":{"biz_code":0,"biz_data":{"files":[{"file_id":"file_789","filename":"demo.txt","bytes":5,"status":"PENDING","purpose":"assistants","is_image":false}]}}}`
-	processedFetchResponse := `{"code":0,"msg":"ok","data":{"biz_code":0,"biz_data":{"files":[{"file_id":"file_789","filename":"demo.txt","bytes":5,"status":"processed","purpose":"assistants","is_image":true}]}}}`
+	uploadResponse := `{"code":0,"msg":"ok","data":{"biz_code":0,"biz_data":{"id":"file_789","file_name":"demo.txt","file_size":5,"status":"PENDING","model_kind":"VISION","is_image":false}}}`
+	pendingFetchResponse := `{"code":0,"msg":"ok","data":{"biz_code":0,"biz_data":{"files":[{"file_id":"file_789","filename":"demo.txt","bytes":5,"status":"PARSING","purpose":"assistants","is_image":false}]}}}`
+	processedFetchResponse := `{"code":0,"msg":"ok","data":{"biz_code":0,"biz_data":{"files":[{"id":"file_789","file_name":"demo.txt","file_size":5,"status":"SUCCESS","model_kind":"VISION","is_image":true,"token_usage":117}]}}}`
 
 	var call int
 	client := &Client{
@@ -240,10 +240,47 @@ func TestUploadFileWaitsForProcessedFetchFiles(t *testing.T) {
 	if result.ID != "file_789" {
 		t.Fatalf("expected uploaded file id file_789, got %#v", result)
 	}
-	if result.Status != "processed" {
-		t.Fatalf("expected final status processed, got %#v", result.Status)
+	if result.Status != "SUCCESS" {
+		t.Fatalf("expected final status SUCCESS, got %#v", result.Status)
+	}
+	if result.TokenUsage != 117 {
+		t.Fatalf("expected token usage from ready metadata, got %#v", result)
 	}
 	if call != 4 {
 		t.Fatalf("expected 4 requests, got %d", call)
+	}
+}
+
+func TestUploadFileThinkingHeaderMatchesOverride(t *testing.T) {
+	thinkingOn, thinkingOff := true, false
+	challengeHash := powpkg.DeepSeekHashV1([]byte(powpkg.BuildPrefix("salt", 1712345678) + "42"))
+	powResponse := `{"code":0,"data":{"biz_code":0,"biz_data":{"challenge":{"algorithm":"DeepSeekHashV1","challenge":"` + hex.EncodeToString(challengeHash[:]) + `","salt":"salt","expire_at":1712345678,"difficulty":1000,"signature":"sig","target_path":"` + dsprotocol.DeepSeekUploadTargetPath + `"}}}}`
+	for _, tc := range []struct {
+		name    string
+		setting *bool
+		want    string
+	}{
+		{name: "default", want: "1"},
+		{name: "enabled", setting: &thinkingOn, want: "1"},
+		{name: "disabled", setting: &thinkingOff, want: "0"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			seen := ""
+			client := &Client{maxRetries: 1, regular: doerFunc(func(req *http.Request) (*http.Response, error) {
+				body := powResponse
+				if req.URL.Path == dsprotocol.DeepSeekUploadTargetPath {
+					seen = req.Header.Get("x-thinking-enabled")
+					body = `{"code":0,"data":{"biz_code":0,"biz_data":{"id":"file-ready","status":"SUCCESS"}}}`
+				}
+				return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader(body)), Request: req}, nil
+			})}
+			_, err := client.UploadFile(context.Background(), &auth.RequestAuth{DeepSeekToken: "token"}, UploadFileRequest{Filename: "file.txt", Data: []byte("hello"), ThinkingEnabled: tc.setting}, 1)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if seen != tc.want {
+				t.Fatalf("unexpected thinking upload header: got=%q want=%q", seen, tc.want)
+			}
+		})
 	}
 }

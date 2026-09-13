@@ -23,15 +23,15 @@ func boolFrom(v any) bool {
 
 func parseSettingsUpdateRequest(req map[string]any) (*config.AdminConfig, *config.RuntimeConfig, *config.ResponsesConfig, *config.EmbeddingsConfig, *config.AutoDeleteConfig, *config.CurrentInputFileConfig, *config.ThinkingInjectionConfig, *config.OutputIntegrityConfig, map[string]string, error) {
 	var (
-		adminCfg          *config.AdminConfig
-		runtimeCfg        *config.RuntimeConfig
-		respCfg           *config.ResponsesConfig
-		embCfg            *config.EmbeddingsConfig
-		autoDeleteCfg     *config.AutoDeleteConfig
-		currentInputCfg   *config.CurrentInputFileConfig
-		thinkingInjCfg    *config.ThinkingInjectionConfig
+		adminCfg           *config.AdminConfig
+		runtimeCfg         *config.RuntimeConfig
+		respCfg            *config.ResponsesConfig
+		embCfg             *config.EmbeddingsConfig
+		autoDeleteCfg      *config.AutoDeleteConfig
+		currentInputCfg    *config.CurrentInputFileConfig
+		thinkingInjCfg     *config.ThinkingInjectionConfig
 		outputIntegrityCfg *config.OutputIntegrityConfig
-		aliasMap          map[string]string
+		aliasMap           map[string]string
 	)
 
 	if raw, ok := req["admin"].(map[string]any); ok {

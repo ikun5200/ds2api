@@ -18,6 +18,7 @@ import (
 	claudefmt "ds2api/internal/format/claude"
 	"ds2api/internal/httpapi/openai/history"
 	"ds2api/internal/httpapi/requestbody"
+	"ds2api/internal/inputfiles"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
 	streamengine "ds2api/internal/stream"
@@ -82,6 +83,12 @@ func (h *Handler) handleClaudeDirect(w http.ResponseWriter, r *http.Request) boo
 		return true
 	}
 	defer h.Auth.Release(a)
+	norm.Standard, err = (&inputfiles.Service{Store: h.Store, DS: h.DS}).Apply(r.Context(), a, norm.Standard)
+	if err != nil {
+		status, message := inputfiles.MapError(err)
+		writeClaudeError(w, status, message)
+		return true
+	}
 	stdReq, err := h.applyCurrentInputFile(r.Context(), a, norm.Standard)
 	if err != nil {
 		status, message := mapCurrentInputFileError(err)
@@ -174,6 +181,7 @@ func (h *Handler) proxyViaOpenAI(w http.ResponseWriter, r *http.Request, store C
 		}
 	}
 	translatedReq := translatorcliproxy.ToOpenAI(sdktranslator.FormatClaude, translateModel, raw, stream)
+	translatedReq = preserveClaudeProxyAttachments(translatedReq, req)
 	translatedReq, exposeThinking := applyClaudeThinkingPolicyToOpenAIRequest(translatedReq, req)
 
 	isVercelPrepare := strings.TrimSpace(r.URL.Query().Get("__stream_prepare")) == "1"
@@ -256,16 +264,18 @@ func applyClaudeThinkingPolicyToOpenAIRequest(translated []byte, original map[st
 	}
 	enabled, ok := util.ResolveThinkingOverride(original)
 	if !ok {
-		if _, translatedHasOverride := util.ResolveThinkingOverride(req); translatedHasOverride {
-			return translated, false
+		if translatedEnabled, translatedHasOverride := util.ResolveThinkingOverride(req); translatedHasOverride {
+			enabled = translatedEnabled
+		} else {
+			enabled = true
 		}
-		enabled = true
 	}
 	typ := "disabled"
 	if enabled {
 		typ = "enabled"
 	}
 	req["thinking"] = map[string]any{"type": typ}
+	promptcompat.PreserveModeOverrides(req, original)
 	out, err := json.Marshal(req)
 	if err != nil {
 		return translated, enabled
@@ -396,6 +406,7 @@ func (h *Handler) handleClaudeStreamRealtimeWithRetry(w http.ResponseWriter, r *
 		promptTokenText,
 		historySession,
 	)
+	streamRuntime.refFileTokens = stdReq.RefFileTokens
 	streamRuntime.sendMessageStart()
 
 	completionruntime.ExecuteStreamWithRetry(r.Context(), h.DS, a, resp, payload, pow, completionruntime.StreamRetryOptions{

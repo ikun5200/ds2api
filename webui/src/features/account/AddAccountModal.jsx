@@ -15,7 +15,7 @@ export default function AddAccountModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/70 backdrop-blur-sm p-4 animate-in fade-in">
-            <div className="bg-card w-full max-w-md rounded-xl border border-border shadow-2xl overflow-hidden animate-in zoom-in-95">
+            <div className="bg-card w-full max-w-md max-h-[calc(100dvh-2rem)] rounded-xl border border-border shadow-2xl overflow-y-auto animate-in zoom-in-95">
                 <div className="p-4 border-b border-border flex justify-between items-center">
                     <h3 className="font-semibold">{t('accountManager.modalAddAccountTitle')}</h3>
                     <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
@@ -72,6 +72,19 @@ export default function AddAccountModal({
                             value={newAccount.password}
                             onChange={e => setNewAccount({ ...newAccount, password: e.target.value })}
                         />
+                    </div>
+                    <div>
+                        <label htmlFor="new-account-device" className="block text-sm font-medium mb-1.5">{t('accountManager.deviceIdLabel')}</label>
+                        <input
+                            id="new-account-device"
+                            type="password"
+                            autoComplete="off"
+                            className="input-field"
+                            placeholder={t('accountManager.deviceIdPlaceholder')}
+                            value={newAccount.device_id || ''}
+                            onChange={e => setNewAccount({ ...newAccount, device_id: e.target.value })}
+                        />
+                        <p className="mt-1.5 text-xs text-muted-foreground">{t('accountManager.deviceIdHint')}</p>
                     </div>
                     <label className="flex items-start gap-3 rounded-lg border border-border bg-background/70 p-3 text-sm">
                         <input

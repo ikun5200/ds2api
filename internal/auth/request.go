@@ -24,14 +24,15 @@ var (
 )
 
 type RequestAuth struct {
-	UseConfigToken bool
-	DeepSeekToken  string
-	CallerID       string
-	AccountID      string
-	TargetAccount  string
-	Account        config.Account
-	TriedAccounts  map[string]bool
-	resolver       *Resolver
+	UseConfigToken  bool
+	DeepSeekToken   string
+	CallerID        string
+	AccountID       string
+	TargetAccount   string
+	Account         config.Account
+	TriedAccounts   map[string]bool
+	resolver        *Resolver
+	upstreamAccount string
 }
 
 type LoginFunc func(ctx context.Context, acc config.Account) (string, error)
@@ -43,6 +44,7 @@ type Resolver struct {
 
 	mu               sync.Mutex
 	tokenRefreshedAt map[string]time.Time
+	fileOwners       map[string]fileOwner
 }
 
 func NewResolver(store *config.Store, pool *account.Pool, login LoginFunc) *Resolver {
@@ -190,23 +192,40 @@ func (r *Resolver) SwitchAccount(ctx context.Context, a *RequestAuth) bool {
 	if strings.TrimSpace(a.TargetAccount) != "" {
 		return false
 	}
+	if a.upstreamAccount != "" {
+		return false
+	}
 	if a.TriedAccounts == nil {
 		a.TriedAccounts = map[string]bool{}
 	}
+	originalAccount, originalID, originalToken := a.Account, a.AccountID, a.DeepSeekToken
 	if a.AccountID != "" {
 		a.TriedAccounts[a.AccountID] = true
-		r.Pool.Release(a.AccountID)
 	}
+	candidateFailed := false
 	for {
-		acc, ok := r.Pool.Acquire("", a.TriedAccounts)
+		acc, ok := r.Pool.Swap(a.AccountID, "", a.TriedAccounts)
 		if !ok {
+			if candidateFailed {
+				if originalID != "" {
+					if _, restored := r.Pool.Swap(a.AccountID, originalID, nil); restored {
+						a.Account, a.AccountID, a.DeepSeekToken = originalAccount, originalID, originalToken
+						return false
+					}
+				}
+				// Another request may have filled the original account while
+				// candidate login ran. Retain no credential without its lease.
+				r.Pool.Release(a.AccountID)
+				a.Account, a.AccountID, a.DeepSeekToken = config.Account{}, "", ""
+			}
 			return false
 		}
 		a.Account = acc
 		a.AccountID = acc.Identifier()
+		a.DeepSeekToken = ""
 		if err := r.ensureManagedToken(ctx, a); err != nil {
 			a.TriedAccounts[a.AccountID] = true
-			r.Pool.Release(a.AccountID)
+			candidateFailed = true
 			continue
 		}
 		return true

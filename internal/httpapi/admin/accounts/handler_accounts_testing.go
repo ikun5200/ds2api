@@ -29,6 +29,11 @@ func (m modelAliasSnapshotReader) ModelAliases() map[string]string {
 func (h *Handler) testSingleAccount(w http.ResponseWriter, r *http.Request) {
 	var req map[string]any
 	_ = json.NewDecoder(r.Body).Decode(&req)
+	deviceID, deviceIDOK, err := accountDeviceIDOptional(req)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
+		return
+	}
 	identifier, _ := req["identifier"].(string)
 	if strings.TrimSpace(identifier) == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "需要账号标识（identifier / email / mobile）"})
@@ -43,9 +48,12 @@ func (h *Handler) testSingleAccount(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "账号已禁用"})
 		return
 	}
+	if deviceIDOK {
+		acc.DeviceID = deviceID
+	}
 	model, _ := req["model"].(string)
 	if model == "" {
-		model = "deepseek-v4-flash"
+		model = config.DefaultDeepSeekModel
 	}
 	message, _ := req["message"].(string)
 	result := h.testAccount(r.Context(), acc, model, message)
@@ -57,7 +65,7 @@ func (h *Handler) testAllAccounts(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewDecoder(r.Body).Decode(&req)
 	model, _ := req["model"].(string)
 	if model == "" {
-		model = "deepseek-v4-flash"
+		model = config.DefaultDeepSeekModel
 	}
 	accounts := h.Store.Snapshot().Accounts
 	enabledAccounts := accounts[:0]
@@ -224,7 +232,7 @@ func (h *Handler) testAPI(w http.ResponseWriter, r *http.Request) {
 	message, _ := req["message"].(string)
 	apiKey, _ := req["api_key"].(string)
 	if model == "" {
-		model = "deepseek-v4-flash"
+		model = config.DefaultDeepSeekModel
 	}
 	if message == "" {
 		message = "你好"

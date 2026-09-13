@@ -4,23 +4,11 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net/http"
 
 	"ds2api/internal/config"
 	trans "ds2api/internal/deepseek/transport"
 )
-
-func (c *Client) postJSON(ctx context.Context, doer trans.Doer, fallback trans.Doer, url string, headers map[string]string, payload any) (map[string]any, error) {
-	body, status, err := c.postJSONWithStatus(ctx, doer, fallback, url, headers, payload)
-	if err != nil {
-		return nil, err
-	}
-	if status == 0 {
-		return nil, errors.New("request failed")
-	}
-	return body, nil
-}
 
 func (c *Client) postJSONWithStatus(ctx context.Context, doer trans.Doer, fallback trans.Doer, url string, headers map[string]string, payload any) (map[string]any, int, error) {
 	b, err := json.Marshal(payload)
@@ -50,7 +38,11 @@ func (c *Client) postJSONWithStatus(ctx context.Context, doer trans.Doer, fallba
 			return nil, 0, err
 		}
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			config.Logger.Warn("[deepseek] close JSON response failed", "url", url, "error", err)
+		}
+	}()
 	payloadBytes, err := readResponseBody(resp)
 	if err != nil {
 		return nil, resp.StatusCode, err
@@ -88,7 +80,11 @@ func (c *Client) getJSONWithStatus(ctx context.Context, doer trans.Doer, url str
 			return nil, 0, err
 		}
 	}
-	defer func() { _ = resp.Body.Close() }()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			config.Logger.Warn("[deepseek] close JSON response failed", "url", url, "error", err)
+		}
+	}()
 	payloadBytes, err := readResponseBody(resp)
 	if err != nil {
 		return nil, resp.StatusCode, err

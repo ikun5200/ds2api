@@ -34,6 +34,8 @@ func NewPool(store *config.Store) *Pool {
 }
 
 func (p *Pool) Reset() {
+	p.mu.Lock()
+	defer p.mu.Unlock()
 	accounts := p.store.Accounts()
 	sort.SliceStable(accounts, func(i, j int) bool {
 		iHas := accounts[i].Token != ""
@@ -67,11 +69,13 @@ func (p *Pool) Reset() {
 		queueLimit = p.store.RuntimeAccountMaxQueue(recommended)
 		globalLimit = p.store.RuntimeGlobalMaxInflight(recommended)
 	}
-	p.mu.Lock()
-	defer p.mu.Unlock()
 	p.drainWaitersLocked()
 	p.queue = ids
-	p.inUse = map[string]int{}
+	// Config reloads cannot cancel active leases. Removed or disabled accounts
+	// still count toward the global limit until their requests release them.
+	if p.inUse == nil {
+		p.inUse = map[string]int{}
+	}
 	p.recommendedConcurrency = recommended
 	p.maxQueueSize = queueLimit
 	p.globalMaxInflight = globalLimit

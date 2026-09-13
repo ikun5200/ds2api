@@ -305,8 +305,8 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `DS2API_DEEPSEEK_USER_AGENT` | Override the DeepSeek upstream `User-Agent` | Built-in Chrome/Web UA |
 | `DS2API_DEEPSEEK_ACCEPT_LANGUAGE` | Override the DeepSeek upstream `Accept-Language` | `zh-CN,zh;q=0.9` |
 | `DS2API_DEEPSEEK_CLIENT_LOCALE` | Override the DeepSeek upstream `x-client-locale` | `zh_CN` |
-| `DS2API_DEEPSEEK_DEVICE_ID` | Override the `device_id` sent during DeepSeek login | Stable account-derived value |
-| `DS2API_DEEPSEEK_DEVICE_SEED` | Local salt used by the default `device_id` derivation | Empty |
+| `DS2API_DEEPSEEK_DEVICE_ID` | Global override for a website-issued login device ID; otherwise uses the account `device_id` | Empty |
+| `DS2API_BROWSER_PATH` | Chrome / Chromium / Edge executable for the local verification helper; not used by the server | Auto-detect |
 | `VERCEL_TOKEN` | Vercel sync token | — |
 | `VERCEL_PROJECT_ID` | Vercel project ID | — |
 | `VERCEL_TEAM_ID` | Vercel team ID | — |
@@ -321,6 +321,38 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `DS2API_VERCEL_PROTECTION_BYPASS` | Deployment protection bypass for internal Node→Go calls | — |
 
 External database mode currently persists Chat history. Accounts, API keys, and runtime settings continue to use the existing `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` configuration flow. PostgreSQL example: `DS2API_DATABASE_TYPE=postgres`, `DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable`. MySQL/MariaDB example: `DS2API_DATABASE_TYPE=mysql`, `DS2API_DATABASE_DSN=user:pass@tcp(host:3306)/ds2api?parseTime=true`.
+
+### 3.2.2 DeepSeek Login Device Verification
+
+Password login uses the website's Web request format and requires a `device_id` issued by its device service. The old 32-character account hash does not satisfy device verification; `DS2API_DEEPSEEK_DEVICE_SEED` no longer generates login IDs. Existing valid DeepSeek tokens and direct-token requests continue to work. Initial password login and later password-based refreshes need a valid device ID.
+
+On a computer with **Node.js 22+** and **Chrome / Chromium / Edge**, run from this repository:
+
+```bash
+node scripts/deepseek-device.mjs
+# Optional: save to a new file with mode 0600; existing files are not overwritten
+node scripts/deepseek-device.mjs --output .tmp/deepseek-device-id
+```
+
+The helper opens the real DeepSeek sign-in page in a temporary browser profile, waits for its original SDK to register the device, outputs the issued ID, and closes its browser and removes that profile. No account password is required. It does not automatically complete verification that requires human input; registration failures and timeouts are reported. Set `DS2API_BROWSER_PATH` to the browser executable if automatic discovery cannot find it.
+
+Paste the output into **Login device ID** when adding or editing an account in the admin UI, or use the configuration JSON:
+
+```json
+{
+  "accounts": [
+    {
+      "email": "user@example.com",
+      "password": "your-password",
+      "device_id": "paste-the-website-issued-device-id-here"
+    }
+  ]
+}
+```
+
+Alternatively, set `DS2API_DEEPSEEK_DEVICE_ID`; this global override takes precedence over account values. Docker and Vercel can use an ID obtained locally, without Chrome or a browser service on the deployment. Account device IDs survive configuration save, import/export, and Vercel sync. Account lists expose only a configured flag; leaving the edit field blank preserves its value.
+
+Go performs subsequent password logins and token refreshes directly. If DeepSeek returns `RISK_DEVICE_DETECTED`, run the helper again, replace the device ID, and retest the account. Errors retain the upstream reason and include renewal guidance. Upstream determines device validity; successful browser login alone does not prove programmatic password login works.
 
 ### 3.4 Vercel Architecture
 
@@ -623,7 +655,7 @@ curl -s -o /dev/null -w "%{http_code}" http://127.0.0.1:5001/admin
 curl http://127.0.0.1:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
-  -d '{"model":"deepseek-v4-flash","messages":[{"role":"user","content":"hello"}]}'
+  -d '{"model":"deepseek-flash","messages":[{"role":"user","content":"hello"}]}'
 ```
 
 ---

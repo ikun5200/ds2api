@@ -53,6 +53,7 @@ func TestAPIRoutesRemainRegistered(t *testing.T) {
 		"POST /messages",
 		"POST /v1/messages/count_tokens",
 		"POST /messages/count_tokens",
+		"GET /v1beta/models",
 		"POST /v1beta/models/{model}:generateContent",
 		"POST /v1beta/models/{model}:streamGenerateContent",
 		"POST /v1/models/{model}:generateContent",

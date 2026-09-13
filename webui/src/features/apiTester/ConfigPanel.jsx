@@ -1,7 +1,7 @@
 import {
     ChevronDown,
     MessageSquare,
-    Cpu,
+    Brain,
     Search as SearchIcon,
     Terminal,
     Zap,
@@ -19,6 +19,10 @@ export default function ConfigPanel({
     models,
     model,
     setModel,
+    thinkingEnabled,
+    setThinkingEnabled,
+    searchEnabled,
+    setSearchEnabled,
     modelsLoaded,
     streamingMode,
     setStreamingMode,
@@ -32,19 +36,14 @@ export default function ConfigPanel({
     customKeyActive,
     customKeyManaged,
 }) {
-    const iconMap = {
-        MessageSquare,
-        Cpu,
-        SearchIcon,
-        Terminal,
-        Zap,
-        ToggleLeft,
-        ToggleRight,
-    }
     const selectedModel = models.find(m => m.id === model) || models[0]
-    const SelectedModelIcon = selectedModel ? (iconMap[selectedModel.icon] || MessageSquare) : MessageSquare
     const defaultKeyPreview = maskSecret(config.keys?.[0])
     const hasModels = models.length > 0
+    const generationOptions = [
+        { key: 'thinkingMode', enabled: thinkingEnabled, setEnabled: setThinkingEnabled, Icon: Brain },
+        { key: 'searchMode', enabled: searchEnabled, setEnabled: setSearchEnabled, Icon: SearchIcon },
+        { key: 'streamMode', enabled: streamingMode, setEnabled: setStreamingMode, Icon: Zap },
+    ]
 
     return (
         <div className={clsx(
@@ -68,7 +67,7 @@ export default function ConfigPanel({
                 </button>
 
                 <div className={clsx(
-                    "p-4 flex flex-col gap-5",
+                    "p-4 flex flex-col gap-5 overflow-y-auto",
                     !configExpanded && "hidden lg:flex"
                 )}>
                     <div className="space-y-2 shrink-0">
@@ -95,11 +94,8 @@ export default function ConfigPanel({
                         {selectedModel ? (
                             <div className="mt-3 rounded-lg border border-border bg-muted/20 p-3">
                                 <div className="flex items-start gap-3">
-                                    <div className={clsx(
-                                        "p-2 rounded-md shrink-0 border border-border bg-background/80",
-                                        selectedModel.color
-                                    )}>
-                                        <SelectedModelIcon className="w-4 h-4" />
+                                    <div className="p-2 rounded-md shrink-0 border border-border bg-background/80 text-amber-500">
+                                        <MessageSquare className="w-4 h-4" />
                                     </div>
                                     <div className="min-w-0 flex-1">
                                         <div className="font-medium text-sm text-foreground truncate">
@@ -122,24 +118,30 @@ export default function ConfigPanel({
                     </div>
 
                     <div className="space-y-2 shrink-0">
-                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider ml-0.5">{t('apiTester.streamMode')}</label>
-                        <button
-                            onClick={() => setStreamingMode(!streamingMode)}
-                            className={clsx(
-                                "w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-all duration-200",
-                                streamingMode
-                                    ? "bg-primary/10 border-primary/50 text-foreground"
-                                    : "bg-background border-border text-muted-foreground hover:bg-muted/50"
-                            )}
-                        >
-                            <div className="flex items-center gap-2">
-                                <div className={clsx("p-1.5 rounded-md", streamingMode ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-                                    <Zap className="w-4 h-4" />
+                        <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider ml-0.5">{t('apiTester.generationOptions')}</label>
+                        {generationOptions.map(({ key, enabled, setEnabled, Icon }) => (
+                            <button
+                                key={key}
+                                type="button"
+                                role="switch"
+                                aria-checked={enabled}
+                                onClick={() => setEnabled(!enabled)}
+                                className={clsx(
+                                    "w-full flex items-center justify-between px-3 py-2 rounded-lg border transition-all duration-200",
+                                    enabled
+                                        ? "bg-primary/10 border-primary/50 text-foreground"
+                                        : "bg-background border-border text-muted-foreground hover:bg-muted/50"
+                                )}
+                            >
+                                <div className="flex items-center gap-2">
+                                    <div className={clsx("p-1.5 rounded-md", enabled ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                                        <Icon className="w-4 h-4" />
+                                    </div>
+                                    <span className="text-sm font-medium">{t(`apiTester.${key}`)}</span>
                                 </div>
-                                <span className="text-sm font-medium">{t('apiTester.streamMode')}</span>
-                            </div>
-                            {streamingMode ? <ToggleRight className="w-5 h-5 text-primary" /> : <ToggleLeft className="w-5 h-5 text-muted-foreground" />}
-                        </button>
+                                {enabled ? <ToggleRight className="w-5 h-5 text-primary" /> : <ToggleLeft className="w-5 h-5 text-muted-foreground" />}
+                            </button>
+                        ))}
                     </div>
 
                     <div className="space-y-2 shrink-0">

@@ -33,6 +33,9 @@ func fieldString(m map[string]any, key string) string {
 func fieldStringOptional(m map[string]any, key string) (string, bool) {
 	return adminshared.FieldStringOptional(m, key)
 }
+func validateAccountDeviceIDs(raw any) error {
+	return adminshared.ValidateAccountDeviceIDs(raw)
+}
 func normalizeAccountForStorage(acc config.Account) config.Account {
 	return adminshared.NormalizeAccountForStorage(acc)
 }

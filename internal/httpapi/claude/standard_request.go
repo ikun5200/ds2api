@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"ds2api/internal/config"
 	"ds2api/internal/prompt"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/util"
@@ -32,14 +31,7 @@ func normalizeClaudeRequest(store ConfigReader, req map[string]any) (claudeNorma
 
 	dsPayload := convertClaudeToDeepSeek(payload, store)
 	dsModel, _ := dsPayload["model"].(string)
-	defaultThinkingEnabled, searchEnabled, ok := config.GetModelConfig(dsModel)
-	if !ok {
-		searchEnabled = false
-	}
-	thinkingEnabled := util.ResolveThinkingEnabled(req, defaultThinkingEnabled)
-	if config.IsNoThinkingModel(dsModel) {
-		thinkingEnabled = false
-	}
+	thinkingEnabled, searchEnabled := promptcompat.ResolveRequestModes(req, dsModel)
 	prepareOptions := promptcompat.PromptPrepareOptionsFromConfig(store)
 	finalPrompt := prompt.MessagesPrepareWithThinkingOptions(toMessageMaps(dsPayload["messages"]), thinkingEnabled, prepareOptions)
 	toolNames := extractClaudeToolNames(toolsRequested)
@@ -49,20 +41,21 @@ func normalizeClaudeRequest(store ConfigReader, req map[string]any) (claudeNorma
 
 	return claudeNormalizedRequest{
 		Standard: promptcompat.StandardRequest{
-			Surface:         "anthropic_messages",
-			RequestedModel:  strings.TrimSpace(model),
-			ResolvedModel:   dsModel,
-			ResponseModel:   strings.TrimSpace(model),
-			Messages:        normalizedMessages,
-			PromptTokenText: finalPrompt,
-			ToolsRaw:        toolsRequested,
-			FinalPrompt:     finalPrompt,
+			Surface:                 "anthropic_messages",
+			RequestedModel:          strings.TrimSpace(model),
+			ResolvedModel:           dsModel,
+			ResponseModel:           strings.TrimSpace(model),
+			Messages:                normalizedMessages,
+			PromptTokenText:         finalPrompt,
+			ToolsRaw:                toolsRequested,
+			FinalPrompt:             finalPrompt,
 			PromptPrepareOptions:    prepareOptions,
 			PromptPrepareOptionsSet: true,
-			ToolNames:       toolNames,
-			Stream:          util.ToBool(req["stream"]),
-			Thinking:        thinkingEnabled,
-			Search:          searchEnabled,
+			ToolNames:               toolNames,
+			Stream:                  util.ToBool(req["stream"]),
+			Thinking:                thinkingEnabled,
+			Search:                  searchEnabled,
+			RefFileIDs:              promptcompat.CollectOpenAIRefFileIDs(req),
 		},
 		NormalizedMessages: normalizedMessages,
 	}, nil

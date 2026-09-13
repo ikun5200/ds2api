@@ -9,8 +9,8 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const [editingAccount, setEditingAccount] = useState(null)
     const [newKey, setNewKey] = useState({ key: '', name: '', remark: '' })
     const [copiedKey, setCopiedKey] = useState(null)
-    const [newAccount, setNewAccount] = useState({ name: '', remark: '', email: '', mobile: '', password: '', disabled: false })
-    const [editAccount, setEditAccount] = useState({ name: '', remark: '', disabled: false })
+    const [newAccount, setNewAccount] = useState({ name: '', remark: '', email: '', mobile: '', password: '', device_id: '', disabled: false })
+    const [editAccount, setEditAccount] = useState({ name: '', remark: '', device_id: '', disabled: false })
     const [loading, setLoading] = useState(false)
     const [testing, setTesting] = useState({})
     const [testingAll, setTestingAll] = useState(false)
@@ -49,14 +49,14 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const openAddAccount = () => {
         setShowEditAccount(false)
         setEditingAccount(null)
-        setEditAccount({ name: '', remark: '', disabled: false })
-        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', disabled: false })
+        setEditAccount({ name: '', remark: '', device_id: '', disabled: false })
+        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', device_id: '', disabled: false })
         setShowAddAccount(true)
     }
 
     const closeAddAccount = () => {
         setShowAddAccount(false)
-        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', disabled: false })
+        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', device_id: '', disabled: false })
     }
 
     const openEditAccount = (account) => {
@@ -68,10 +68,12 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         setShowAddAccount(false)
         setEditingAccount({
             identifier,
+            has_device_id: Boolean(account?.has_device_id),
         })
         setEditAccount({
             name: account?.name || '',
             remark: account?.remark || '',
+            device_id: '',
             disabled: Boolean(account?.disabled),
         })
         setShowEditAccount(true)
@@ -80,7 +82,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const closeEditAccount = () => {
         setShowEditAccount(false)
         setEditingAccount(null)
-        setEditAccount({ name: '', remark: '', disabled: false })
+        setEditAccount({ name: '', remark: '', device_id: '', disabled: false })
     }
 
     const addKey = async () => {
@@ -176,7 +178,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
             const res = await apiFetch(`/admin/accounts/${encodeURIComponent(identifier)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(editAccount),
+                body: JSON.stringify({ ...editAccount, device_id: editAccount.device_id?.trim() || undefined }),
             })
             const data = await readMutationResponse(res)
             if (res.ok) {

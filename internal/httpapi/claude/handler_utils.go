@@ -17,6 +17,7 @@ func normalizeClaudeMessages(messages []any) []any {
 		callIDSequence: 0,
 	}
 	for _, m := range messages {
+		messageStart := len(out)
 		msg, ok := m.(map[string]any)
 		if !ok {
 			continue
@@ -106,6 +107,7 @@ func normalizeClaudeMessages(messages []any) []any {
 			copied := cloneMap(msg)
 			out = append(out, copied)
 		}
+		out = attachClaudeMessageFiles(out, messageStart, msg["content"])
 	}
 	return out
 }

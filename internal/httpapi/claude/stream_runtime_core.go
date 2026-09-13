@@ -23,6 +23,7 @@ type claudeStreamRuntime struct {
 	messages        []any
 	toolsRaw        any
 	promptTokenText string
+	refFileTokens   int
 
 	thinkingEnabled       bool
 	searchEnabled         bool

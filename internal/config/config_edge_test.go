@@ -96,22 +96,18 @@ func TestGetModelConfigDeepSeekVisionSearchUnsupported(t *testing.T) {
 	}
 }
 
-func TestGetModelTypeDefaultExpertAndVision(t *testing.T) {
-	defaultType, ok := GetModelType("deepseek-v4-flash")
-	if !ok || defaultType != "default" {
-		t.Fatalf("expected default model_type, got ok=%v model_type=%q", ok, defaultType)
+func TestGetModelTypeUsesDefaultForCurrentAndLegacyModels(t *testing.T) {
+	for _, model := range []string{
+		"deepseek-flash", "deepseek-flash-nothinking",
+		"deepseek-v4-flash", "deepseek-v4-flash-nothinking",
+		"deepseek-v4-pro", "deepseek-v4-pro-search", "deepseek-v4-vision",
+	} {
+		if modelType, ok := GetModelType(model); !ok || modelType != "default" {
+			t.Fatalf("GetModelType(%q) = (%q, %v), want (default, true)", model, modelType, ok)
+		}
 	}
-	defaultNoThinkingType, ok := GetModelType("deepseek-v4-flash-nothinking")
-	if !ok || defaultNoThinkingType != "default" {
-		t.Fatalf("expected default model_type for nothinking, got ok=%v model_type=%q", ok, defaultNoThinkingType)
-	}
-	expertType, ok := GetModelType("deepseek-v4-pro")
-	if !ok || expertType != "expert" {
-		t.Fatalf("expected expert model_type, got ok=%v model_type=%q", ok, expertType)
-	}
-	visionType, ok := GetModelType("deepseek-v4-vision")
-	if !ok || visionType != "vision" {
-		t.Fatalf("expected vision model_type, got ok=%v model_type=%q", ok, visionType)
+	if modelType, ok := GetModelType("unknown"); ok || modelType != "" {
+		t.Fatalf("unknown model unexpectedly has model_type %q", modelType)
 	}
 }
 
@@ -679,30 +675,8 @@ func TestOpenAIModelsResponse(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected data type: %T", resp["data"])
 	}
-	if len(data) == 0 {
-		t.Fatal("expected non-empty models list")
-	}
-	expected := map[string]bool{
-		"deepseek-v4-flash":                   false,
-		"deepseek-v4-flash-nothinking":        false,
-		"deepseek-v4-pro":                     false,
-		"deepseek-v4-pro-nothinking":          false,
-		"deepseek-v4-flash-search":            false,
-		"deepseek-v4-flash-search-nothinking": false,
-		"deepseek-v4-pro-search":              false,
-		"deepseek-v4-pro-search-nothinking":   false,
-		"deepseek-v4-vision":                  false,
-		"deepseek-v4-vision-nothinking":       false,
-	}
-	for _, model := range data {
-		if _, ok := expected[model.ID]; ok {
-			expected[model.ID] = true
-		}
-	}
-	for id, seen := range expected {
-		if !seen {
-			t.Fatalf("expected OpenAI model list to include %s", id)
-		}
+	if len(data) != 1 || data[0].ID != "deepseek-flash" {
+		t.Fatalf("expected only deepseek-flash in model list, got %#v", data)
 	}
 }
 
@@ -715,7 +689,10 @@ func TestClaudeModelsResponse(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected data type: %T", resp["data"])
 	}
-	if len(data) == 0 {
-		t.Fatal("expected non-empty models list")
+	if len(data) != 1 || data[0].ID != "deepseek-flash" {
+		t.Fatalf("expected only deepseek-flash in Claude model list, got %#v", data)
+	}
+	if resp["first_id"] != "deepseek-flash" || resp["last_id"] != "deepseek-flash" || resp["has_more"] != false {
+		t.Fatalf("unexpected pagination for single model: %#v", resp)
 	}
 }

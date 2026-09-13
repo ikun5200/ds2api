@@ -51,12 +51,7 @@ func (r *Runner) caseModelsOpenAI(ctx context.Context, cc *caseContext) error {
 	}
 	cc.assert("status_200", resp.StatusCode == http.StatusOK, fmt.Sprintf("status=%d", resp.StatusCode))
 	ids := extractModelIDs(resp.Body)
-	cc.assert("has_deepseek_chat", contains(ids, "deepseek-v4-flash"), strings.Join(ids, ","))
-	cc.assert("has_deepseek_reasoner", contains(ids, "deepseek-v4-pro"), strings.Join(ids, ","))
-	cc.assert("has_deepseek_expert_chat", contains(ids, "deepseek-v4-pro"), strings.Join(ids, ","))
-	cc.assert("has_deepseek_expert_reasoner", contains(ids, "deepseek-v4-pro"), strings.Join(ids, ","))
-	cc.assert("has_deepseek_vision_chat", contains(ids, "deepseek-v4-vision"), strings.Join(ids, ","))
-	cc.assert("has_deepseek_vision_reasoner", contains(ids, "deepseek-v4-vision"), strings.Join(ids, ","))
+	cc.assert("only_deepseek_flash", len(ids) == 1 && ids[0] == "deepseek-flash", strings.Join(ids, ","))
 	return nil
 }
 
@@ -69,7 +64,7 @@ func (r *Runner) caseModelOpenAIByID(ctx context.Context, cc *caseContext) error
 	var m map[string]any
 	_ = json.Unmarshal(resp.Body, &m)
 	cc.assert("object_model", asString(m["object"]) == "model", fmt.Sprintf("body=%s", string(resp.Body)))
-	cc.assert("id_deepseek_chat", asString(m["id"]) == "deepseek-v4-flash", fmt.Sprintf("body=%s", string(resp.Body)))
+	cc.assert("id_deepseek_flash", asString(m["id"]) == "deepseek-flash", fmt.Sprintf("body=%s", string(resp.Body)))
 	return nil
 }
 func (r *Runner) caseChatNonstream(ctx context.Context, cc *caseContext) error {

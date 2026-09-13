@@ -45,6 +45,7 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 
 		reader := bufio.NewReaderSize(body, lineReaderBufferSize)
 		currentType := initialType
+		parser := contentLineParser{}
 
 		var pumpErr error
 
@@ -318,7 +319,7 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 					}
 					goto done
 				}
-				result := ParseDeepSeekContentLine(line, thinkingEnabled, currentType)
+				result := parser.parse(line, thinkingEnabled, currentType)
 				if !processLine(result) {
 					goto done
 				}
@@ -331,7 +332,7 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 					pumpErr = err
 				}
 				for line := range scanCh {
-					result := ParseDeepSeekContentLine(line, thinkingEnabled, currentType)
+					result := parser.parse(line, thinkingEnabled, currentType)
 					if !processLine(result) {
 						goto done
 					}

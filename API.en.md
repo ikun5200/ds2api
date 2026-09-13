@@ -42,7 +42,7 @@ Docs: [Overview](README.en.md) / [Architecture](docs/ARCHITECTURE.en.md) / [Depl
 - Adapter responsibilities are streamlined to: **request normalization → DeepSeek invocation → protocol-shaped rendering**, reducing legacy split-logic paths.
 - Tool-calling semantics are aligned between Go and Node runtime: models should output the halfwidth-pipe DSML shell `<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`; DS2API also accepts DSML wrapper aliases such as `<dsml|tool_calls>` and `<|tool_calls>`, common DSML separator drift such as `<|DSML tool_calls>`, collapsed DSML local names such as `<DSMLtool_calls>`, control-separator drift such as `<DSML␂tool_calls>` / raw STX `\x02`, CJK angle bracket, fullwidth-bang / ideographic-comma separator drift, PascalCase local-name drift, and trailing attribute separator drift such as `<DSM|parameter name="command"|>...〈/DSM|parameter〉`, `<！DSML！invoke name=“Bash”>`, `<、DSML、tool_calls>`, `<DSmartToolCalls>`, or `<DSMLtool_calls※>`, arbitrary protocol prefixes such as `<proto💥tool_calls>`, and legacy canonical XML `<tool_calls>` → `<invoke name="...">` → `<parameter name="...">`. The scanner normalizes fixed local names (`tool_calls` / `invoke` / `parameter`) with non-structural separators before or after them back to XML before parsing, and also tolerates CDATA opener drift such as `<！[CDATA[` / `<、[CDATA[`; only wrapped tool blocks or the narrow missing-opening-wrapper repair path enter the tool path, while bare `<invoke>` does not count as supported syntax. JSON literal parameter bodies are preserved as structured values, explicit empty or whitespace-only parameters are preserved as empty strings, malformed complete wrappers are released as plain text, and loose CDATA is narrowly repaired at final parse/flush when it can preserve a complete outer tool call.
 - `Admin API` separates static config from runtime policy: `/admin/config*` for configuration state, `/admin/settings*` for runtime behavior.
-- When upstream returns a thinking-only response with no visible text, the Go main path and the Vercel Node streaming path retry once in the same DeepSeek session: it appends the prompt suffix `"Previous reply had no visible output. Please regenerate the visible final answer or tool call now."` and sets `parent_message_id`. If that same-account retry would still end as `429 upstream_empty_output`, managed-account mode switches to the next available account, creates a fresh session, and retries the original payload once before returning 429.
+- When upstream returns a thinking-only response with no visible text, the Go main path and the Vercel Node streaming path retry once in the same DeepSeek session: it appends the prompt suffix `"Previous reply had no visible output. Please regenerate the visible final answer or tool call now."` and sets `parent_message_id`. If that same-account retry would still end as `429 upstream_empty_output`, managed requests without an account pin or user attachment/external file reference switch to the next available account, create a fresh session, and retry the original payload once before returning 429. Attachment requests stay on the original account so their file IDs remain usable.
 - Citation/reference marker boundary: streaming output hides upstream `[citation:N]` / `[reference:N]` placeholders by default; non-stream output converts DeepSeek search reference markers into Markdown links.
 
 ---
@@ -86,7 +86,7 @@ Two header formats accepted:
 - Token is in `config.keys` → **Managed account mode**: DS2API auto-selects an account via rotation
 - Token is not in `config.keys` → **Direct token mode**: treated as a DeepSeek token directly
 
-**Optional header**: `X-Ds2-Target-Account: <email_or_mobile>` — Pin a specific managed account; if the target account does not exist or the managed-account queue is exhausted, the request returns `429`, and current responses do not include `Retry-After`. If the account exists but login/refresh fails, the request returns the underlying `401` or upstream error. Without a pinned target, managed-account completion requests try one alternate-account fresh retry before returning an empty-output 429; pinned-target requests and requests with no other available account do not switch.
+**Optional header**: `X-Ds2-Target-Account: <email_or_mobile>` — Pin a specific managed account; if the target account does not exist or the managed-account queue is exhausted, the request returns `429`, and current responses do not include `Retry-After`. If the account exists but login/refresh fails, the request returns the underlying `401` or upstream error. Without an account pin or user attachment/external file reference, managed completion requests try one alternate-account fresh retry before returning an empty-output 429. Requests with a pinned target, attachments/file references, or no other available account do not switch.
 Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=` as the caller credential source.
 
 ### Admin Endpoints (`/admin/*`)
@@ -122,6 +122,7 @@ Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=
 | POST | `/messages` | Business | Claude shortcut path |
 | POST | `/v1/messages/count_tokens` | Business | Claude token counting shortcut |
 | POST | `/messages/count_tokens` | Business | Claude token counting shortcut |
+| GET | `/v1beta/models` | None | Gemini model catalog, only `models/deepseek-flash` |
 | POST | `/v1beta/models/{model}:generateContent` | Business | Gemini non-stream |
 | POST | `/v1beta/models/{model}:streamGenerateContent` | Business | Gemini stream |
 | POST | `/v1/models/{model}:generateContent` | Business | Gemini non-stream compat path |
@@ -198,37 +199,26 @@ OpenAI `/v1/*` paths are canonical. For clients configured with the bare DS2API 
 
 ### `GET /v1/models`
 
-No auth required. Returns the currently supported DeepSeek native model list.
-
-**Response**:
+No auth required. Returns only `deepseek-flash`, which supports thinking, web search, files and images.
 
 ```json
 {
   "object": "list",
   "data": [
-    {"id": "deepseek-v4-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-flash-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-pro", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-pro-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-flash-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-flash-search-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-pro-search", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-pro-search-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-vision", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []},
-    {"id": "deepseek-v4-vision-nothinking", "object": "model", "created": 1677610602, "owned_by": "deepseek", "permission": []}
+    {"id": "deepseek-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek"}
   ]
 }
 ```
 
-> Note: `/v1/models` returns normalized DeepSeek native model IDs. Common aliases are accepted only as request input and are not expanded as separate items in this endpoint.
+Verified against DeepSeek Web configuration on 2026-09-11: fast, expert and image understanding share `default`; the old `expert` and `vision` lanes are disabled. OpenAI, Claude, Gemini and Ollama catalogs no longer expand legacy names or aliases.
 
 ### Model Alias Resolution
 
 For `chat` / `responses` / `embeddings`, DS2API follows a wide-input/strict-output policy:
 
-1. Match DeepSeek native model IDs first.
+1. Match `deepseek-flash` or supported legacy `deepseek-v4-*` names first.
 2. Then match exact keys in `model_aliases`.
-3. If the request name ends with `-nothinking`, resolve the base alias and append the corresponding no-thinking variant.
+3. If the request name ends with `-nothinking`, resolve the base model/alias and retain its forced no-thinking semantics.
 4. If still unmatched, return `invalid_request_error`. Unknown model families are not guessed heuristically; add explicit compatibility names through `model_aliases`.
 
 Built-in aliases come from `internal/config/models.go`; `config.model_aliases` can override or add mappings at runtime. Excerpt:
@@ -239,11 +229,34 @@ Built-in aliases come from `internal/config/models.go`; `config.model_aliases` c
 - Gemini: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-3.1-pro`, `gemini-3-pro`, `gemini-3-flash`, `gemini-3.1-flash-lite`, `gemini-pro-vision`
 - Other exact built-in aliases: `llama-3.1-70b-instruct`, `qwen-max`
 
-Aliases with a `-nothinking` suffix also map to the corresponding forced no-thinking DeepSeek model.
+Legacy `deepseek-v4-flash`, `deepseek-v4-pro`, `deepseek-v4-vision` and their `-nothinking` variants remain accepted. Legacy `deepseek-v4-flash-search` / `deepseek-v4-pro-search`, including aliases mapped to them, retain search-on defaults; explicit `search_enabled: false` turns search off. The `-nothinking` suffix always forces thinking off.
 
-Current vision support resolves only to `deepseek-v4-vision` and does not expose a separate `vision-search` variant.
+These names provide compatibility inputs and legacy mode defaults only. Completion `model_type` and upload `x-model-type` are always `default`. Images and files work together with thinking and search; no separate vision or search model is needed.
 
 Retired historical families such as `claude-1.*`, `claude-2.*`, `claude-instant-*`, and `gpt-3.5*` are explicitly rejected.
+
+### Thinking and Search Controls
+
+OpenAI Chat / Responses, Claude Messages and Gemini generateContent share these mode settings:
+
+| Field | Type | `deepseek-flash` default | Location |
+| --- | --- | --- | --- |
+| `thinking_enabled` | boolean | `true` | Top level or `extra_body` |
+| `search_enabled` | boolean | `false` | Top level or `extra_body` |
+
+An explicit top-level field takes precedence over the same field in `extra_body`; `false` is preserved as an off instruction. Existing `thinking`, `reasoning` and `reasoning_effort` options remain compatible. A model's `-nothinking` suffix overrides all request switches and forces thinking off. Native Gemini `generationConfig.thinkingConfig.thinkingBudget` maps to the same switch: `0` disables it, nonzero values (including dynamic budget `-1`) enable it; explicit shared mode fields take precedence.
+
+```json
+{
+  "model": "deepseek-flash",
+  "thinking_enabled": true,
+  "search_enabled": true,
+  "messages": [{"role": "user", "content": "Answer using the attachment and web sources"}],
+  "file_ids": ["<uploaded-file-id>"]
+}
+```
+
+File IDs come from `/v1/files`; omit `file_ids` when no attachment is needed. All modes use shared standard-request completion assembly. Clients do not need to supply upstream `model_type`, `action` or `preempt`.
 
 ### `POST /v1/chat/completions`
 
@@ -263,6 +276,8 @@ Content-Type: application/json
 | `model` | string | ✅ | DeepSeek native models + common aliases (`gpt-5.5`, `gpt-5.4-mini`, `gpt-5.3-codex`, `o3`, `claude-opus-4-6`, `gemini-2.5-pro`, `gemini-3.1-pro`, `gemini-3-flash`, etc.); `-nothinking` suffixes force thinking / reasoning off |
 | `messages` | array | ✅ | OpenAI-style messages |
 | `stream` | boolean | ❌ | Default `false` |
+| `thinking_enabled` | boolean | ❌ | Default `true`; also accepted in `extra_body`; `-nothinking` forces it off |
+| `search_enabled` | boolean | ❌ | Default `false`; also accepted in `extra_body`; works with files/images |
 | `tools` | array | ❌ | Function calling schema |
 | `temperature`, etc. | any | ❌ | Accepted but final behavior depends on upstream |
 
@@ -273,7 +288,7 @@ Content-Type: application/json
   "id": "<chat_session_id>",
   "object": "chat.completion",
   "created": 1738400000,
-  "model": "deepseek-v4-pro",
+  "model": "deepseek-flash",
   "choices": [
     {
       "index": 0,
@@ -364,11 +379,13 @@ Additional notes:
 
 ### `GET /v1/models/{id}`
 
-No auth required. Alias values are accepted as path params (for example `gpt-4o`), and the returned object is the mapped DeepSeek model.
+No auth required. Existing aliases are accepted as path params (for example `gpt-4o`); the returned model object is `deepseek-flash`.
 
 ### `POST /v1/responses`
 
-OpenAI Responses-style endpoint, accepting either `input` or `messages`.
+OpenAI Responses-style endpoint, accepting either `input` or `messages`, with the same thinking, search and file/image input support.
+
+A nonempty `previous_response_id` returns `400` before attachment uploads or generation, with instructions to include the complete conversation and file references in `input`, preventing silently lost images or history. `null` / empty strings are treated as absent; `GET /v1/responses/{response_id}` still reads cached output and does not provide stateful continuation.
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
@@ -377,6 +394,8 @@ OpenAI Responses-style endpoint, accepting either `input` or `messages`.
 | `messages` | array | ❌ | One of `input` or `messages` is required |
 | `instructions` | string | ❌ | Prepended as a system message |
 | `stream` | boolean | ❌ | Default `false` |
+| `thinking_enabled` | boolean | ❌ | Default `true`; also accepted in `extra_body`; `-nothinking` forces it off |
+| `search_enabled` | boolean | ❌ | Default `false`; also accepted in `extra_body`; works with files/images |
 | `tools` | array | ❌ | Same tool detection/translation policy as chat |
 | `tool_choice` | string/object | ❌ | Supports `auto`/`none`/`required` and forced function selection (`{"type":"function","name":"..."}`) |
 
@@ -444,46 +463,95 @@ Business auth required. OpenAI Files-compatible upload endpoint; currently only 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
 | `file` | file | ✅ | Binary payload |
-| `purpose` | string | ❌ | Forwarded purpose field |
+| `purpose` | string | ❌ | File purpose metadata returned in the `file` object |
+| `model` | string | ❌ | Use `deepseek-flash`; legacy names/aliases remain accepted and always use the `default` upload type |
+| `thinking_enabled` | boolean/string | ❌ | Defaults to `true` for standalone uploads; a valid form value takes precedence over `X-Thinking-Enabled` |
 
 Constraints and behavior:
 
 - `Content-Type` must be `multipart/form-data` (otherwise `400`).
 - Total request size limit is **100 MiB** (over-limit returns `413`).
 - Success returns an OpenAI `file` object (`id/object/bytes/filename/purpose/status`, etc.) and includes `account_id` for source-account tracing.
+- Files and images both use the `default` upstream upload lane. DS2API sends DeepSeek a multipart body containing only `file`, with `x-model-type: default`, `x-file-size`, `x-thinking-enabled` (`true` → `1`, `false` → `0`) and PoW for the upload target.
+- DeepSeek may initially return `PENDING` / `PARSING`; DS2API waits for `SUCCESS` or another ready status. Terminal `FAILED` / `CANCELLED` / `CONTENT_FILTER` / `CONTENT_TOO_LONG` / `CONTENT_EMPTY` statuses fail immediately instead of waiting for the polling timeout.
+- `file_id` remains the original upstream value and does not encode accounts or credentials. The server caches the managed upload account for each caller and file; reusing a known ID with the same caller credentials automatically selects and pins its owner. The response still includes `account_id` for explicit `X-Ds2-Target-Account` selection, which the WebUI retains.
+- The `thinking_enabled` form field or `X-Thinking-Enabled` header accepts `true/false`, `1/0`, `on/off` and `enabled/disabled` (also `enable/disable/none`). A parseable form value wins, then the header; if neither supplies a valid value, thinking defaults to on. WebUI uploads include the selected thinking mode; message attachments and generated context files inherit the generation request mode.
 
 ### `GET /v1/files/{file_id}`
 
-Business auth required. Retrieves the current DeepSeek upload status for a file and returns an OpenAI `file` object. Returns `404` when no matching file is found.
+Business auth required. Resolves file ownership, retrieves DeepSeek upload status and returns an OpenAI `file` object. Returns `404` if the selected account cannot access the file, or `409` if an explicit target conflicts with known ownership. Retrieval can return metadata with `PENDING` / `FAILED` status; only generation requires references to be ready.
+
+### Files and Images in Messages
+
+Each protocol normalizes attachments into standard file blocks. The shared `inputfiles.Service` decodes/downloads and uploads them, then merges their IDs into the same `ref_file_ids`. Attachments work with both `thinking_enabled: true` and `search_enabled: true`. Requests with inline attachments or external file IDs resolve and validate ownership before pinning the owning DeepSeek account. Subsequent uploads, PoW, session and completion calls may refresh that account token but do not pass existing files to another account.
+
+| Protocol | Accepted input |
+| --- | --- |
+| OpenAI Chat | `image_url` as a string or `{ "url": "..." }` (data URL / public HTTP(S)); `file` / `input_file` with base64 or data-URL `file_data`, `file_url` or `file_id`; nested `file` objects and `{"type":"image_file","image_file":{"file_id":"..."}}` image references also work |
+| OpenAI Responses | `input_image.image_url`, `input_file.file_data` / `file_url` / `file_id`, `image_file` references, and existing `attachments` / `file_ids`; explicit image/file blocks in `function_call_output` / `tool_result` `output` are also uploaded or collected |
+| Claude Messages | `image` / `document` `source`: `type: "base64"` with `media_type` and `data`, `type: "url"` with `url`, or an uploaded `file_id`; documents also accept `type: "text"` with `data` |
+| Gemini | `inlineData` with `mimeType` and base64 `data`; `fileData` with `mimeType` and public HTTP(S) `fileUri` or an existing `file_id`; snake_case `inline_data` / `file_data` / `mime_type` / `file_uri` also work; explicit attachments using these formats in `functionResponse.parts` are retained |
+
+An existing `file_id` in an attachment block (including `file.file_id` / `file.id`) takes precedence: it is verified and reused without downloading an accompanying URL or uploading again. Image blocks without a valid URL, inline payload or file ID return `400`.
+
+Both the native and Vercel prepare/proxy paths preserve these Claude/Gemini images, documents and existing file references for the shared service. Attachment detection requires explicit protocol blocks or standard file fields. Ordinary tool-result `name` / `data` / `url` values, or an unrelated business-JSON `output` field, do not trigger file uploads.
+
+Standalone uploads, generation and file retrieval share ownership handling. Managed-mode cache entries are keyed by caller identity and the original `file_id`, so known files reused with the same caller credentials do not require an account header. Known references belonging to different accounts, or an explicit `X-Ds2-Target-Account` conflicting with known ownership, return `409` before generation.
+
+The ownership cache has a **24-hour TTL**, refreshed by successful uploads or access verification, and holds at most **10,000 entries per resolver**, **only in the current process memory**. An unknown ID after a restart, expiry, another instance or different caller credentials is checked only against the currently selected account; the service does not probe every account. If that account cannot access the file, it returns an explicit `404`; select the correct `X-Ds2-Target-Account` or upload again. Automatic ownership recovery across Vercel instances is not guaranteed. Direct-token mode always uses the supplied token and does not switch accounts through the managed ownership cache.
+
+For verification before generation, `404` means no matching file was found for the selected account. A file that is not ready returns `409`; failed processing returns `400`; an upstream verification failure returns `502`; an unavailable known owner returns `503`; a custom backend without file verification support returns `501`. Generation stops in each case instead of silently omitting the image.
+
+The WebUI remembers which credentials uploaded each attachment. Changing a direct token, or switching between managed-key and direct-token modes, displays a credential mismatch and blocks sending or adding mixed attachments. Restore the original credentials or remove and upload the attachments again. Keys belonging to the same managed pool can still share attachments while retaining the original upload account.
+
+Remote attachment URLs must be downloadable without extra authentication; DS2API does not forward the caller's API key. Downloads accept HTTP(S) only, reject loopback/private/link-local/reserved addresses, and validate DNS connections and redirects. `file://`, `gs://` and URIs requiring Google Files API credentials are unsupported. Each remote download has a 60-second timeout and follows at most 4 redirects.
+
+Decoded inline/URL attachments must be **1 byte to 100 MiB** each, with at most **50 attachment blocks to upload per request** and **50 unique IDs in total after merging existing and newly uploaded references**. Exceeding the limit returns `400`; client images are not truncated. Decode/download/size errors return `400`; DeepSeek upload failures return `500`. Each route's total HTTP body size limit still applies. Within one request, identical content, MIME type and filename are uploaded once; references and attachment token usage are also deduplicated.
+
+Automatic context files count toward the same 50-reference limit. If adding `HISTORY.txt` / `TOOLS.txt` would exceed it, the request keeps its complete inline prompt and all user attachments instead of uploading those automatic files. For example, 49 attachments plus both history and tools files uses the complete prompt.
+
+After `HISTORY.txt` uploads successfully or a DeepSeek session is created, those upstream resources bind the request to their owning account. Lower-level PoW, `TOOLS.txt` and completion retries may refresh that account token but cannot switch accounts. Only an explicit fresh-completion retry in the shared runtime may select another account when no user-attachment or explicit-account pin applies; it creates a new session and uploads the automatic context files again.
+
+For example, combine an image and text file in one OpenAI Chat request (replace the image base64 placeholder):
+
+```json
+{
+  "model": "deepseek-flash",
+  "thinking_enabled": true,
+  "search_enabled": true,
+  "messages": [{
+    "role": "user",
+    "content": [
+      {"type": "text", "text": "Explain using the image, notes and web sources"},
+      {"type": "image_url", "image_url": {"url": "data:image/png;base64,<image-base64>"}},
+      {"type": "file", "file": {"filename": "notes.txt", "file_data": "bm90ZXM="}}
+    ]
+  }]
+}
+```
 
 ---
 
 ## Claude-Compatible API
 
 Besides `/anthropic/v1/*`, DS2API also supports shortcut paths: `/v1/messages`, `/messages`, `/v1/messages/count_tokens`, `/messages/count_tokens`.
-Implementation-wise this path is unified on the OpenAI Chat Completions parse-and-translate pipeline to avoid maintaining divergent parsing chains.
+Requests normalize into standard messages and attachments, then use shared mode, upload and completion runtime behavior. Protocol adapters handle only request/response shapes.
 
 ### `GET /anthropic/v1/models`
 
-No auth required.
-
-**Response**:
+No auth required. Lists only the unified model; existing Claude aliases remain accepted in the `model` field of message requests.
 
 ```json
 {
   "object": "list",
   "data": [
-    {"id": "claude-sonnet-4-6", "object": "model", "created": 1715635200, "owned_by": "anthropic"},
-    {"id": "claude-haiku-4-5", "object": "model", "created": 1715635200, "owned_by": "anthropic"},
-    {"id": "claude-opus-4-6", "object": "model", "created": 1715635200, "owned_by": "anthropic"}
+    {"id": "deepseek-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek"}
   ],
-  "first_id": "claude-opus-4-6",
-  "last_id": "claude-3-haiku-20240307",
+  "first_id": "deepseek-flash",
+  "last_id": "deepseek-flash",
   "has_more": false
 }
 ```
-
-> Note: the example is partial; besides the current primary aliases, the real response also includes Claude 4.x snapshots plus historical 3.x IDs and common aliases.
 
 ### `POST /anthropic/v1/messages`
 
@@ -501,10 +569,12 @@ anthropic-version: 2023-06-01
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `model` | string | ✅ | For example `claude-sonnet-4-6` / `claude-opus-4-6` / `claude-haiku-4-5` (compatible with `claude-3-5-haiku-latest`), plus historical Claude model IDs |
+| `model` | string | ✅ | Use `deepseek-flash`; aliases such as `claude-sonnet-4-6` / `claude-opus-4-6` / `claude-haiku-4-5` (compatible with `claude-3-5-haiku-latest`), plus historical Claude model IDs |
 | `messages` | array | ✅ | Claude-style messages |
 | `max_tokens` | number | ❌ | Auto-filled to `8192` when omitted; not strictly enforced by upstream bridge |
 | `stream` | boolean | ❌ | Default `false` |
+| `thinking_enabled` | boolean | ❌ | Default `true`; also accepted in `extra_body`; `-nothinking` forces it off |
+| `search_enabled` | boolean | ❌ | Default `false`; also accepted in `extra_body`; works with files/images |
 | `system` | string | ❌ | Optional system prompt |
 | `tools` | array | ❌ | Claude tool schema |
 | `thinking` | object | ❌ | Anthropic thinking config; translated into downstream reasoning control, and ignored by `-nothinking` models |
@@ -602,12 +672,27 @@ Supported paths:
 - `/v1/models/{model}:generateContent` (compat path)
 - `/v1/models/{model}:streamGenerateContent` (compat path)
 
-Authentication is the same as other business routes (`Authorization: Bearer <token>` or `x-api-key`).
-Implementation-wise this path is unified on the OpenAI Chat Completions parse-and-translate pipeline to avoid maintaining divergent parsing chains.
+Generation endpoints use business authentication and also accept `x-goog-api-key`, `?key=` or `?api_key=`. The model catalog requires no authentication.
+Requests normalize into standard messages and attachments, then use shared mode, upload and completion runtime behavior. Protocol adapters handle only request/response shapes.
+
+### `GET /v1beta/models`
+
+No auth required. Uses the Gemini model catalog format:
+
+```json
+{
+  "models": [{
+    "name": "models/deepseek-flash",
+    "baseModelId": "deepseek-flash",
+    "displayName": "DeepSeek Flash",
+    "supportedGenerationMethods": ["generateContent", "streamGenerateContent"]
+  }]
+}
+```
 
 ### `POST /v1beta/models/{model}:generateContent`
 
-Request body accepts Gemini-style `contents` / `tools`. Model names can use aliases and are mapped to DeepSeek models.
+The body accepts Gemini `contents` / `tools`. Use `deepseek-flash` in the path; existing aliases remain accepted, and `-nothinking` still forces thinking off. Set `thinking_enabled` / `search_enabled` at the top level or in `extra_body`. Native `generationConfig.thinkingConfig.thinkingBudget` disables thinking at `0` and enables it for nonzero values (including `-1`). A `googleSearch` / `googleSearchRetrieval` tool (snake_case also accepted) enables web search; explicit `search_enabled` takes precedence.
 
 Response uses Gemini-compatible fields, including:
 
@@ -630,6 +715,8 @@ Returns SSE (`text/event-stream`), each chunk as `data: <json>`:
 
 ## Ollama API
 
+`GET /api/tags` lists only `deepseek-flash`.
+
 - `POST /api/show` request body: `{"model":"<model-id>"}`.
 - Response uses lowercase `id` (not `ID`) and includes `capabilities` for Ollama-style clients and strict schemas.
 
@@ -637,8 +724,8 @@ Example response:
 
 ```json
 {
-  "id": "deepseek-v4-flash",
-  "capabilities": ["tools", "thinking"]
+  "id": "deepseek-flash",
+  "capabilities": ["tools", "thinking", "vision"]
 }
 ```
 
@@ -725,13 +812,14 @@ Returns sanitized config, including both `keys` and `api_keys`.
       "email": "user@example.com",
       "mobile": "",
       "has_password": true,
+      "has_device_id": true,
       "has_token": true,
       "token_preview": "abcde..."
     }
   ],
   "model_aliases": {
-    "claude-sonnet-4-6": "deepseek-v4-flash",
-    "claude-opus-4-6": "deepseek-v4-pro"
+    "claude-sonnet-4-6": "deepseek-flash",
+    "claude-opus-4-6": "deepseek-flash"
   }
 }
 ```
@@ -762,8 +850,8 @@ If both `api_keys` and `keys` are sent, the structured `api_keys` entries win so
     {"email": "user@example.com", "password": "pwd", "token": ""}
   ],
   "model_aliases": {
-    "claude-sonnet-4-6": "deepseek-v4-flash",
-    "claude-opus-4-6": "deepseek-v4-pro"
+    "claude-sonnet-4-6": "deepseek-flash",
+    "claude-opus-4-6": "deepseek-flash"
   }
 }
 ```
@@ -890,6 +978,7 @@ Tests proxy connectivity: provide `proxy_id` to test a saved proxy; omit it to r
       "email": "user@example.com",
       "mobile": "",
       "has_password": true,
+      "has_device_id": true,
       "has_token": true,
       "token_preview": "abc...",
       "test_status": "ok"
@@ -907,20 +996,22 @@ Returned items also include `test_status`, usually `ok` or `failed`.
 ### `POST /admin/accounts`
 
 ```json
-{"email": "user@example.com", "password": "pwd"}
+{"email": "user@example.com", "password": "pwd", "device_id": "website-issued-device-id"}
 ```
 
 **Response**: `{"success": true, "total_accounts": 6}`
 
 ### `PUT /admin/accounts/{identifier}`
 
-Updates the `name` / `remark` of the specified account. The path `identifier` can be email or mobile and cannot be changed.
+Updates the `name` / `remark` / `disabled` / `device_id` of the specified account. The path `identifier` can be email or mobile and cannot be changed.
 
 ```json
 {"name": "Primary account", "remark": "Shared with the team"}
 ```
 
 **Response**: `{"success": true, "total_accounts": 6}`
+
+`device_id` is a website-issued device ID used for password login. Create, update, and new accounts in JSON batch import accept it. Batch import continues to skip existing accounts and does not replace their device IDs. Omitted or `null` preserves the saved value; strings are trimmed, an explicit empty string clears it, and non-strings return `400`. Normal configuration/account lists expose only `has_device_id`; configuration export and Vercel sync preserve the value. See [login device verification](docs/DEPLOY.en.md#322-deepseek-login-device-verification). An empty admin edit field does not submit a clear operation.
 
 ### `DELETE /admin/accounts/{identifier}`
 
@@ -971,8 +1062,9 @@ Updates proxy binding for a specific account.
 | Field | Required | Notes |
 | --- | --- | --- |
 | `identifier` | ✅ | email / mobile / token-only synthetic id |
-| `model` | ❌ | default `deepseek-v4-flash` |
+| `model` | ❌ | default `deepseek-flash` |
 | `message` | ❌ | if empty, only session creation is tested |
+| `device_id` | ❌ | Device ID override for this test only; update account configuration to persist it |
 
 **Response**:
 
@@ -982,7 +1074,7 @@ Updates proxy binding for a specific account.
   "success": true,
   "response_time": 1240,
   "message": "API test successful (session creation only)",
-  "model": "deepseek-v4-flash",
+  "model": "deepseek-flash",
   "session_count": 0,
   "config_writable": true,
   "config_warning": ""
@@ -1056,7 +1148,7 @@ Test API availability through the service itself.
 
 | Field | Required | Default |
 | --- | --- | --- |
-| `model` | ❌ | `deepseek-v4-flash` |
+| `model` | ❌ | `deepseek-flash` |
 | `message` | ❌ | `你好` |
 | `api_key` | ❌ | First key in config |
 
@@ -1080,7 +1172,7 @@ Common request fields:
 | --- | --- | --- | --- |
 | `message` | No | `你好` | Convenience single-turn user message |
 | `messages` | No | Auto-derived from `message` | OpenAI-style message array |
-| `model` | No | `deepseek-v4-flash` | Target model |
+| `model` | No | `deepseek-flash` | Target model |
 | `stream` | No | `true` | Recommended to keep streaming enabled so raw SSE is recorded |
 | `api_key` | No | First configured key | Business API key to use |
 | `sample_id` | No | Auto-generated | Sample directory name |
@@ -1276,7 +1368,7 @@ Clients should handle HTTP status code plus `error` / `detail` fields.
 | Code | Meaning |
 | --- | --- |
 | `401` | Authentication failed (invalid key/token, or expired admin JWT) |
-| `429` | Too many requests (exceeded inflight + queue capacity, or upstream thinking-only output with no visible answer; managed-account mode first tries one alternate-account fresh retry; current responses do not include `Retry-After`) |
+| `429` | Too many requests (exceeded inflight + queue capacity, or upstream thinking-only output with no visible answer; managed requests without an account pin or attachments first try one alternate-account fresh retry; current responses do not include `Retry-After`) |
 | `503` | Model unavailable or upstream error |
 
 ---
@@ -1290,7 +1382,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash",
+    "model": "deepseek-flash",
     "messages": [{"role": "user", "content": "Hello"}],
     "stream": false
   }'
@@ -1303,7 +1395,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-pro",
+    "model": "deepseek-flash",
     "messages": [{"role": "user", "content": "Explain quantum entanglement"}],
     "stream": true
   }'
@@ -1341,7 +1433,9 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash-search",
+    "model": "deepseek-flash",
+    "thinking_enabled": true,
+    "search_enabled": true,
     "messages": [{"role": "user", "content": "Latest news today"}],
     "stream": true
   }'
@@ -1354,7 +1448,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash",
+    "model": "deepseek-flash",
     "messages": [{"role": "user", "content": "What is the weather in Beijing?"}],
     "tools": [
       {
@@ -1378,7 +1472,7 @@ curl http://localhost:5001/v1/chat/completions \
 ### Gemini Non-Stream
 
 ```bash
-curl "http://localhost:5001/v1beta/models/gemini-2.5-pro:generateContent" \
+curl "http://localhost:5001/v1beta/models/deepseek-flash:generateContent" \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1394,7 +1488,7 @@ curl "http://localhost:5001/v1beta/models/gemini-2.5-pro:generateContent" \
 ### Gemini Stream
 
 ```bash
-curl "http://localhost:5001/v1beta/models/gemini-2.5-flash:streamGenerateContent" \
+curl "http://localhost:5001/v1beta/models/deepseek-flash:streamGenerateContent" \
   -H "Authorization: Bearer your-api-key" \
   -H "Content-Type: application/json" \
   -d '{
@@ -1415,7 +1509,7 @@ curl http://localhost:5001/anthropic/v1/messages \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
-    "model": "claude-sonnet-4-6",
+    "model": "deepseek-flash",
     "max_tokens": 1024,
     "messages": [{"role": "user", "content": "Hello"}]
   }'
@@ -1429,7 +1523,7 @@ curl http://localhost:5001/anthropic/v1/messages \
   -H "Content-Type: application/json" \
   -H "anthropic-version: 2023-06-01" \
   -d '{
-    "model": "claude-opus-4-6",
+    "model": "deepseek-flash",
     "max_tokens": 1024,
     "messages": [{"role": "user", "content": "Explain relativity"}],
     "stream": true
@@ -1452,7 +1546,7 @@ curl http://localhost:5001/v1/chat/completions \
   -H "X-Ds2-Target-Account: user@example.com" \
   -H "Content-Type: application/json" \
   -d '{
-    "model": "deepseek-v4-flash",
+    "model": "deepseek-flash",
     "messages": [{"role": "user", "content": "Hello"}]
   }'
 ```

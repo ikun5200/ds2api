@@ -29,6 +29,9 @@ func (c *Client) waitForUploadedFile(ctx context.Context, a *auth.RequestAuth, r
 	if result == nil || strings.TrimSpace(result.ID) == "" {
 		return nil
 	}
+	if err := uploadedFileProcessingError(result); err != nil {
+		return err
+	}
 	if isReadyUploadFileStatus(result.Status) {
 		return nil
 	}
@@ -48,6 +51,9 @@ func (c *Client) waitForUploadedFile(ctx context.Context, a *auth.RequestAuth, r
 		fetched, err := c.FetchUploadedFile(pollCtx, a, result.ID)
 		if err == nil && fetched != nil {
 			mergeUploadFileResults(result, fetched)
+			if err := uploadedFileProcessingError(result); err != nil {
+				return err
+			}
 			if isReadyUploadFileStatus(result.Status) {
 				return nil
 			}
@@ -142,12 +148,13 @@ func buildUploadFileResultFromMap(m map[string]any, targetID string) *UploadFile
 		return nil
 	}
 	result := &UploadFileResult{
-		ID:       fileID,
-		Filename: firstNonEmptyString(m, "name", "filename", "file_name"),
-		Status:   firstNonEmptyString(m, "status", "file_status"),
-		Purpose:  firstNonEmptyString(m, "purpose"),
-		IsImage:  firstBool(m, "is_image", "isImage"),
-		Bytes:    firstPositiveInt64(m, "bytes", "size", "file_size"),
+		ID:         fileID,
+		Filename:   firstNonEmptyString(m, "name", "filename", "file_name"),
+		Status:     firstNonEmptyString(m, "status", "file_status"),
+		Purpose:    firstNonEmptyString(m, "purpose"),
+		IsImage:    firstBool(m, "is_image", "isImage"),
+		Bytes:      firstPositiveInt64(m, "bytes", "size", "file_size"),
+		TokenUsage: int(firstPositiveInt64(m, "token_usage")),
 	}
 	if result.Status == "" {
 		result.Status = "uploaded"
@@ -168,6 +175,9 @@ func mergeUploadFileResults(dst, src *UploadFileResult) {
 	if src.Bytes > 0 {
 		dst.Bytes = src.Bytes
 	}
+	if src.TokenUsage > 0 {
+		dst.TokenUsage = src.TokenUsage
+	}
 	if strings.TrimSpace(src.Status) != "" {
 		dst.Status = strings.TrimSpace(src.Status)
 	}
@@ -183,11 +193,25 @@ func mergeUploadFileResults(dst, src *UploadFileResult) {
 	}
 }
 
+// IsUploadedFileReady shares upload completion rules with file-reference checks.
+func IsUploadedFileReady(status string) bool {
+	return isReadyUploadFileStatus(status)
+}
+
 func isReadyUploadFileStatus(status string) bool {
 	switch strings.ToLower(strings.TrimSpace(status)) {
 	case "processed", "ready", "done", "available", "success", "completed", "finished":
 		return true
 	default:
 		return false
+	}
+}
+
+func uploadedFileProcessingError(result *UploadFileResult) error {
+	switch strings.ToUpper(strings.TrimSpace(result.Status)) {
+	case "FAILED", "CONTENT_FILTER", "CONTENT_TOO_LONG", "CANCELLED", "CONTENT_EMPTY":
+		return fmt.Errorf("file %s processing failed: status=%s", result.ID, result.Status)
+	default:
+		return nil
 	}
 }

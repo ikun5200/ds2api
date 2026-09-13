@@ -57,6 +57,7 @@ func (s *claudeStreamRuntime) sendMessageStart() {
 	if inputTokens == 0 {
 		inputTokens = util.CountPromptTokens(fmt.Sprintf("%v", s.messages), s.model)
 	}
+	inputTokens += s.refFileTokens
 	s.send("message_start", map[string]any{
 		"type": "message_start",
 		"message": map[string]any{
