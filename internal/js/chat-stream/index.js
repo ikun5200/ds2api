@@ -69,7 +69,7 @@ async function handler(req, res) {
   }
 
   // Keep all non-stream behavior and non-OpenAI-chat paths on Go side to avoid
-  // protocol-shape regressions (e.g. Gemini/Claude clients expecting their own formats).
+  // protocol-shape regressions.
   if (!toBool(payload.stream) || !isNodeStreamSupportedPath(req.url || '')) {
     await proxyToGo(req, res, rawBody);
     return;

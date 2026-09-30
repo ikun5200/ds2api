@@ -9,7 +9,7 @@
 
 DS2API 的定位不是“又一个 API 代理”，也不是训练工具。
 
-它本质上是一个网页转 API 的兼容层：把 DeepSeek 网页对话侧可用的能力，整理成 OpenAI / Claude / Gemini 风格客户端可以接入的请求与响应形态。
+它本质上是一个网页转 API 的兼容层：把 DeepSeek 网页对话侧可用的能力，整理成 OpenAI 风格客户端可以接入的请求与响应形态。
 
 本项目的核心价值在于：
 
@@ -32,7 +32,7 @@ DS2API 的定位不是“又一个 API 代理”，也不是训练工具。
 
 DS2API 通过 `promptcompat`、`completionruntime`、`assistantturn` 和各协议 renderer，把这段差距收敛到一条可维护的主链路中：
 
-- 请求侧把 OpenAI / Claude / Gemini 消息归一成网页纯文本上下文。
+- 请求侧把 OpenAI 消息归一成网页纯文本上下文。
 - 上游侧按 DeepSeek 网页 completion 需要的 payload 发起会话。
 - 输出侧把 DeepSeek SSE 收集或流式事件再渲染回各协议原生形态。
 

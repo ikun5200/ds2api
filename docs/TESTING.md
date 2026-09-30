@@ -82,7 +82,6 @@ npm run build --prefix webui
 
 3. **场景测试**：
    - ✅ OpenAI 非流式 / 流式
-   - ✅ Claude 非流式 / 流式
    - ✅ Admin API（登录 / 配置 / 账号管理）
    - ✅ Tool Calling
    - ✅ 并发压力测试

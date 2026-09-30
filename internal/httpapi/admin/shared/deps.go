@@ -39,7 +39,6 @@ type ConfigStore interface {
 	ThinkingInjectionPrompt() string
 	OutputIntegrityGuardEnabled() bool
 	OutputIntegrityGuardPrompt() string
-	AutoDeleteSessions() bool
 }
 
 type PoolController interface {

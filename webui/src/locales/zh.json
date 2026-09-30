@@ -78,11 +78,11 @@
         "visualDocs": "图形化文档",
         "consoleLabel": "在线管理面板",
         "kicker": "DeepSeek 兼容网关",
-        "subtitle": "把 DeepSeek Web 对话能力转换为 OpenAI、Claude 与 Gemini 兼容 API，并支持用外部数据库长期保存响应记录。",
+        "subtitle": "把 DeepSeek Web 对话能力转换为 OpenAI 兼容 API，并支持用外部数据库长期保存响应记录。",
         "features": {
             "compatibility": {
                 "title": "全面兼容",
-                "desc": "适配 OpenAI 与 Claude 格式"
+                "desc": "适配 OpenAI 格式"
             },
             "loadBalancing": {
                 "title": "负载均衡",
@@ -114,12 +114,12 @@
             "title": "推荐阅读顺序",
             "deploy": "1. 先看部署指南，确认 Docker、Vercel、Zeabur 或源码运行方式。",
             "config": "2. 再看外部存储说明和配置示例，决定响应记录保存在哪里。",
-            "client": "3. 最后按接口文档接入 OpenAI、Claude 或 Gemini 客户端。"
+            "client": "3. 最后按接口文档接入 OpenAI 兼容客户端。"
         },
         "flow": {
             "client": {
                 "title": "客户端 / SDK",
-                "desc": "兼容客户端向 DS2API 发起 OpenAI、Claude 或 Gemini 请求。"
+                "desc": "兼容客户端向 DS2API 发起 OpenAI 请求。"
             },
             "adapter": {
                 "title": "协议适配",
@@ -145,7 +145,7 @@
             },
             "api": {
                 "title": "接口文档",
-                "desc": "鉴权、模型、Chat、Responses、Claude、Gemini 与 Admin API。"
+                "desc": "鉴权、模型、Chat、Responses、Files 与 Admin API。"
             },
             "arch": {
                 "title": "架构说明",
@@ -306,7 +306,8 @@
     "apiTester": {
         "defaultMessage": "你好，请用一句话介绍你自己。",
         "models": {
-            "flash": "DeepSeek Flash · 支持思考、联网、文件和图片"
+            "flash": "DeepSeek Flash · 支持思考、联网、文件和图片",
+            "flashSearch": "DeepSeek Flash Search · 默认开启联网搜索，支持思考、文件和图片"
         },
         "missingApiKey": "请提供 API 密钥",
         "requestFailed": "请求失败",
@@ -349,7 +350,7 @@
         "loading": "正在加载对话记录...",
         "loadFailed": "加载对话记录失败",
         "retentionTitle": "保留条数",
-        "retentionDesc": "服务器端只保留最新 N 条 DeepSeek 上游响应记录，覆盖 OpenAI Chat、OpenAI Responses、Claude 和 Gemini 直连接口。",
+        "retentionDesc": "服务器端只保留最新 N 条 DeepSeek 上游响应记录，覆盖 OpenAI Chat 与 OpenAI Responses 接口。",
         "off": "OFF",
         "refresh": "刷新",
         "clearAll": "清空全部",

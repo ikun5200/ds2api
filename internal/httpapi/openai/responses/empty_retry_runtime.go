@@ -1,19 +1,71 @@
 package responses
 
 import (
+	"context"
 	"io"
 	"net/http"
 	"strings"
 	"time"
 
+	"ds2api/internal/assistantturn"
 	"ds2api/internal/auth"
 	"ds2api/internal/completionruntime"
 	"ds2api/internal/config"
 	dsprotocol "ds2api/internal/deepseek/protocol"
+	openaifmt "ds2api/internal/format/openai"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/responsehistory"
 	streamengine "ds2api/internal/stream"
 )
+
+func (h *Handler) handleResponsesNonStreamWithRetry(w http.ResponseWriter, ctx context.Context, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow, owner, responseID, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, toolChoice promptcompat.ToolChoicePolicy, traceID string, historySession *responsehistory.Session) {
+	if resp.StatusCode != http.StatusOK {
+		defer func() { _ = resp.Body.Close() }()
+		body, _ := io.ReadAll(resp.Body)
+		if historySession != nil {
+			historySession.Error(resp.StatusCode, strings.TrimSpace(string(body)), "error", "", "")
+		}
+		writeOpenAIError(w, resp.StatusCode, strings.TrimSpace(string(body)))
+		return
+	}
+	stdReq := promptcompat.StandardRequest{
+		Surface:         "responses",
+		ResponseModel:   model,
+		PromptTokenText: finalPrompt,
+		FinalPrompt:     finalPrompt,
+		RefFileTokens:   refFileTokens,
+		Thinking:        thinkingEnabled,
+		Search:          searchEnabled,
+		ToolNames:       toolNames,
+		ToolsRaw:        toolsRaw,
+		ToolChoice:      toolChoice,
+	}
+	retryEnabled := h != nil && h.DS != nil && emptyOutputRetryEnabled()
+	result, outErr := completionruntime.ExecuteNonStreamStartedWithRetry(ctx, h.DS, a, completionruntime.StartResult{
+		SessionID: responseID,
+		Payload:   payload,
+		Pow:       pow,
+		Response:  resp,
+		Request:   stdReq,
+	}, completionruntime.Options{
+		RetryEnabled:     retryEnabled,
+		RetryMaxAttempts: emptyOutputRetryMaxAttempts(),
+	})
+	if outErr != nil {
+		if historySession != nil {
+			historySession.ErrorTurn(outErr.Status, outErr.Message, outErr.Code, result.Turn)
+		}
+		writeOpenAIErrorWithCode(w, outErr.Status, outErr.Message, outErr.Code)
+		return
+	}
+	if historySession != nil {
+		historySession.SuccessTurn(http.StatusOK, result.Turn, assistantturn.OpenAIResponsesUsage(result.Turn))
+	}
+	responseObj := openaifmt.BuildResponseObjectWithToolCalls(responseID, model, result.Turn.Prompt, result.Turn.Thinking, result.Turn.Text, result.Turn.ToolCalls, toolsRaw)
+	responseObj["usage"] = assistantturn.OpenAIResponsesUsage(result.Turn)
+	h.getResponseStore().put(owner, responseID, responseObj)
+	writeJSON(w, http.StatusOK, responseObj)
+}
 
 func (h *Handler) handleResponsesStreamWithRetry(w http.ResponseWriter, r *http.Request, a *auth.RequestAuth, resp *http.Response, payload map[string]any, pow, owner, responseID string, stdReq promptcompat.StandardRequest, model, finalPrompt string, refFileTokens int, thinkingEnabled, searchEnabled bool, toolNames []string, toolsRaw any, toolChoice promptcompat.ToolChoicePolicy, traceID string, historySession *responsehistory.Session) {
 	streamRuntime, initialType, ok := h.prepareResponsesStreamRuntime(w, resp, owner, responseID, model, finalPrompt, refFileTokens, thinkingEnabled, searchEnabled, toolNames, toolsRaw, toolChoice, traceID, historySession)

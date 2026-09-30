@@ -24,7 +24,7 @@ These rules apply to all agent-made changes in this repository.
 
 ## Protocol Adapter Boundary
 
-- Do not let OpenAI Chat, OpenAI Responses, Claude, Gemini, or other interface protocol formatting own shared business behavior.
+- Do not let OpenAI Chat, OpenAI Responses, or other interface protocol formatting own shared business behavior.
 - Normalize protocol-specific request shapes into the project standard request/turn model first, run shared business logic in one place, then render back to the target protocol at the boundary.
 - Business logic that must stay globally consistent includes empty-output retry, thinking/reasoning handling, tool-call detection and policy, usage accounting, current-input-file injection, history persistence, file/reference handling, and completion payload assembly.
 - If a behavior must differ by protocol, keep the difference as an explicit adapter/rendering concern and document why it cannot live in the shared normalized path.

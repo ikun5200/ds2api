@@ -99,6 +99,7 @@ func TestGetModelConfigDeepSeekVisionSearchUnsupported(t *testing.T) {
 func TestGetModelTypeUsesDefaultForCurrentAndLegacyModels(t *testing.T) {
 	for _, model := range []string{
 		"deepseek-flash", "deepseek-flash-nothinking",
+		"deepseek-flash-search", "deepseek-flash-search-nothinking",
 		"deepseek-v4-flash", "deepseek-v4-flash-nothinking",
 		"deepseek-v4-pro", "deepseek-v4-pro-search", "deepseek-v4-vision",
 	} {
@@ -162,7 +163,7 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 	cfg := Config{
 		Keys:         []string{"key1", "key2"},
 		Accounts:     []Account{{Email: "user@example.com", Password: "pass", Token: "tok"}},
-		ModelAliases: map[string]string{"Claude-Sonnet-4-6": "DeepSeek-V4-Flash"},
+		ModelAliases: map[string]string{"Custom-Chat-Model": "DeepSeek-V4-Flash"},
 		AutoDelete: AutoDeleteConfig{
 			Mode: "single",
 		},
@@ -197,7 +198,7 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 	if len(decoded.Accounts) != 1 || decoded.Accounts[0].Email != "user@example.com" {
 		t.Fatalf("unexpected accounts: %#v", decoded.Accounts)
 	}
-	if decoded.ModelAliases["claude-sonnet-4-6"] != "deepseek-v4-flash" {
+	if decoded.ModelAliases["custom-chat-model"] != "deepseek-v4-flash" {
 		t.Fatalf("unexpected normalized model aliases: %#v", decoded.ModelAliases)
 	}
 	if decoded.Runtime.TokenRefreshIntervalHours != 12 {
@@ -296,7 +297,7 @@ func TestConfigCloneIsDeepCopy(t *testing.T) {
 	cfg := Config{
 		Keys:             []string{"key1"},
 		Accounts:         []Account{{Email: "user@test.com", Token: "token"}},
-		ModelAliases:     map[string]string{"claude-sonnet-4-6": "deepseek-v4-flash"},
+		ModelAliases:     map[string]string{"custom-chat-model": "deepseek-v4-flash"},
 		AdditionalFields: map[string]any{"custom": "value"},
 	}
 
@@ -305,7 +306,7 @@ func TestConfigCloneIsDeepCopy(t *testing.T) {
 	// Modify original
 	cfg.Keys[0] = "modified"
 	cfg.Accounts[0].Email = "modified@test.com"
-	cfg.ModelAliases["claude-sonnet-4-6"] = "modified-model"
+	cfg.ModelAliases["custom-chat-model"] = "modified-model"
 
 	// Cloned should not be affected
 	if cloned.Keys[0] != "key1" {
@@ -314,7 +315,7 @@ func TestConfigCloneIsDeepCopy(t *testing.T) {
 	if cloned.Accounts[0].Email != "user@test.com" {
 		t.Fatalf("clone accounts was affected: %#v", cloned.Accounts)
 	}
-	if cloned.ModelAliases["claude-sonnet-4-6"] != "deepseek-v4-flash" {
+	if cloned.ModelAliases["custom-chat-model"] != "deepseek-v4-flash" {
 		t.Fatalf("clone model aliases was affected: %#v", cloned.ModelAliases)
 	}
 }
@@ -610,14 +611,14 @@ func TestNormalizeCredentialsPrefersStructuredAPIKeys(t *testing.T) {
 }
 
 func TestStoreModelAliasesIncludesDefaultsAndOverrides(t *testing.T) {
-	t.Setenv("DS2API_CONFIG_JSON", `{"keys":[],"accounts":[],"model_aliases":{"claude-opus-4-6":"deepseek-v4-pro-search"}}`)
+	t.Setenv("DS2API_CONFIG_JSON", `{"keys":[],"accounts":[],"model_aliases":{"my-pro-model":"deepseek-v4-pro-search"}}`)
 	store := LoadStore()
 	aliases := store.ModelAliases()
-	if aliases["claude-sonnet-4-6"] != "deepseek-v4-flash" {
-		t.Fatalf("expected default alias to remain available, got %q", aliases["claude-sonnet-4-6"])
+	if aliases["gpt-4o"] != "deepseek-v4-flash" {
+		t.Fatalf("expected default alias to remain available, got %q", aliases["gpt-4o"])
 	}
-	if aliases["claude-opus-4-6"] != "deepseek-v4-pro-search" {
-		t.Fatalf("expected custom alias override, got %q", aliases["claude-opus-4-6"])
+	if aliases["my-pro-model"] != "deepseek-v4-pro-search" {
+		t.Fatalf("expected custom alias override, got %q", aliases["my-pro-model"])
 	}
 }
 
@@ -628,8 +629,8 @@ func TestStoreModelAliasesDefault(t *testing.T) {
 	if aliases == nil {
 		t.Fatal("expected non-nil aliases")
 	}
-	if aliases["claude-sonnet-4-6"] != "deepseek-v4-flash" {
-		t.Fatalf("expected built-in alias, got %q", aliases["claude-sonnet-4-6"])
+	if aliases["gpt-4o"] != "deepseek-v4-flash" {
+		t.Fatalf("expected built-in alias, got %q", aliases["gpt-4o"])
 	}
 }
 
@@ -675,24 +676,7 @@ func TestOpenAIModelsResponse(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected data type: %T", resp["data"])
 	}
-	if len(data) != 1 || data[0].ID != "deepseek-flash" {
-		t.Fatalf("expected only deepseek-flash in model list, got %#v", data)
-	}
-}
-
-func TestClaudeModelsResponse(t *testing.T) {
-	resp := ClaudeModelsResponse()
-	if resp["object"] != "list" {
-		t.Fatalf("unexpected object: %v", resp["object"])
-	}
-	data, ok := resp["data"].([]ModelInfo)
-	if !ok {
-		t.Fatalf("unexpected data type: %T", resp["data"])
-	}
-	if len(data) != 1 || data[0].ID != "deepseek-flash" {
-		t.Fatalf("expected only deepseek-flash in Claude model list, got %#v", data)
-	}
-	if resp["first_id"] != "deepseek-flash" || resp["last_id"] != "deepseek-flash" || resp["has_more"] != false {
-		t.Fatalf("unexpected pagination for single model: %#v", resp)
+	if len(data) != 2 || data[0].ID != "deepseek-flash" || data[1].ID != "deepseek-flash-search" {
+		t.Fatalf("expected flash and search in model list, got %#v", data)
 	}
 }

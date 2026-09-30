@@ -7,9 +7,6 @@ const DEFAULT_CORS_ALLOW_HEADERS = [
   'X-Ds2-Target-Account',
   'X-Ds2-Source',
   'X-Vercel-Protection-Bypass',
-  'X-Goog-Api-Key',
-  'Anthropic-Version',
-  'Anthropic-Beta',
 ];
 
 const BLOCKED_CORS_REQUEST_HEADERS = new Set([

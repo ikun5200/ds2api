@@ -3,7 +3,7 @@ package toolcall
 import "strings"
 
 // BuildToolCallInstructions generates the unified tool-calling instruction block
-// used by all adapters (OpenAI, Claude, Gemini). It uses attention-optimized
+// used by all adapters (OpenAI). It uses attention-optimized
 // structure: rules → negative examples → positive examples → anchor.
 //
 // The toolNames slice should contain the actual tool names available in the

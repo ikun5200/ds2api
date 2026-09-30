@@ -200,19 +200,15 @@ func (r *Runner) caseSSEJSONIntegrity(ctx context.Context, cc *caseContext) erro
 	badOpenAI := countMalformedSSEJSONLines(openaiResp.Body)
 	cc.assert("openai_sse_json_valid", badOpenAI == 0, fmt.Sprintf("malformed=%d", badOpenAI))
 
-	anthropicResp, err := cc.request(ctx, requestSpec{
+	responsesResp, err := cc.request(ctx, requestSpec{
 		Method: http.MethodPost,
-		Path:   "/anthropic/v1/messages",
+		Path:   "/v1/responses",
 		Headers: map[string]string{
-			"Authorization":     "Bearer " + r.apiKey,
-			"anthropic-version": "2023-06-01",
+			"Authorization": "Bearer " + r.apiKey,
 		},
 		Body: map[string]any{
-			"model": "claude-sonnet-4-5",
-			"messages": []map[string]any{
-				{"role": "user", "content": "stream json integrity"},
-			},
-			"stream": true,
+			"model": "deepseek-v4-flash",
+			"input": "stream json integrity",
 		},
 		Stream:    true,
 		Retryable: false,
@@ -220,9 +216,9 @@ func (r *Runner) caseSSEJSONIntegrity(ctx context.Context, cc *caseContext) erro
 	if err != nil {
 		return err
 	}
-	cc.assert("anthropic_status_200", anthropicResp.StatusCode == http.StatusOK, fmt.Sprintf("status=%d", anthropicResp.StatusCode))
-	badAnthropic := countMalformedSSEJSONLines(anthropicResp.Body)
-	cc.assert("anthropic_sse_json_valid", badAnthropic == 0, fmt.Sprintf("malformed=%d", badAnthropic))
+	cc.assert("responses_status_200", responsesResp.StatusCode == http.StatusOK, fmt.Sprintf("status=%d", responsesResp.StatusCode))
+	badResponses := countMalformedSSEJSONLines(responsesResp.Body)
+	cc.assert("responses_sse_json_valid", badResponses == 0, fmt.Sprintf("malformed=%d", badResponses))
 	return nil
 }
 

@@ -51,7 +51,7 @@ a{width:100%;min-height:44px}
 <section>
 <p class="eyebrow">DeepSeek 兼容网关</p>
 <h1>DS2API</h1>
-<p>把 DeepSeek Web 对话能力转换为 OpenAI、Claude 与 Gemini 兼容 API。
+<p>把 DeepSeek Web 对话能力转换为 OpenAI 兼容 API。
 这里可以进入管理面板、查看接口状态，也可以先阅读中文图形化文档。</p>
 <div class="actions">
 <a class="primary" href="/admin">管理面板</a>
@@ -62,7 +62,7 @@ a{width:100%;min-height:44px}
 </section>
 <aside class="panel" aria-label="DS2API 请求链路">
 <div class="flow">
-<div class="node"><strong>客户端 / SDK</strong><span>OpenAI、Claude、Gemini 或兼容客户端统一请求 DS2API。</span></div>
+<div class="node"><strong>客户端 / SDK</strong><span>OpenAI 或兼容客户端统一请求 DS2API。</span></div>
 <div class="arrow">↓</div>
 <div class="node"><strong>协议适配层</strong><span>请求先归一化为共享对话模型，再进入统一运行时。</span></div>
 <div class="arrow">↓</div>
@@ -177,7 +177,7 @@ p{font-size:15px}
 <ul>
 <li>先看部署指南，确认 Docker、Vercel 或源码运行方式。</li>
 <li>再看外部存储说明，决定使用内置 JSON 还是外部数据库。</li>
-<li>最后按接口文档接入 OpenAI、Claude 或 Gemini 客户端。</li>
+<li>最后按接口文档接入 OpenAI 兼容客户端。</li>
 </ul>
 </div>
 </section>
@@ -186,7 +186,7 @@ p{font-size:15px}
 <h2>请求链路</h2>
 <p>DS2API 将不同协议的请求归一化，再复用同一套账号池、会话和流式处理逻辑。</p>
 <div class="flow">
-<div class="step"><strong>1. 客户端</strong><span>OpenAI / Claude / Gemini SDK 发起兼容请求。</span></div>
+<div class="step"><strong>1. 客户端</strong><span>OpenAI SDK 发起兼容请求。</span></div>
 <div class="step"><strong>2. 协议适配</strong><span>协议层转换为统一请求模型，
 保留工具调用和历史上下文。</span></div>
 <div class="step"><strong>3. 运行时</strong><span>账号池、PoW、上传文件和流式解析统一处理。</span></div>
@@ -197,7 +197,7 @@ p{font-size:15px}
 <section class="grid cols-3" style="margin-top:14px">
 <div class="card mini"><h3>部署入口</h3><p>Docker、Vercel、Zeabur 和源码运行路径集中在部署指南。</p></div>
 <div class="card mini"><h3>管理面板</h3><p>上线后进入 /admin 管理账号、API Key、代理、设置和响应记录。</p></div>
-<div class="card mini"><h3>兼容接口</h3><p>/v1/chat/completions、/v1/responses、/anthropic 和 Gemini 路径共存。</p></div>
+<div class="card mini"><h3>兼容接口</h3><p>/v1/chat/completions、/v1/responses、/v1/files 等路径统一开放。</p></div>
 </section>
 
 <section class="grid cols-2" style="margin-top:14px">
@@ -229,7 +229,7 @@ p{font-size:15px}
 <a class="doclink" href="https://github.com/ikun5200/ds2api/blob/main/docs/DEPLOY.md#321-外部存储chat-history详细说明" target="_blank" rel="noreferrer">
 <strong>外部存储说明</strong><span>PostgreSQL、MySQL、MariaDB、自动建表和环境变量示例。</span></a>
 <a class="doclink" href="https://github.com/ikun5200/ds2api/blob/main/API.md" target="_blank" rel="noreferrer">
-<strong>接口文档</strong><span>鉴权、模型、Chat、Responses、Claude、Gemini 与 Admin API。</span></a>
+<strong>接口文档</strong><span>鉴权、模型、Chat、Responses、Files 与 Admin API。</span></a>
 <a class="doclink" href="https://github.com/ikun5200/ds2api/blob/main/docs/ARCHITECTURE.md" target="_blank" rel="noreferrer">
 <strong>架构说明</strong><span>模块边界、协议适配、运行时和 WebUI 的关系。</span></a>
 <a class="doclink" href="https://github.com/ikun5200/ds2api/blob/main/config.example.json" target="_blank" rel="noreferrer">

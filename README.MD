@@ -15,7 +15,7 @@
 
 语言 / Language: [中文](README.MD) | [English](README.en.md)
 
-将 DeepSeek Web 对话能力转换为 OpenAI、Claude 与 Gemini 兼容 API。核心后端以 **Go** 实现，Vercel 流式桥接额外使用少量 Node Runtime，前端为 React WebUI 管理台（源码在 `webui/`，部署时自动构建到 `static/admin`）。
+将 DeepSeek Web 对话能力转换为 OpenAI 兼容 API。核心后端以 **Go** 实现，Vercel 流式桥接额外使用少量 Node Runtime，前端为 React WebUI 管理台（源码在 `webui/`，部署时自动构建到 `static/admin`）。
 
 文档入口：[文档导航](docs/README.md) / [架构说明](docs/ARCHITECTURE.md) / [接口文档](API.md) / [外部存储说明](docs/DEPLOY.md#321-外部存储chat-history详细说明)
 
@@ -46,8 +46,6 @@
 - [平台兼容矩阵](#平台兼容矩阵)
 - [模型支持](#模型支持)
   - [OpenAI 接口](#openai-接口get-v1models)
-  - [Claude 接口](#claude-接口get-anthropicv1models)
-  - [Gemini 接口](#gemini-接口)
 - [快速开始](#快速开始)
   - [方式一：下载 Release 构建包](#方式一下载-release-构建包)
   - [方式二：Docker 运行](#方式二docker-运行)
@@ -68,7 +66,7 @@
 
 ```mermaid
 flowchart LR
-    Client["🖥️ 客户端 / SDK\n(OpenAI / Claude / Gemini)"]
+    Client["🖥️ 客户端 / SDK\n(OpenAI)"]
     Upstream["☁️ DeepSeek API"]
 
     subgraph DS2API["DS2API 4.x（模块化 HTTP surface + PromptCompat 内核）"]
@@ -76,8 +74,6 @@ flowchart LR
 
         subgraph HTTP["HTTP API surface"]
             OA["OpenAI\nchat / responses / files / embeddings"]
-            CA["Claude\n/anthropic/* + /v1/messages"]
-            GA["Gemini\n/v1beta/models/* + /v1/models/*"]
             Admin["Admin API\n资源子包"]
             WebUI["WebUI\n/admin（静态托管）"]
             Vercel["Vercel Node Stream\n/v1/chat/completions"]
@@ -87,7 +83,7 @@ flowchart LR
             Compat["PromptCompat\n(API -> 网页纯文本上下文)"]
             Completion["Completion Runtime\n(Session / PoW / Completion)"]
             Turn["AssistantTurn\n(输出语义归一)"]
-            Auth["Auth Resolver\n(API key / bearer / x-goog-api-key)"]
+            Auth["Auth Resolver\n(API key / bearer / x-api-key)"]
             Pool["Account Pool + Queue\n(并发槽位 + 等待队列)"]
             DSClient["DeepSeek Client\n(Session / Auth / Completion / Files)"]
             Pow["PoW 实现\n(纯 Go)"]
@@ -97,13 +93,12 @@ flowchart LR
     end
 
     Client --> Router
-    Router --> OA & CA & GA
+    Router --> OA
     Router --> Admin
     Router --> WebUI
     Router --> Vercel
 
     OA --> Compat
-    CA & GA --> Compat
     Compat --> Completion
     Completion -.完整上下文.-> History
     Completion --> Turn
@@ -131,10 +126,8 @@ flowchart LR
 | 能力 | 说明 |
 | --- | --- |
 | OpenAI 兼容 | `GET /v1/models`、`GET /v1/models/{id}`、`POST /v1/chat/completions`、`POST /v1/responses`、`GET /v1/responses/{response_id}`、`POST /v1/embeddings`、`POST /v1/files`、`GET /v1/files/{file_id}` |
-| Claude 兼容 | `GET /anthropic/v1/models`、`POST /anthropic/v1/messages`、`POST /anthropic/v1/messages/count_tokens`（及快捷路径 `/v1/messages`、`/messages`） |
-| Gemini 兼容 | `GET /v1beta/models`、`POST /v1beta/models/{model}:generateContent`、`POST /v1beta/models/{model}:streamGenerateContent`（及 `/v1/models/{model}:*` 路径） |
 | Ollama 兼容 | `GET /api/version`、`GET /api/tags`、`POST /api/show` |
-| 统一 CORS 兼容 | `/v1/*`、`/anthropic/*`、`/v1beta/models/*`、`/api/*`、`/admin/*` 统一走同一套 CORS 策略；Vercel 上 `/v1/chat/completions` 的 Node Runtime 也对齐相同放行规则，尽量减少第三方预检请求头限制 |
+| 统一 CORS 兼容 | `/v1/*`、`/api/*`、`/admin/*` 统一走同一套 CORS 策略；Vercel 上 `/v1/chat/completions` 的 Node Runtime 也对齐相同放行规则，尽量减少第三方预检请求头限制 |
 | 多账号轮询 | 自动 token 刷新、邮箱/手机号双登录方式 |
 | 并发队列控制 | 每账号 in-flight 上限 + 等待队列，动态计算建议并发值 |
 | DeepSeek PoW | 纯 Go 高性能实现（DeepSeekHashV1），毫秒级响应 |
@@ -153,21 +146,20 @@ OpenAI `/v1/*` 仍是推荐的规范路径；同时支持 `/models`、`/chat/com
 | P0 | Codex CLI/SDK（`wire_api=chat` / `wire_api=responses`） | ✅ |
 | P0 | OpenAI SDK（JS/Python，chat + responses） | ✅ |
 | P0 | Vercel AI SDK（openai-compatible） | ✅ |
-| P0 | Anthropic SDK（messages） | ✅ |
-| P0 | Google Gemini SDK（generateContent） | ✅ |
 | P1 | LangChain / LlamaIndex / OpenWebUI（OpenAI 兼容接入） | ✅ |
 
 ## 模型支持
 
-2026-09-11 已核对 [DeepSeek 网页端](https://chat.deepseek.com/)：快速、专家和识图能力合并到 `default` 通道，旧 `expert` / `vision` 通道已停用。DS2API 对外统一提供 `deepseek-flash`，思考、联网、文件和图片可组合使用。
+2026-09-11 已核对 [DeepSeek 网页端](https://chat.deepseek.com/)：快速、专家和识图能力合并到 `default` 通道，旧 `expert` / `vision` 通道已停用。DS2API 提供 `deepseek-flash` 和默认开启联网的 `deepseek-flash-search`，两者使用同一上游模型，思考、联网、文件和图片可组合使用。
 
 ### OpenAI 接口（`GET /v1/models`）
 
-| 模型类型 | 唯一模型 ID | 思考 | 联网 | 附件 |
+| 模型类型 | 模型 ID | 思考 | 联网 | 附件 |
 | --- | --- | --- | --- | --- |
 | `default` | `deepseek-flash` | 默认开启，`thinking_enabled` 控制 | 默认关闭，`search_enabled` 控制 | 文件和图片 |
+| `default` | `deepseek-flash-search` | 默认开启，`thinking_enabled` 控制 | 默认开启，`search_enabled` 控制 | 文件和图片 |
 
-推荐新客户端固定使用 `deepseek-flash`，通过请求字段独立切换功能：
+需要默认联网时使用 `deepseek-flash-search`，无需另传 `search_enabled`；也可使用 `deepseek-flash` 并通过请求字段独立切换功能：
 
 ```json
 {
@@ -178,26 +170,11 @@ OpenAI `/v1/*` 仍是推荐的规范路径；同时支持 `/models`、`/chat/com
 }
 ```
 
-两个布尔字段也可放在 `extra_body` 中；原有 `thinking` / `reasoning` / `reasoning_effort` 写法继续兼容。WebUI「API 测试」提供独立的思考、联网开关与文件/图片上传按钮。上传中改选账号不会被上传结果覆盖；附件与所选账号不匹配时，需切回所属账号或移除重传。
+两个布尔字段也可放在 `extra_body` 中，显式 `search_enabled: false` 可关闭搜索模型的联网；原有 `thinking` / `reasoning` / `reasoning_effort` 写法继续兼容。WebUI「API 测试」选择 `deepseek-flash-search` 时自动打开联网开关，仍可独立切换思考和联网，并上传文件/图片。上传中改选账号不会被上传结果覆盖；附件与所选账号不匹配时，需切回所属账号或移除重传。
 
-旧 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-v4-vision` 以及已支持的 OpenAI / Claude / Gemini alias 仍可作为请求输入，但不会出现在模型目录中。旧 `deepseek-v4-flash-search` / `deepseek-v4-pro-search` 保留默认联网语义，可用 `search_enabled: false` 关闭；`-nothinking` 后缀仍强制关闭思考。所有兼容名称的实际完成请求和上传类型均为 `default`。完整规则见 [API.md](API.md#模型-alias-解析策略)。
+旧 `deepseek-v4-flash`、`deepseek-v4-pro`、`deepseek-v4-vision` 以及已支持的 OpenAI alias 仍可作为请求输入，但不会出现在模型目录中。旧 `deepseek-v4-flash-search` / `deepseek-v4-pro-search` 保留默认联网语义，可用 `search_enabled: false` 关闭；`-nothinking` 后缀仍强制关闭思考。所有兼容名称的实际完成请求和上传类型均为 `default`。完整规则见 [API.md](API.md#模型-alias-解析策略)。
 
-### Claude 接口（`GET /anthropic/v1/models`）
-
-该目录也只返回 `deepseek-flash`。请求可直接使用这一模型名；`claude-sonnet-4-6`、`claude-haiku-4-5`、`claude-opus-4-6` 等已有 alias 继续兼容，均使用同一上游通道。`model_aliases` 仍可配置客户端名称，旧 `-nothinking` 强制关闭思考语义保持不变。
-
-#### Claude Code 接入避坑（实测）
-
-- `ANTHROPIC_BASE_URL` 推荐直接指向 DS2API 根地址（例如 `http://127.0.0.1:5001`），Claude Code 会请求 `/v1/messages?beta=true`。
-- `ANTHROPIC_API_KEY` 需要与 `config.json` 中 `keys` 一致；建议同时保留常规 key 与 `sk-ant-*` 形态 key，兼容不同客户端校验习惯。
-- 若系统设置了代理，建议对 DS2API 地址配置 `NO_PROXY=127.0.0.1,localhost,<你的主机IP>`，避免本地回环请求被代理拦截。
-- 如遇“工具调用输出成文本、未执行”问题，请优先检查模型输出是否为推荐的半角管道符 DSML 工具块：`<|DSML|tool_calls><|DSML|invoke name="..."><|DSML|parameter name="...">...`。兼容层也接受旧式 canonical XML：`<tool_calls><invoke name="..."><parameter name="...">...`；旧式 `<tools>` / `<tool_call>` / `<tool_name>` / `<param>`、`<function_call>`、`tool_use` 或纯 JSON `tool_calls` 片段不会执行，会作为普通文本处理。
-
-### Gemini 接口
-
-`GET /v1beta/models` 返回唯一的 `models/deepseek-flash`。`generateContent` 和 `streamGenerateContent` 均可使用该模型，并支持 Tool Calling（`functionDeclarations` → `functionCall` 输出）。已有 `gemini-2.5-*`、`gemini-3*` 等精确 alias 继续兼容；原生 `generationConfig.thinkingConfig.thinkingBudget` 归一为同一思考开关。
-
-Ollama `GET /api/tags` 同样只列出 `deepseek-flash`；`POST /api/show` 声明 `tools`、`thinking`、`vision` 能力。文件和图片先经过统一上传服务，再作为 `ref_file_ids` 发送给 DeepSeek；各协议的附件格式见 [API.md](API.md)。
+Ollama `GET /api/tags` 同样列出 `deepseek-flash` 和 `deepseek-flash-search`；`POST /api/show` 声明 `tools`、`thinking`、`vision` 能力。文件和图片先经过统一上传服务，再作为 `ref_file_ids` 发送给 DeepSeek；各协议的附件格式见 [API.md](API.md)。
 
 ## 快速开始
 
@@ -333,7 +310,7 @@ go run ./cmd/ds2api
 
 - `keys` / `api_keys`：客户端访问密钥，`api_keys` 支持 `name` 与 `remark` 元信息，`keys` 继续兼容。
 - `accounts`：DeepSeek 托管账号，支持 `email` 或 `mobile` 登录，可配置代理、名称、备注和 `disabled` 禁用状态。密码登录还需官网签发的 `device_id`，可填在账号中或通过环境变量设置，详见[登录设备验证](docs/DEPLOY.md#322-deepseek-登录设备验证)。
-- `model_aliases`：OpenAI / Claude / Gemini 共用的模型 alias 映射。
+- `model_aliases`：OpenAI 兼容客户端共用的模型 alias 映射。
 - `runtime`：账号并发、队列与 token 刷新策略，可通过 Admin Settings 热更新。
 - `auto_delete.mode`：请求结束后的远端会话清理策略，支持 `none` / `single` / `all`。
 - `current_input_file`：全局生效的上下文拆分上传策略；默认开启且阈值为 `0`，触发时将完整上下文合并上传为 `HISTORY.txt` 上下文文件。
@@ -359,7 +336,7 @@ DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable
 
 ## 鉴权模式
 
-调用业务接口（`/v1/*`、`/anthropic/*`、Gemini 路由）时支持两种模式：
+调用业务接口（`/v1/*` 及根路径别名）时支持两种模式：
 
 | 模式 | 说明 |
 | --- | --- |
@@ -369,7 +346,6 @@ DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable
 可选请求头 `X-Ds2-Target-Account`：指定使用某个托管账号（值为 email 或 mobile）。
 如果指定账号不存在，或者当前管理账号队列已满，请求会返回 `429`；当前 `429` 不附带 `Retry-After` 头。若账号存在但登录/刷新失败，则返回对应的鉴权错误。
 未指定目标账号时，如果 completion 因上游 thinking-only 空输出在同账号补偿重试后仍将返回 `429 upstream_empty_output`，托管账号模式会自动切到下一个可用账号，新建 session，并用原始 payload 再 fresh retry 一次。
-Gemini 路由还可以使用 `x-goog-api-key`，或在没有认证头时使用 `?key=` / `?api_key=` 作为调用方凭据。
 
 ## 并发模型
 
@@ -393,7 +369,7 @@ Gemini 路由还可以使用 `x-goog-api-key`，或在没有认证头时使用 `
 2. 解析层当前把半角管道符 DSML 外壳视为推荐可执行调用：`<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`；兼容旧式 canonical XML `<tool_calls>` → `<invoke name="...">` → `<parameter name="...">`，以及若干 DSML 前缀/分隔符漂移。DSML 只是外壳别名，内部仍以 XML 解析语义为准；旧式 `<tools>` / `<tool_call>` / `<tool_name>` / `<param>`、`<function_call>`、`tool_use` / antml 变体与纯 JSON `tool_calls` 片段都会按普通文本处理，完整但 malformed 的 wrapper 也会作为普通文本释放
 3. `responses` 流式严格使用官方 item 生命周期事件（`response.output_item.*`、`response.content_part.*`、`response.function_call_arguments.*`）
 4. `responses` 支持并执行 `tool_choice`（`auto`/`none`/`required`/强制函数）；`required` 违规时非流式返回 `422`，流式返回 `response.failed`
-5. 客户端请求哪种协议，就按该协议返回工具调用（OpenAI/Claude/Gemini 各自原生结构）；模型侧优先约束输出规范 XML，再由兼容层转译
+5. 工具调用统一按 OpenAI 原生 `tool_calls` 结构返回；模型侧优先约束输出规范 XML，再由兼容层转译
 
 > 说明：当前版本 parser 层以”尽量解析成功”为优先，所有格式合法的 XML 工具调用都会通过，不做工具名 allow-list 过滤。
 > 解析层会保留显式空字符串或纯空白参数；Prompt 会要求模型不要主动输出空参数，缺参/空命令的拒绝应由工具执行侧或客户端 schema 校验负责。

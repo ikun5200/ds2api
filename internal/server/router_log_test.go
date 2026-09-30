@@ -22,7 +22,7 @@ func TestFilteredLogFormatterRedactsSensitiveQueryParams(t *testing.T) {
 	}
 	req := httptest.NewRequest(
 		http.MethodPost,
-		"/v1beta/models/gemini-2.5-pro:generateContent?key=caller-secret&api_key=second-secret&alt=sse",
+		"/v1/chat/completions?key=caller-secret&api_key=second-secret&stream=true",
 		nil,
 	)
 
@@ -38,10 +38,10 @@ func TestFilteredLogFormatterRedactsSensitiveQueryParams(t *testing.T) {
 	if !strings.Contains(got, "key=REDACTED") || !strings.Contains(got, "api_key=REDACTED") {
 		t.Fatalf("log line did not include redacted sensitive params: %s", got)
 	}
-	if !strings.Contains(got, "alt=sse") {
+	if !strings.Contains(got, "stream=true") {
 		t.Fatalf("log line did not preserve non-sensitive query param: %s", got)
 	}
-	if req.URL.RawQuery != "key=caller-secret&api_key=second-secret&alt=sse" {
+	if req.URL.RawQuery != "key=caller-secret&api_key=second-secret&stream=true" {
 		t.Fatalf("request was mutated, RawQuery = %q", req.URL.RawQuery)
 	}
 }
@@ -56,14 +56,14 @@ func TestFilteredLogFormatterRedactsSensitiveQueryParamsWhenMalformed(t *testing
 	}{
 		{
 			name:      "semicolon separator",
-			target:    "/v1beta/models/gemini-2.5-pro:generateContent?key=caller-secret;alt=sse",
+			target:    "/v1/chat/completions?key=caller-secret;stream=true",
 			secrets:   []string{"caller-secret"},
 			redacted:  []string{"key=REDACTED"},
-			preserved: []string{"alt=sse"},
+			preserved: []string{"stream=true"},
 		},
 		{
 			name:     "bad escape in sensitive value",
-			target:   "/v1beta/models/gemini-2.5-pro:generateContent?api_key=second-secret%ZZ",
+			target:   "/v1/chat/completions?api_key=second-secret%ZZ",
 			secrets:  []string{"second-secret"},
 			redacted: []string{"api_key=REDACTED"},
 		},

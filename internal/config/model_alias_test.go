@@ -32,6 +32,37 @@ func TestResolveModelDirectDeepSeekNoThinking(t *testing.T) {
 	}
 }
 
+func TestResolveSearchModelAndCustomAlias(t *testing.T) {
+	store := mockModelAliasReader{"my-search": "deepseek-flash-search"}
+	for _, tc := range []struct {
+		requested string
+		resolved  string
+		thinking  bool
+	}{
+		{"deepseek-flash-search", "deepseek-flash-search", true},
+		{"DeepSeek-Flash-Search", "deepseek-flash-search", true},
+		{"my-search", "deepseek-flash-search", true},
+		{"deepseek-flash-search-nothinking", "deepseek-flash-search-nothinking", false},
+		{"my-search-nothinking", "deepseek-flash-search-nothinking", false},
+	} {
+		t.Run(tc.requested, func(t *testing.T) {
+			resolved, ok := ResolveModel(store, tc.requested)
+			if !ok || resolved != tc.resolved {
+				t.Fatalf("ResolveModel(%q) = (%q, %v)", tc.requested, resolved, ok)
+			}
+			if thinking, search, ok := GetModelConfig(resolved); !ok || thinking != tc.thinking || !search {
+				t.Fatalf("unexpected mode defaults: thinking=%v search=%v ok=%v", thinking, search, ok)
+			}
+			if model, ok := OpenAIModelByID(store, tc.requested); !ok || model.ID != "deepseek-flash-search" {
+				t.Fatalf("unexpected model metadata: %#v, ok=%v", model, ok)
+			}
+			if model, ok := OllamaModelByID(store, tc.requested); !ok || model.ID != "deepseek-flash-search" {
+				t.Fatalf("unexpected Ollama model metadata: %#v, ok=%v", model, ok)
+			}
+		})
+	}
+}
+
 func TestResolveModelAlias(t *testing.T) {
 	got, ok := ResolveModel(nil, "gpt-4.1")
 	if !ok || got != "deepseek-v4-flash" {
@@ -46,20 +77,6 @@ func TestResolveLatestOpenAIAlias(t *testing.T) {
 	}
 }
 
-func TestResolveLatestClaudeAlias(t *testing.T) {
-	got, ok := ResolveModel(nil, "claude-sonnet-4-6")
-	if !ok || got != "deepseek-v4-flash" {
-		t.Fatalf("expected alias claude-sonnet-4-6 -> deepseek-v4-flash, got ok=%v model=%q", ok, got)
-	}
-}
-
-func TestResolveLatestClaudeAliasNoThinking(t *testing.T) {
-	got, ok := ResolveModel(nil, "claude-sonnet-4-6-nothinking")
-	if !ok || got != "deepseek-v4-flash-nothinking" {
-		t.Fatalf("expected alias claude-sonnet-4-6-nothinking -> deepseek-v4-flash-nothinking, got ok=%v model=%q", ok, got)
-	}
-}
-
 func TestResolveExpandedHistoricalAliases(t *testing.T) {
 	cases := []struct {
 		name  string
@@ -70,12 +87,6 @@ func TestResolveExpandedHistoricalAliases(t *testing.T) {
 		{name: "openai codex max", model: "gpt-5.1-codex-max", want: "deepseek-v4-pro"},
 		{name: "openai deep research", model: "o3-deep-research", want: "deepseek-v4-pro-search"},
 		{name: "openai historical reasoning", model: "o1-preview", want: "deepseek-v4-pro"},
-		{name: "claude latest historical", model: "claude-3-5-sonnet-latest", want: "deepseek-v4-flash"},
-		{name: "claude historical opus", model: "claude-3-opus-20240229", want: "deepseek-v4-pro"},
-		{name: "claude historical haiku", model: "claude-3-haiku-20240307", want: "deepseek-v4-flash"},
-		{name: "gemini latest alias", model: "gemini-flash-latest", want: "deepseek-v4-flash"},
-		{name: "gemini historical pro", model: "gemini-1.5-pro", want: "deepseek-v4-pro"},
-		{name: "gemini vision legacy", model: "gemini-pro-vision", want: "deepseek-v4-vision"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -120,8 +131,8 @@ func TestResolveModelRejectsLegacyDeepSeekIDs(t *testing.T) {
 
 func TestResolveModelRejectsRetiredHistoricalModels(t *testing.T) {
 	retiredModels := []string{
-		"claude-2.1",
-		"claude-instant-1.2",
+		"claude-sonnet-4-6",
+		"gemini-2.5-flash",
 		"gpt-3.5-turbo",
 	}
 	for _, model := range retiredModels {
@@ -153,18 +164,5 @@ func TestResolveModelCustomAliasToVision(t *testing.T) {
 	}, "my-vision-model")
 	if !ok || got != "deepseek-v4-vision" {
 		t.Fatalf("expected alias -> deepseek-v4-vision, got ok=%v model=%q", ok, got)
-	}
-}
-
-func TestClaudeModelsResponsePaginationFields(t *testing.T) {
-	resp := ClaudeModelsResponse()
-	if _, ok := resp["first_id"]; !ok {
-		t.Fatalf("expected first_id in response: %#v", resp)
-	}
-	if _, ok := resp["last_id"]; !ok {
-		t.Fatalf("expected last_id in response: %#v", resp)
-	}
-	if _, ok := resp["has_more"]; !ok {
-		t.Fatalf("expected has_more in response: %#v", resp)
 	}
 }

@@ -2,6 +2,7 @@ package responses
 
 import (
 	"bufio"
+	"context"
 	"encoding/json"
 	"io"
 	"net/http"
@@ -9,11 +10,37 @@ import (
 	"strings"
 	"testing"
 
+	"ds2api/internal/auth"
+	dsclient "ds2api/internal/deepseek/client"
 	"ds2api/internal/promptcompat"
 )
 
+type emptyRetryDS struct{}
+
+func (emptyRetryDS) CreateSession(context.Context, *auth.RequestAuth, int) (string, error) {
+	return "session-id", nil
+}
+
+func (emptyRetryDS) GetPow(context.Context, *auth.RequestAuth, int) (string, error) {
+	return "pow", nil
+}
+
+func (emptyRetryDS) UploadFile(context.Context, *auth.RequestAuth, dsclient.UploadFileRequest, int) (*dsclient.UploadFileResult, error) {
+	return &dsclient.UploadFileResult{ID: "file-id"}, nil
+}
+
+func (emptyRetryDS) CallCompletion(_ context.Context, _ *auth.RequestAuth, _ map[string]any, _ string, _ int) (*http.Response, error) {
+	return &http.Response{StatusCode: http.StatusOK, Header: make(http.Header), Body: io.NopCloser(strings.NewReader("data: [DONE]\n"))}, nil
+}
+
+func (emptyRetryDS) DeleteSessionForToken(context.Context, string, string) (*dsclient.DeleteSessionResult, error) {
+	return &dsclient.DeleteSessionResult{Success: true}, nil
+}
+
+func (emptyRetryDS) DeleteAllSessionsForToken(context.Context, string) error { return nil }
+
 func TestHandleResponsesStreamDoesNotEmitReasoningTextCompatEvents(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 
@@ -27,7 +54,7 @@ func TestHandleResponsesStreamDoesNotEmitReasoningTextCompatEvents(t *testing.T)
 		Body:       io.NopCloser(strings.NewReader(streamBody)),
 	}
 
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_test", "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_test", promptcompat.StandardRequest{}, "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 
 	body := rec.Body.String()
 	if !strings.Contains(body, "event: response.reasoning.delta") {
@@ -39,7 +66,7 @@ func TestHandleResponsesStreamDoesNotEmitReasoningTextCompatEvents(t *testing.T)
 }
 
 func TestHandleResponsesStreamEmitsOutputTextDoneBeforeContentPartDone(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 
@@ -57,7 +84,7 @@ func TestHandleResponsesStreamEmitsOutputTextDoneBeforeContentPartDone(t *testin
 		Body:       io.NopCloser(strings.NewReader(streamBody)),
 	}
 
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_test", promptcompat.StandardRequest{}, "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 	body := rec.Body.String()
 	if !strings.Contains(body, "event: response.output_text.done") {
 		t.Fatalf("expected response.output_text.done payload, body=%s", body)
@@ -73,7 +100,7 @@ func TestHandleResponsesStreamEmitsOutputTextDoneBeforeContentPartDone(t *testin
 }
 
 func TestHandleResponsesStreamOutputTextDeltaCarriesItemIndexes(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 
@@ -91,7 +118,7 @@ func TestHandleResponsesStreamOutputTextDeltaCarriesItemIndexes(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader(streamBody)),
 	}
 
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_test", promptcompat.StandardRequest{}, "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 	body := rec.Body.String()
 
 	deltaPayload, ok := extractSSEEventPayload(body, "response.output_text.delta")
@@ -110,7 +137,7 @@ func TestHandleResponsesStreamOutputTextDeltaCarriesItemIndexes(t *testing.T) {
 }
 
 func TestHandleResponsesStreamCoalescesSmallOutputTextDeltas(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 
@@ -130,7 +157,7 @@ func TestHandleResponsesStreamCoalescesSmallOutputTextDeltas(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader(streamBody.String())),
 	}
 
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_coalesce", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_coalesce", promptcompat.StandardRequest{}, "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 
 	payloads := extractSSEEventPayloads(rec.Body.String(), "response.output_text.delta")
 	if len(payloads) == 0 {
@@ -152,7 +179,7 @@ func TestHandleResponsesStreamCoalescesSmallOutputTextDeltas(t *testing.T) {
 }
 
 func TestHandleResponsesStreamEmitsDistinctToolCallIDsAcrossSeparateToolBlocks(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 
@@ -172,7 +199,7 @@ func TestHandleResponsesStreamEmitsDistinctToolCallIDsAcrossSeparateToolBlocks(t
 		Body:       io.NopCloser(strings.NewReader(streamBody)),
 	}
 
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, []string{"read_file", "search"}, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_test", promptcompat.StandardRequest{}, "deepseek-v4-flash", "prompt", 0, false, false, []string{"read_file", "search"}, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 
 	body := rec.Body.String()
 	doneEvents := extractSSEEventPayloads(body, "response.function_call_arguments.done")
@@ -203,7 +230,7 @@ func TestHandleResponsesStreamEmitsDistinctToolCallIDsAcrossSeparateToolBlocks(t
 }
 
 func TestHandleResponsesStreamRequiredToolChoiceFailure(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 
@@ -225,7 +252,7 @@ func TestHandleResponsesStreamRequiredToolChoiceFailure(t *testing.T) {
 		Mode:    promptcompat.ToolChoiceRequired,
 		Allowed: map[string]struct{}{"read_file": {}},
 	}
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, []string{"read_file"}, nil, policy, "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_test", promptcompat.StandardRequest{}, "deepseek-v4-flash", "prompt", 0, false, false, []string{"read_file"}, nil, policy, "", nil)
 
 	body := rec.Body.String()
 	if !strings.Contains(body, "event: response.failed") {
@@ -237,7 +264,7 @@ func TestHandleResponsesStreamRequiredToolChoiceFailure(t *testing.T) {
 }
 
 func TestHandleResponsesStreamFailsWhenUpstreamHasOnlyThinking(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 
@@ -255,7 +282,7 @@ func TestHandleResponsesStreamFailsWhenUpstreamHasOnlyThinking(t *testing.T) {
 		Body:       io.NopCloser(strings.NewReader(streamBody)),
 	}
 
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_test", "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_test", promptcompat.StandardRequest{}, "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 
 	body := rec.Body.String()
 	if !strings.Contains(body, "event: response.failed") {
@@ -275,7 +302,7 @@ func TestHandleResponsesStreamFailsWhenUpstreamHasOnlyThinking(t *testing.T) {
 }
 
 func TestHandleResponsesStreamPromotesThinkingToolCallsOnFinalizeWithoutMidstreamIntercept(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 
@@ -293,7 +320,7 @@ func TestHandleResponsesStreamPromotesThinkingToolCallsOnFinalizeWithoutMidstrea
 		Body:       io.NopCloser(strings.NewReader(streamBody)),
 	}
 
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_test", "deepseek-v4-pro", "prompt", 0, true, false, []string{"read_file"}, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_test", promptcompat.StandardRequest{}, "deepseek-v4-pro", "prompt", 0, true, false, []string{"read_file"}, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 
 	body := rec.Body.String()
 	if strings.Contains(body, "event: response.reasoning.delta") {
@@ -308,7 +335,7 @@ func TestHandleResponsesStreamPromotesThinkingToolCallsOnFinalizeWithoutMidstrea
 }
 
 func TestHandleResponsesStreamPromotesHiddenThinkingDSMLToolCallsOnFinalize(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 
@@ -330,7 +357,7 @@ func TestHandleResponsesStreamPromotesHiddenThinkingDSMLToolCallsOnFinalize(t *t
 		Mode:    promptcompat.ToolChoiceRequired,
 		Allowed: map[string]struct{}{"read_file": {}},
 	}
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_hidden", "deepseek-v4-pro", "prompt", 0, false, false, []string{"read_file"}, nil, policy, "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_hidden", promptcompat.StandardRequest{}, "deepseek-v4-pro", "prompt", 0, false, false, []string{"read_file"}, nil, policy, "", nil)
 
 	body := rec.Body.String()
 	if strings.Contains(body, "event: response.reasoning.delta") {
@@ -345,7 +372,7 @@ func TestHandleResponsesStreamPromotesHiddenThinkingDSMLToolCallsOnFinalize(t *t
 }
 
 func TestHandleResponsesNonStreamRequiredToolChoiceViolation(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	rec := httptest.NewRecorder()
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
@@ -359,7 +386,7 @@ func TestHandleResponsesNonStreamRequiredToolChoiceViolation(t *testing.T) {
 		Allowed: map[string]struct{}{"read_file": {}},
 	}
 
-	h.handleResponsesNonStream(rec, resp, "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, []string{"read_file"}, nil, policy, "")
+	h.handleResponsesNonStreamWithRetry(rec, context.Background(), nil, resp, nil, "", "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, []string{"read_file"}, nil, policy, "", nil)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("expected 422 for required tool_choice violation, got %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -371,7 +398,7 @@ func TestHandleResponsesNonStreamRequiredToolChoiceViolation(t *testing.T) {
 }
 
 func TestHandleResponsesNonStreamRequiredToolChoiceIgnoresThinkingToolPayloadWhenTextExists(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	rec := httptest.NewRecorder()
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
@@ -386,7 +413,7 @@ func TestHandleResponsesNonStreamRequiredToolChoiceIgnoresThinkingToolPayloadWhe
 		Allowed: map[string]struct{}{"read_file": {}},
 	}
 
-	h.handleResponsesNonStream(rec, resp, "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, true, false, []string{"read_file"}, nil, policy, "")
+	h.handleResponsesNonStreamWithRetry(rec, context.Background(), nil, resp, nil, "", "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, true, false, []string{"read_file"}, nil, policy, "", nil)
 	if rec.Code != http.StatusUnprocessableEntity {
 		t.Fatalf("expected 422 for required tool_choice violation, got %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -398,7 +425,7 @@ func TestHandleResponsesNonStreamRequiredToolChoiceIgnoresThinkingToolPayloadWhe
 }
 
 func TestHandleResponsesNonStreamSingleAttemptReturns503WhenUpstreamOutputEmpty(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	rec := httptest.NewRecorder()
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
@@ -408,7 +435,7 @@ func TestHandleResponsesNonStreamSingleAttemptReturns503WhenUpstreamOutputEmpty(
 		)),
 	}
 
-	h.handleResponsesNonStream(rec, resp, "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesNonStreamWithRetry(rec, context.Background(), nil, resp, nil, "", "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 	if rec.Code != http.StatusServiceUnavailable {
 		t.Fatalf("expected 503 for empty upstream output, got %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -420,7 +447,7 @@ func TestHandleResponsesNonStreamSingleAttemptReturns503WhenUpstreamOutputEmpty(
 }
 
 func TestHandleResponsesNonStreamSingleAttemptReturnsContentFilterErrorWhenUpstreamFilteredWithoutOutput(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	rec := httptest.NewRecorder()
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
@@ -430,7 +457,7 @@ func TestHandleResponsesNonStreamSingleAttemptReturnsContentFilterErrorWhenUpstr
 		)),
 	}
 
-	h.handleResponsesNonStream(rec, resp, "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesNonStreamWithRetry(rec, context.Background(), nil, resp, nil, "", "owner-a", "resp_test", "deepseek-v4-flash", "prompt", 0, false, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400 for filtered empty upstream output, got %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -442,7 +469,7 @@ func TestHandleResponsesNonStreamSingleAttemptReturnsContentFilterErrorWhenUpstr
 }
 
 func TestHandleResponsesNonStreamSingleAttemptReturns429WhenUpstreamHasOnlyThinking(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	rec := httptest.NewRecorder()
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
@@ -452,7 +479,7 @@ func TestHandleResponsesNonStreamSingleAttemptReturns429WhenUpstreamHasOnlyThink
 		)),
 	}
 
-	h.handleResponsesNonStream(rec, resp, "owner-a", "resp_test", "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesNonStreamWithRetry(rec, context.Background(), nil, resp, nil, "", "owner-a", "resp_test", "deepseek-v4-pro", "prompt", 0, true, false, nil, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 	if rec.Code != http.StatusTooManyRequests {
 		t.Fatalf("expected 429 for thinking-only upstream output, got %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -464,7 +491,7 @@ func TestHandleResponsesNonStreamSingleAttemptReturns429WhenUpstreamHasOnlyThink
 }
 
 func TestHandleResponsesNonStreamPromotesThinkingToolCallsWhenTextEmpty(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	rec := httptest.NewRecorder()
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
@@ -474,7 +501,7 @@ func TestHandleResponsesNonStreamPromotesThinkingToolCallsWhenTextEmpty(t *testi
 		)),
 	}
 
-	h.handleResponsesNonStream(rec, resp, "owner-a", "resp_test", "deepseek-v4-pro", "prompt", 0, true, false, []string{"read_file"}, nil, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesNonStreamWithRetry(rec, context.Background(), nil, resp, nil, "", "owner-a", "resp_test", "deepseek-v4-pro", "prompt", 0, true, false, []string{"read_file"}, nil, promptcompat.DefaultToolChoicePolicy(), "", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200 for thinking tool calls, got %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -490,7 +517,7 @@ func TestHandleResponsesNonStreamPromotesThinkingToolCallsWhenTextEmpty(t *testi
 }
 
 func TestHandleResponsesNonStreamPromotesHiddenThinkingDSMLToolCallsWhenTextEmpty(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	rec := httptest.NewRecorder()
 	resp := &http.Response{
 		StatusCode: http.StatusOK,
@@ -504,7 +531,7 @@ func TestHandleResponsesNonStreamPromotesHiddenThinkingDSMLToolCallsWhenTextEmpt
 		Mode:    promptcompat.ToolChoiceRequired,
 		Allowed: map[string]struct{}{"read_file": {}},
 	}
-	h.handleResponsesNonStream(rec, resp, "owner-a", "resp_hidden", "deepseek-v4-pro", "prompt", 0, false, false, []string{"read_file"}, nil, policy, "")
+	h.handleResponsesNonStreamWithRetry(rec, context.Background(), nil, resp, nil, "", "owner-a", "resp_hidden", "deepseek-v4-pro", "prompt", 0, false, false, []string{"read_file"}, nil, policy, "", nil)
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200 for hidden thinking tool calls, got %d body=%s", rec.Code, rec.Body.String())
 	}
@@ -523,7 +550,7 @@ func TestHandleResponsesNonStreamPromotesHiddenThinkingDSMLToolCallsWhenTextEmpt
 }
 
 func TestHandleResponsesStreamCoercesSchemaDeclaredStringArguments(t *testing.T) {
-	h := &Handler{}
+	h := &Handler{DS: emptyRetryDS{}}
 	req := httptest.NewRequest(http.MethodPost, "/v1/responses", nil)
 	rec := httptest.NewRecorder()
 	toolsRaw := []any{
@@ -551,7 +578,7 @@ func TestHandleResponsesStreamCoercesSchemaDeclaredStringArguments(t *testing.T)
 		Body:       io.NopCloser(strings.NewReader(streamBody)),
 	}
 
-	h.handleResponsesStream(rec, req, resp, "owner-a", "resp_string_protect", "deepseek-v4-flash", "prompt", 0, false, false, []string{"Write"}, toolsRaw, promptcompat.DefaultToolChoicePolicy(), "")
+	h.handleResponsesStreamWithRetry(rec, req, nil, resp, nil, "", "owner-a", "resp_string_protect", promptcompat.StandardRequest{}, "deepseek-v4-flash", "prompt", 0, false, false, []string{"Write"}, toolsRaw, promptcompat.DefaultToolChoicePolicy(), "", nil)
 
 	payload, ok := extractSSEEventPayload(rec.Body.String(), "response.function_call_arguments.done")
 	if !ok {

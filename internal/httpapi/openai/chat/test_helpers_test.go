@@ -14,8 +14,6 @@ import (
 type mockOpenAIConfig struct {
 	aliases             map[string]string
 	autoDeleteMode      string
-	toolMode            string
-	earlyEmit           string
 	responsesTTL        int
 	embedProv           string
 	currentInputEnabled bool
@@ -24,18 +22,15 @@ type mockOpenAIConfig struct {
 	thinkingPrompt      string
 }
 
-func (m mockOpenAIConfig) ModelAliases() map[string]string     { return m.aliases }
-func (m mockOpenAIConfig) ToolcallMode() string                { return m.toolMode }
-func (m mockOpenAIConfig) ToolcallEarlyEmitConfidence() string { return m.earlyEmit }
-func (m mockOpenAIConfig) ResponsesStoreTTLSeconds() int       { return m.responsesTTL }
-func (m mockOpenAIConfig) EmbeddingsProvider() string          { return m.embedProv }
+func (m mockOpenAIConfig) ModelAliases() map[string]string { return m.aliases }
+func (m mockOpenAIConfig) ResponsesStoreTTLSeconds() int   { return m.responsesTTL }
+func (m mockOpenAIConfig) EmbeddingsProvider() string      { return m.embedProv }
 func (m mockOpenAIConfig) AutoDeleteMode() string {
 	if m.autoDeleteMode == "" {
 		return "none"
 	}
 	return m.autoDeleteMode
 }
-func (m mockOpenAIConfig) AutoDeleteSessions() bool      { return false }
 func (m mockOpenAIConfig) CurrentInputFileEnabled() bool { return m.currentInputEnabled }
 func (m mockOpenAIConfig) CurrentInputFileMinChars() int {
 	return m.currentInputMin

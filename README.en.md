@@ -14,7 +14,7 @@
 
 Language: [中文](README.MD) | [English](README.en.md)
 
-DS2API converts DeepSeek Web chat capability into OpenAI-compatible, Claude-compatible, and Gemini-compatible APIs. The core backend is Go-based, with a small Node Runtime bridge used for Vercel streaming, and the React WebUI admin panel lives in `webui/` (build output auto-generated to `static/admin` during deployment).
+DS2API converts DeepSeek Web chat capability into an OpenAI-compatible API. The core backend is Go-based, with a small Node Runtime bridge used for Vercel streaming, and the React WebUI admin panel lives in `webui/` (build output auto-generated to `static/admin` during deployment).
 
 Documentation entry: [Docs Index](docs/README.md) / [Architecture](docs/ARCHITECTURE.en.md) / [API Reference](API.en.md)
 
@@ -43,8 +43,6 @@ Documentation entry: [Docs Index](docs/README.md) / [Architecture](docs/ARCHITEC
 - [Platform Compatibility Matrix](#platform-compatibility-matrix)
 - [Model Support](#model-support)
   - [OpenAI Endpoint](#openai-endpoint-get-v1models)
-  - [Claude Endpoint](#claude-endpoint-get-anthropicv1models)
-  - [Gemini Endpoint](#gemini-endpoint)
 - [Quick Start](#quick-start)
   - [Option 1: Download Release Binaries](#option-1-download-release-binaries)
   - [Option 2: Docker / GHCR](#option-2-docker--ghcr)
@@ -64,7 +62,7 @@ Documentation entry: [Docs Index](docs/README.md) / [Architecture](docs/ARCHITEC
 
 ```mermaid
 flowchart LR
-    Client["🖥️ Clients / SDKs\n(OpenAI / Claude / Gemini)"]
+    Client["🖥️ Clients / SDKs\n(OpenAI)"]
     Upstream["☁️ DeepSeek API"]
 
     subgraph DS2API["DS2API 4.x (Modular HTTP Surface + PromptCompat Core)"]
@@ -72,8 +70,6 @@ flowchart LR
 
         subgraph HTTP["HTTP API Surface"]
             OA["OpenAI\nchat / responses / files / embeddings"]
-            CA["Claude\n/anthropic/* + /v1/messages"]
-            GA["Gemini\n/v1beta/models/* + /v1/models/*"]
             Admin["Admin API\nresource packages"]
             WebUI["WebUI\n/admin (static hosting)"]
             Vercel["Vercel Node Stream\n/v1/chat/completions"]
@@ -83,7 +79,7 @@ flowchart LR
             Compat["PromptCompat\n(API -> web-chat plain text context)"]
             Completion["Completion Runtime\n(session / PoW / completion)"]
             Turn["AssistantTurn\n(output semantic normalization)"]
-            Auth["Auth Resolver\n(API key / bearer / x-goog-api-key)"]
+            Auth["Auth Resolver\n(API key / bearer / x-api-key)"]
             Pool["Account Pool + Queue\n(in-flight slots + wait queue)"]
             DSClient["DeepSeek Client\n(session / auth / completion / files)"]
             Pow["PoW Solver\n(Pure Go)"]
@@ -93,13 +89,12 @@ flowchart LR
     end
 
     Client --> Router
-    Router --> OA & CA & GA
+    Router --> OA
     Router --> Admin
     Router --> WebUI
     Router --> Vercel
 
     OA --> Compat
-    CA & GA --> Compat
     Compat --> Completion
     Completion -.full context.-> History
     Completion --> Turn
@@ -127,10 +122,8 @@ For the full module-by-module architecture and directory responsibilities, see [
 | Capability | Details |
 | --- | --- |
 | OpenAI compatible | `GET /v1/models`, `GET /v1/models/{id}`, `POST /v1/chat/completions`, `POST /v1/responses`, `GET /v1/responses/{response_id}`, `POST /v1/embeddings`, `POST /v1/files`, `GET /v1/files/{file_id}` |
-| Claude compatible | `GET /anthropic/v1/models`, `POST /anthropic/v1/messages`, `POST /anthropic/v1/messages/count_tokens` (plus shortcut paths `/v1/messages`, `/messages`) |
-| Gemini compatible | `GET /v1beta/models`, `POST /v1beta/models/{model}:generateContent`, `POST /v1beta/models/{model}:streamGenerateContent` (plus `/v1/models/{model}:*` paths) |
 | Ollama compatible | `GET /api/version`, `GET /api/tags`, `POST /api/show` |
-| Unified CORS compatibility | `/v1/*`, `/anthropic/*`, `/v1beta/models/*`, `/api/*`, and `/admin/*` share one CORS policy; on Vercel, the Node Runtime for `/v1/chat/completions` mirrors the same relaxed preflight behavior for third-party clients |
+| Unified CORS compatibility | `/v1/*`, `/api/*`, and `/admin/*` share one CORS policy; on Vercel, the Node Runtime for `/v1/chat/completions` mirrors the same relaxed preflight behavior for third-party clients |
 | Multi-account rotation | Auto token refresh, email/mobile dual login |
 | Concurrency control | Per-account in-flight limit + waiting queue, dynamic recommended concurrency |
 | DeepSeek PoW | Pure Go high-performance solver (DeepSeekHashV1), ms-level response |
@@ -148,21 +141,20 @@ OpenAI `/v1/*` routes remain canonical, and DS2API also accepts root shortcuts s
 | P0 | Codex CLI/SDK (`wire_api=chat` / `wire_api=responses`) | ✅ |
 | P0 | OpenAI SDK (JS/Python, chat + responses) | ✅ |
 | P0 | Vercel AI SDK (openai-compatible) | ✅ |
-| P0 | Anthropic SDK (messages) | ✅ |
-| P0 | Google Gemini SDK (generateContent) | ✅ |
 | P1 | LangChain / LlamaIndex / OpenWebUI (OpenAI-compatible integration) | ✅ |
 
 ## Model Support
 
-Verified against [DeepSeek Web](https://chat.deepseek.com/) on 2026-09-11: fast, expert and image understanding now share the `default` lane; the old `expert` and `vision` lanes are disabled. DS2API exposes `deepseek-flash`, with thinking, web search, files and images available together.
+Verified against [DeepSeek Web](https://chat.deepseek.com/) on 2026-09-11: fast, expert and image understanding now share the `default` lane; the old `expert` and `vision` lanes are disabled. DS2API exposes `deepseek-flash` and `deepseek-flash-search`, which enables web search by default. Both use the same upstream model and support thinking, web search, files and images together.
 
 ### OpenAI Endpoint (`GET /v1/models`)
 
-| Upstream type | Only model ID | Thinking | Web search | Attachments |
+| Upstream type | Model ID | Thinking | Web search | Attachments |
 | --- | --- | --- | --- | --- |
 | `default` | `deepseek-flash` | On by default; `thinking_enabled` controls it | Off by default; `search_enabled` controls it | Files and images |
+| `default` | `deepseek-flash-search` | On by default; `thinking_enabled` controls it | On by default; `search_enabled` controls it | Files and images |
 
-New clients should use `deepseek-flash` and select each capability through request fields:
+Use `deepseek-flash-search` to enable web search without setting `search_enabled`, or use `deepseek-flash` and select capabilities through request fields:
 
 ```json
 {
@@ -173,26 +165,11 @@ New clients should use `deepseek-flash` and select each capability through reque
 }
 ```
 
-Both boolean fields also work inside `extra_body`. Existing `thinking`, `reasoning` and `reasoning_effort` options remain compatible. The WebUI API tester has independent thinking/search switches and a file/image upload button. An upload finishing does not overwrite an account selected while it was running; switch back to the attachment owner or remove and upload the files again before sending.
+Both boolean fields also work inside `extra_body`; explicit `search_enabled: false` disables search even for the search model. Existing `thinking`, `reasoning` and `reasoning_effort` options remain compatible. Selecting `deepseek-flash-search` in the WebUI API tester turns on its search switch; thinking and search can still be adjusted independently, alongside file/image uploads. An upload finishing does not overwrite an account selected while it was running; switch back to the attachment owner or remove and upload the files again before sending.
 
-Legacy `deepseek-v4-flash`, `deepseek-v4-pro`, `deepseek-v4-vision` and supported OpenAI / Claude / Gemini aliases remain accepted as request input, but are omitted from model catalogs. Legacy `deepseek-v4-flash-search` / `deepseek-v4-pro-search` retain search-on defaults, which `search_enabled: false` can override; `-nothinking` still forces thinking off. Every accepted name uses `default` for completion and upload requests. See [API.en.md](API.en.md#model-alias-resolution) for the full rules.
+Legacy `deepseek-v4-flash`, `deepseek-v4-pro`, `deepseek-v4-vision` and supported OpenAI aliases remain accepted as request input, but are omitted from model catalogs. Legacy `deepseek-v4-flash-search` / `deepseek-v4-pro-search` retain search-on defaults, which `search_enabled: false` can override; `-nothinking` still forces thinking off. Every accepted name uses `default` for completion and upload requests. See [API.en.md](API.en.md#model-alias-resolution) for the full rules.
 
-### Claude Endpoint (`GET /anthropic/v1/models`)
-
-This catalog also returns only `deepseek-flash`. Requests can use that name directly; existing aliases such as `claude-sonnet-4-6`, `claude-haiku-4-5` and `claude-opus-4-6` remain accepted and use the same upstream lane. `model_aliases` still configures client names, and the legacy `-nothinking` suffix continues to force thinking off.
-
-#### Claude Code integration pitfalls (validated)
-
-- Set `ANTHROPIC_BASE_URL` to the DS2API root URL (for example `http://127.0.0.1:5001`). Claude Code sends requests to `/v1/messages?beta=true`.
-- `ANTHROPIC_API_KEY` must match an entry in `keys` from `config.json`. Keeping both a regular key and an `sk-ant-*` style key improves client compatibility.
-- If your environment has proxy variables, set `NO_PROXY=127.0.0.1,localhost,<your_host_ip>` for DS2API to avoid proxy interception of local traffic.
-- If tool calls are rendered as plain text and not executed, first verify the model output uses the recommended halfwidth-pipe DSML block: `<|DSML|tool_calls><|DSML|invoke name="..."><|DSML|parameter name="...">...`. DS2API also accepts legacy canonical XML: `<tool_calls><invoke name="..."><parameter name="...">...`; legacy `<tools>` / `<tool_call>` / `<tool_name>` / `<param>`, `<function_call>`, `tool_use`, or standalone JSON `tool_calls` are not executed and stay plain text.
-
-### Gemini Endpoint
-
-`GET /v1beta/models` returns only `models/deepseek-flash`. Both `generateContent` and `streamGenerateContent` support this model and Tool Calling (`functionDeclarations` → `functionCall` output). Existing exact aliases such as `gemini-2.5-*` and `gemini-3*` remain compatible; native `generationConfig.thinkingConfig.thinkingBudget` is normalized into the shared thinking switch.
-
-Ollama `GET /api/tags` likewise lists only `deepseek-flash`; `POST /api/show` advertises `tools`, `thinking` and `vision`. Files and images go through a shared upload service and reach DeepSeek as `ref_file_ids`. See [API.en.md](API.en.md) for each protocol's attachment formats.
+Ollama `GET /api/tags` likewise lists `deepseek-flash` and `deepseek-flash-search`; `POST /api/show` advertises `tools`, `thinking` and `vision`. Files and images go through a shared upload service and reach DeepSeek as `ref_file_ids`. See [API.en.md](API.en.md) for each protocol's attachment formats.
 
 ## Quick Start
 
@@ -327,7 +304,7 @@ Common fields:
 
 - `keys` / `api_keys`: client API keys; `api_keys` adds `name` and `remark` metadata while `keys` remains compatible.
 - `accounts`: managed DeepSeek accounts, supporting `email` or `mobile` login plus proxy/name/remark metadata and the `disabled` flag. Password login also needs a website-issued `device_id`, supplied per account or through the environment; see [login device verification](docs/DEPLOY.en.md#322-deepseek-login-device-verification).
-- `model_aliases`: one shared alias map for OpenAI / Claude / Gemini model names.
+- `model_aliases`: one shared alias map for OpenAI-compatible client model names.
 - `runtime`: account concurrency, queueing, and token refresh behavior, hot-reloadable via Admin Settings.
 - `auto_delete.mode`: remote session cleanup after each request, supporting `none` / `single` / `all`.
 - `current_input_file`: the global context split/upload mode; it is enabled by default and uploads the full context as a `HISTORY.txt` context file once the character threshold is reached.
@@ -338,7 +315,7 @@ For the full environment variable list, see [docs/DEPLOY.en.md](docs/DEPLOY.en.m
 
 ## Authentication Modes
 
-For business endpoints (`/v1/*`, `/anthropic/*`, Gemini routes), DS2API supports two modes:
+For business endpoints (`/v1/*` and root-path aliases), DS2API supports two modes:
 
 | Mode | Description |
 | --- | --- |
@@ -347,7 +324,6 @@ For business endpoints (`/v1/*`, `/anthropic/*`, Gemini routes), DS2API supports
 
 Optional header `X-Ds2-Target-Account`: Pin a specific managed account (value is email or mobile).
 When no target account is pinned, if a completion would end as `429 upstream_empty_output` after the same-account empty-output retry, managed-account mode switches to the next available account, creates a fresh session, and retries the original payload once.
-Gemini routes also accept `x-goog-api-key`, or `?key=` / `?api_key=` when no auth header is present.
 
 ## Concurrency Model
 
@@ -371,7 +347,7 @@ When `tools` is present in the request, DS2API performs anti-leak handling:
 2. The parser treats the halfwidth-pipe DSML shell as the recommended executable tool-calling syntax: `<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`; it also accepts legacy canonical XML `<tool_calls>` → `<invoke name="...">` → `<parameter name="...">`, plus common DSML prefix/separator drift. DSML is a shell alias and internal parsing remains XML-based; legacy `<tools>` / `<tool_call>` / `<tool_name>` / `<param>`, `<function_call>`, `tool_use`, antml variants, and standalone JSON `tool_calls` payloads are treated as plain text, and complete but malformed wrappers are released as plain text too
 3. `responses` streaming strictly uses official item lifecycle events (`response.output_item.*`, `response.content_part.*`, `response.function_call_arguments.*`)
 4. `responses` supports and enforces `tool_choice` (`auto`/`none`/`required`/forced function); `required` violations return `422` for non-stream and `response.failed` for stream
-5. The output protocol follows the client request (OpenAI / Claude / Gemini native shapes); model-side prompting can prefer XML, and the compatibility layer handles the protocol-specific translation
+5. Tool calls are returned in OpenAI's native `tool_calls` structure; model-side prompting can prefer XML, and the compatibility layer handles the translation
 
 > Note: the current parser still prioritizes “parse successfully whenever possible”; hard allow-list rejection for undeclared tool names is not enabled yet.
 > Explicit empty strings or whitespace-only parameters are preserved by the parser; prompting tells the model not to emit blank parameters, and missing/empty argument rejection belongs in the tool executor or client schema validation.

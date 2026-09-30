@@ -16,8 +16,6 @@ Docs: [Overview](README.en.md) / [Architecture](docs/ARCHITECTURE.en.md) / [Depl
 - [Route Index](#route-index)
 - [Health Endpoints](#health-endpoints)
 - [OpenAI-Compatible API](#openai-compatible-api)
-- [Claude-Compatible API](#claude-compatible-api)
-- [Gemini-Compatible API](#gemini-compatible-api)
 - [Ollama API](#ollama-api)
 - [Admin API](#admin-api)
 - [Error Payloads](#error-payloads)
@@ -32,13 +30,13 @@ Docs: [Overview](README.en.md) / [Architecture](docs/ARCHITECTURE.en.md) / [Depl
 | Base URL | `http://localhost:5001` or your deployment domain |
 | Default Content-Type | `application/json` |
 | Health probes | `GET /healthz`, `GET /readyz` |
-| CORS | Enabled (uniformly covers `/v1/*`, `/anthropic/*`, `/v1beta/models/*`, `/api/*`, and `/admin/*`; echoes the browser `Origin` when present, otherwise `*`; default allow-list includes `Content-Type`, `Authorization`, `X-API-Key`, `X-Ds2-Target-Account`, `X-Ds2-Source`, `X-Vercel-Protection-Bypass`, `X-Goog-Api-Key`, `Anthropic-Version`, `Anthropic-Beta`, and also accepts third-party preflight-requested headers such as `x-stainless-*`; `/v1/chat/completions` on Vercel Node Runtime matches the same behavior; internal-only `X-Ds2-Internal-Token` remains blocked) |
+| CORS | Enabled (uniformly covers `/v1/*`, `/api/*`, and `/admin/*`; echoes the browser `Origin` when present, otherwise `*`; default allow-list includes `Content-Type`, `Authorization`, `X-API-Key`, `X-Ds2-Target-Account`, `X-Ds2-Source`, `X-Vercel-Protection-Bypass`, and also accepts third-party preflight-requested headers such as `x-stainless-*`; `/v1/chat/completions` on Vercel Node Runtime matches the same behavior; internal-only `X-Ds2-Internal-Token` remains blocked) |
 
 - All JSON request bodies must be valid UTF-8; malformed byte sequences are rejected on ingress with `400 invalid json`.
 
 ### 3.0 Adapter-Layer Notes
 
-- OpenAI / Claude / Gemini protocols are now mounted on one shared `chi` router tree assembled in `internal/server/router.go`.
+- The OpenAI-compatible API (including root shortcuts) and the Ollama API are mounted on one shared `chi` router tree assembled in `internal/server/router.go`.
 - Adapter responsibilities are streamlined to: **request normalization → DeepSeek invocation → protocol-shaped rendering**, reducing legacy split-logic paths.
 - Tool-calling semantics are aligned between Go and Node runtime: models should output the halfwidth-pipe DSML shell `<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`; DS2API also accepts DSML wrapper aliases such as `<dsml|tool_calls>` and `<|tool_calls>`, common DSML separator drift such as `<|DSML tool_calls>`, collapsed DSML local names such as `<DSMLtool_calls>`, control-separator drift such as `<DSML␂tool_calls>` / raw STX `\x02`, CJK angle bracket, fullwidth-bang / ideographic-comma separator drift, PascalCase local-name drift, and trailing attribute separator drift such as `<DSM|parameter name="command"|>...〈/DSM|parameter〉`, `<！DSML！invoke name=“Bash”>`, `<、DSML、tool_calls>`, `<DSmartToolCalls>`, or `<DSMLtool_calls※>`, arbitrary protocol prefixes such as `<proto💥tool_calls>`, and legacy canonical XML `<tool_calls>` → `<invoke name="...">` → `<parameter name="...">`. The scanner normalizes fixed local names (`tool_calls` / `invoke` / `parameter`) with non-structural separators before or after them back to XML before parsing, and also tolerates CDATA opener drift such as `<！[CDATA[` / `<、[CDATA[`; only wrapped tool blocks or the narrow missing-opening-wrapper repair path enter the tool path, while bare `<invoke>` does not count as supported syntax. JSON literal parameter bodies are preserved as structured values, explicit empty or whitespace-only parameters are preserved as empty strings, malformed complete wrappers are released as plain text, and loose CDATA is narrowly repaired at final parse/flush when it can preserve a complete outer tool call.
 - `Admin API` separates static config from runtime policy: `/admin/config*` for configuration state, `/admin/settings*` for runtime behavior.
@@ -71,7 +69,7 @@ For Vercel one-click bootstrap, you can set only `DS2API_ADMIN_KEY` first, then 
 
 ## Authentication
 
-### Business Endpoints (`/v1/*`, `/anthropic/*`, `/v1beta/models/*`)
+### Business Endpoints (`/v1/*`)
 
 Two header formats accepted:
 
@@ -79,7 +77,6 @@ Two header formats accepted:
 | --- | --- |
 | Bearer Token | `Authorization: Bearer <token>` |
 | API Key Header | `x-api-key: <token>` (no `Bearer` prefix) |
-| Gemini-compatible | `x-goog-api-key: <token>` or `?key=<token>` / `?api_key=<token>` |
 
 **Auth behavior**:
 
@@ -87,7 +84,6 @@ Two header formats accepted:
 - Token is not in `config.keys` → **Direct token mode**: treated as a DeepSeek token directly
 
 **Optional header**: `X-Ds2-Target-Account: <email_or_mobile>` — Pin a specific managed account; if the target account does not exist or the managed-account queue is exhausted, the request returns `429`, and current responses do not include `Retry-After`. If the account exists but login/refresh fails, the request returns the underlying `401` or upstream error. Without an account pin or user attachment/external file reference, managed completion requests try one alternate-account fresh retry before returning an empty-output 429. Requests with a pinned target, attachments/file references, or no other available account do not switch.
-Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=` as the caller credential source.
 
 ### Admin Endpoints (`/admin/*`)
 
@@ -115,18 +111,6 @@ Gemini-compatible clients can also send `x-goog-api-key`, `?key=`, or `?api_key=
 | POST | `/v1/embeddings` | Business | OpenAI Embeddings API |
 | POST | `/v1/files` | Business | OpenAI Files upload (multipart/form-data) |
 | GET | `/v1/files/{file_id}` | Business | Retrieve uploaded file status |
-| GET | `/anthropic/v1/models` | None | Claude model list |
-| POST | `/anthropic/v1/messages` | Business | Claude messages |
-| POST | `/anthropic/v1/messages/count_tokens` | Business | Claude token counting |
-| POST | `/v1/messages` | Business | Claude shortcut path |
-| POST | `/messages` | Business | Claude shortcut path |
-| POST | `/v1/messages/count_tokens` | Business | Claude token counting shortcut |
-| POST | `/messages/count_tokens` | Business | Claude token counting shortcut |
-| GET | `/v1beta/models` | None | Gemini model catalog, only `models/deepseek-flash` |
-| POST | `/v1beta/models/{model}:generateContent` | Business | Gemini non-stream |
-| POST | `/v1beta/models/{model}:streamGenerateContent` | Business | Gemini stream |
-| POST | `/v1/models/{model}:generateContent` | Business | Gemini non-stream compat path |
-| POST | `/v1/models/{model}:streamGenerateContent` | Business | Gemini stream compat path |
 | GET | `/api/version` | None | Ollama version endpoint |
 | GET | `/api/tags` | None | Ollama model list |
 | POST | `/api/show` | None | Ollama model capability query (returns `id` + `capabilities`) |
@@ -199,24 +183,25 @@ OpenAI `/v1/*` paths are canonical. For clients configured with the bare DS2API 
 
 ### `GET /v1/models`
 
-No auth required. Returns only `deepseek-flash`, which supports thinking, web search, files and images.
+No auth required. Returns `deepseek-flash` and `deepseek-flash-search`; the latter enables DeepSeek web search by default. Both use the same upstream model and support thinking, web search, files and images.
 
 ```json
 {
   "object": "list",
   "data": [
-    {"id": "deepseek-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek"}
+    {"id": "deepseek-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek"},
+    {"id": "deepseek-flash-search", "object": "model", "created": 1677610602, "owned_by": "deepseek"}
   ]
 }
 ```
 
-Verified against DeepSeek Web configuration on 2026-09-11: fast, expert and image understanding share `default`; the old `expert` and `vision` lanes are disabled. OpenAI, Claude, Gemini and Ollama catalogs no longer expand legacy names or aliases.
+Verified against DeepSeek Web configuration on 2026-09-11: fast, expert and image understanding share `default`; the old `expert` and `vision` lanes are disabled. OpenAI and Ollama catalogs no longer expand legacy names or aliases.
 
 ### Model Alias Resolution
 
 For `chat` / `responses` / `embeddings`, DS2API follows a wide-input/strict-output policy:
 
-1. Match `deepseek-flash` or supported legacy `deepseek-v4-*` names first.
+1. Match `deepseek-flash`, `deepseek-flash-search`, or supported legacy `deepseek-v4-*` names first.
 2. Then match exact keys in `model_aliases`.
 3. If the request name ends with `-nothinking`, resolve the base model/alias and retain its forced no-thinking semantics.
 4. If still unmatched, return `invalid_request_error`. Unknown model families are not guessed heuristically; add explicit compatibility names through `model_aliases`.
@@ -225,26 +210,26 @@ Built-in aliases come from `internal/config/models.go`; `config.model_aliases` c
 
 - OpenAI / Codex: `gpt-4o`, `gpt-4.1`, `gpt-5`, `gpt-5.5`, `gpt-5-codex`, `gpt-5.3-codex`, `codex-mini-latest`
 - OpenAI reasoning: `o1`, `o3`, `o3-deep-research`, `o4-mini`
-- Claude: `claude-opus-4-6`, `claude-sonnet-4-6`, `claude-haiku-4-5`, `claude-3-5-sonnet-latest`
-- Gemini: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-3.1-pro`, `gemini-3-pro`, `gemini-3-flash`, `gemini-3.1-flash-lite`, `gemini-pro-vision`
 - Other exact built-in aliases: `llama-3.1-70b-instruct`, `qwen-max`
 
 Legacy `deepseek-v4-flash`, `deepseek-v4-pro`, `deepseek-v4-vision` and their `-nothinking` variants remain accepted. Legacy `deepseek-v4-flash-search` / `deepseek-v4-pro-search`, including aliases mapped to them, retain search-on defaults; explicit `search_enabled: false` turns search off. The `-nothinking` suffix always forces thinking off.
 
-These names provide compatibility inputs and legacy mode defaults only. Completion `model_type` and upload `x-model-type` are always `default`. Images and files work together with thinking and search; no separate vision or search model is needed.
+These historical names provide compatibility inputs and legacy mode defaults only. Completion `model_type` and upload `x-model-type` are always `default`. `deepseek-flash-search` uses the same upstream type and simply enables search by default; images and files still work together with thinking and search.
 
-Retired historical families such as `claude-1.*`, `claude-2.*`, `claude-instant-*`, and `gpt-3.5*` are explicitly rejected.
+Built-in aliases no longer include the `claude-*` and `gemini-*` families (such as `claude-sonnet-4-6` and `gemini-2.5-pro`); these names, along with retired historical families such as `gpt-3.5*`, are explicitly rejected. If a client still sends these model names, map them to `deepseek-flash` / `deepseek-flash-search` explicitly through `model_aliases`.
 
 ### Thinking and Search Controls
 
-OpenAI Chat / Responses, Claude Messages and Gemini generateContent share these mode settings:
+OpenAI Chat / Responses share these mode settings:
 
-| Field | Type | `deepseek-flash` default | Location |
-| --- | --- | --- | --- |
-| `thinking_enabled` | boolean | `true` | Top level or `extra_body` |
-| `search_enabled` | boolean | `false` | Top level or `extra_body` |
+| Field | Type | `deepseek-flash` default | `deepseek-flash-search` default | Location |
+| --- | --- | --- | --- | --- |
+| `thinking_enabled` | boolean | `true` | `true` | Top level or `extra_body` |
+| `search_enabled` | boolean | `false` | `true` | Top level or `extra_body` |
 
-An explicit top-level field takes precedence over the same field in `extra_body`; `false` is preserved as an off instruction. Existing `thinking`, `reasoning` and `reasoning_effort` options remain compatible. A model's `-nothinking` suffix overrides all request switches and forces thinking off. Native Gemini `generationConfig.thinkingConfig.thinkingBudget` maps to the same switch: `0` disables it, nonzero values (including dynamic budget `-1`) enable it; explicit shared mode fields take precedence.
+Selecting `deepseek-flash-search` requires no separate search field; explicit `search_enabled: false` still disables search. Requests may also use `deepseek-flash-search-nothinking` to enable search by default and force thinking off, but that variant is not separately listed in model catalogs.
+
+An explicit top-level field takes precedence over the same field in `extra_body`; `false` is preserved as an off instruction. Existing `thinking`, `reasoning` and `reasoning_effort` options remain compatible. A model's `-nothinking` suffix overrides all request switches and forces thinking off.
 
 ```json
 {
@@ -273,7 +258,7 @@ Content-Type: application/json
 
 | Field | Type | Required | Notes |
 | --- | --- | --- | --- |
-| `model` | string | ✅ | DeepSeek native models + common aliases (`gpt-5.5`, `gpt-5.4-mini`, `gpt-5.3-codex`, `o3`, `claude-opus-4-6`, `gemini-2.5-pro`, `gemini-3.1-pro`, `gemini-3-flash`, etc.); `-nothinking` suffixes force thinking / reasoning off |
+| `model` | string | ✅ | DeepSeek native models + common aliases (`gpt-5.5`, `gpt-5.4-mini`, `gpt-5.3-codex`, `o3`, etc.); `-nothinking` suffixes force thinking / reasoning off |
 | `messages` | array | ✅ | OpenAI-style messages |
 | `stream` | boolean | ❌ | Default `false` |
 | `thinking_enabled` | boolean | ❌ | Default `true`; also accepted in `extra_body`; `-nothinking` forces it off |
@@ -379,7 +364,7 @@ Additional notes:
 
 ### `GET /v1/models/{id}`
 
-No auth required. Existing aliases are accepted as path params (for example `gpt-4o`); the returned model object is `deepseek-flash`.
+No auth required. Existing aliases are accepted as path params (for example `gpt-4o`); the returned model object is `deepseek-flash` or `deepseek-flash-search`, according to the resolved model's default search mode.
 
 ### `POST /v1/responses`
 
@@ -489,12 +474,10 @@ Each protocol normalizes attachments into standard file blocks. The shared `inpu
 | --- | --- |
 | OpenAI Chat | `image_url` as a string or `{ "url": "..." }` (data URL / public HTTP(S)); `file` / `input_file` with base64 or data-URL `file_data`, `file_url` or `file_id`; nested `file` objects and `{"type":"image_file","image_file":{"file_id":"..."}}` image references also work |
 | OpenAI Responses | `input_image.image_url`, `input_file.file_data` / `file_url` / `file_id`, `image_file` references, and existing `attachments` / `file_ids`; explicit image/file blocks in `function_call_output` / `tool_result` `output` are also uploaded or collected |
-| Claude Messages | `image` / `document` `source`: `type: "base64"` with `media_type` and `data`, `type: "url"` with `url`, or an uploaded `file_id`; documents also accept `type: "text"` with `data` |
-| Gemini | `inlineData` with `mimeType` and base64 `data`; `fileData` with `mimeType` and public HTTP(S) `fileUri` or an existing `file_id`; snake_case `inline_data` / `file_data` / `mime_type` / `file_uri` also work; explicit attachments using these formats in `functionResponse.parts` are retained |
 
 An existing `file_id` in an attachment block (including `file.file_id` / `file.id`) takes precedence: it is verified and reused without downloading an accompanying URL or uploading again. Image blocks without a valid URL, inline payload or file ID return `400`.
 
-Both the native and Vercel prepare/proxy paths preserve these Claude/Gemini images, documents and existing file references for the shared service. Attachment detection requires explicit protocol blocks or standard file fields. Ordinary tool-result `name` / `data` / `url` values, or an unrelated business-JSON `output` field, do not trigger file uploads.
+Both the native and Vercel prepare/proxy paths preserve these images, documents and existing file references for the shared service. Attachment detection requires explicit protocol blocks or standard file fields. Ordinary tool-result `name` / `data` / `url` values, or an unrelated business-JSON `output` field, do not trigger file uploads.
 
 Standalone uploads, generation and file retrieval share ownership handling. Managed-mode cache entries are keyed by caller identity and the original `file_id`, so known files reused with the same caller credentials do not require an account header. Known references belonging to different accounts, or an explicit `X-Ds2-Target-Account` conflicting with known ownership, return `409` before generation.
 
@@ -532,190 +515,9 @@ For example, combine an image and text file in one OpenAI Chat request (replace 
 
 ---
 
-## Claude-Compatible API
-
-Besides `/anthropic/v1/*`, DS2API also supports shortcut paths: `/v1/messages`, `/messages`, `/v1/messages/count_tokens`, `/messages/count_tokens`.
-Requests normalize into standard messages and attachments, then use shared mode, upload and completion runtime behavior. Protocol adapters handle only request/response shapes.
-
-### `GET /anthropic/v1/models`
-
-No auth required. Lists only the unified model; existing Claude aliases remain accepted in the `model` field of message requests.
-
-```json
-{
-  "object": "list",
-  "data": [
-    {"id": "deepseek-flash", "object": "model", "created": 1677610602, "owned_by": "deepseek"}
-  ],
-  "first_id": "deepseek-flash",
-  "last_id": "deepseek-flash",
-  "has_more": false
-}
-```
-
-### `POST /anthropic/v1/messages`
-
-**Headers**:
-
-```http
-x-api-key: your-api-key
-Content-Type: application/json
-anthropic-version: 2023-06-01
-```
-
-> `anthropic-version` is optional; DS2API auto-fills `2023-06-01` when absent.
-
-**Request body**:
-
-| Field | Type | Required | Notes |
-| --- | --- | --- | --- |
-| `model` | string | ✅ | Use `deepseek-flash`; aliases such as `claude-sonnet-4-6` / `claude-opus-4-6` / `claude-haiku-4-5` (compatible with `claude-3-5-haiku-latest`), plus historical Claude model IDs |
-| `messages` | array | ✅ | Claude-style messages |
-| `max_tokens` | number | ❌ | Auto-filled to `8192` when omitted; not strictly enforced by upstream bridge |
-| `stream` | boolean | ❌ | Default `false` |
-| `thinking_enabled` | boolean | ❌ | Default `true`; also accepted in `extra_body`; `-nothinking` forces it off |
-| `search_enabled` | boolean | ❌ | Default `false`; also accepted in `extra_body`; works with files/images |
-| `system` | string | ❌ | Optional system prompt |
-| `tools` | array | ❌ | Claude tool schema |
-| `thinking` | object | ❌ | Anthropic thinking config; translated into downstream reasoning control, and ignored by `-nothinking` models |
-| `temperature` | number | ❌ | Passed through to the downstream bridge; if `temperature` and `top_p` are both present, `temperature` wins |
-| `top_p` | number | ❌ | Passed through when `temperature` is absent |
-| `stop_sequences` | array | ❌ | Passed through as downstream stop sequences |
-| `tool_choice` | string/object | ❌ | Supports `auto` / `none` / `required` / `{"type":"function","name":"..."}` and is translated to downstream tool choice |
-
-> Note: `thinking`, `temperature`, `top_p`, `stop_sequences`, and `tool_choice` are translated through the compatibility bridge. Final behavior still depends on the selected model and upstream support. When both `temperature` and `top_p` are present, `temperature` takes precedence.
-
-#### Non-Stream Response
-
-```json
-{
-  "id": "msg_1738400000000000000",
-  "type": "message",
-  "role": "assistant",
-  "model": "claude-sonnet-4-6",
-  "content": [
-    {"type": "text", "text": "response"}
-  ],
-  "stop_reason": "end_turn",
-  "stop_sequence": null,
-  "usage": {
-    "input_tokens": 12,
-    "output_tokens": 34
-  }
-}
-```
-
-If tool use is detected, `stop_reason` becomes `tool_use` and `content` contains `tool_use` blocks.
-
-#### Streaming (`stream=true`)
-
-SSE uses paired `event:` + `data:` lines. Event type is also in JSON `type`.
-
-```text
-event: message_start
-data: {"type":"message_start","message":{...}}
-
-event: content_block_start
-data: {"type":"content_block_start","index":0,"content_block":{"type":"text","text":""}}
-
-event: content_block_delta
-data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"hello"}}
-
-event: ping
-data: {"type":"ping"}
-
-event: content_block_stop
-data: {"type":"content_block_stop","index":0}
-
-event: message_delta
-data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"output_tokens":12}}
-
-event: message_stop
-data: {"type":"message_stop"}
-```
-
-**Notes**:
-
-- Models that support thinking emit `thinking` blocks / `thinking_delta` by default; explicit thinking disablement or `-nothinking` models suppress them
-- `signature_delta` is not emitted (DeepSeek does not provide verifiable thinking signatures)
-- In `tools` mode, the stream avoids leaking raw tool JSON and does not force `input_json_delta`
-
-### `POST /anthropic/v1/messages/count_tokens`
-
-**Request**:
-
-```json
-{
-  "model": "claude-sonnet-4-6",
-  "messages": [
-    {"role": "user", "content": "Hello"}
-  ]
-}
-```
-
-**Response**:
-
-```json
-{
-  "input_tokens": 5
-}
-```
-
----
-
-## Gemini-Compatible API
-
-Supported paths:
-
-- `/v1beta/models/{model}:generateContent`
-- `/v1beta/models/{model}:streamGenerateContent`
-- `/v1/models/{model}:generateContent` (compat path)
-- `/v1/models/{model}:streamGenerateContent` (compat path)
-
-Generation endpoints use business authentication and also accept `x-goog-api-key`, `?key=` or `?api_key=`. The model catalog requires no authentication.
-Requests normalize into standard messages and attachments, then use shared mode, upload and completion runtime behavior. Protocol adapters handle only request/response shapes.
-
-### `GET /v1beta/models`
-
-No auth required. Uses the Gemini model catalog format:
-
-```json
-{
-  "models": [{
-    "name": "models/deepseek-flash",
-    "baseModelId": "deepseek-flash",
-    "displayName": "DeepSeek Flash",
-    "supportedGenerationMethods": ["generateContent", "streamGenerateContent"]
-  }]
-}
-```
-
-### `POST /v1beta/models/{model}:generateContent`
-
-The body accepts Gemini `contents` / `tools`. Use `deepseek-flash` in the path; existing aliases remain accepted, and `-nothinking` still forces thinking off. Set `thinking_enabled` / `search_enabled` at the top level or in `extra_body`. Native `generationConfig.thinkingConfig.thinkingBudget` disables thinking at `0` and enables it for nonzero values (including `-1`). A `googleSearch` / `googleSearchRetrieval` tool (snake_case also accepted) enables web search; explicit `search_enabled` takes precedence.
-
-Response uses Gemini-compatible fields, including:
-
-- `candidates[].content.parts[].text`
-- `candidates[].content.parts[].thought=true` for thinking output
-- `candidates[].content.parts[].functionCall` (when tool call is produced)
-- `usageMetadata` (`promptTokenCount` / `candidatesTokenCount` / `totalTokenCount`)
-
-### `POST /v1beta/models/{model}:streamGenerateContent`
-
-Returns SSE (`text/event-stream`), each chunk as `data: <json>`:
-
-- regular text: incremental text chunks
-- thinking: incremental chunks with `parts[].thought=true`
-- `tools` mode: buffered and emitted as `functionCall` at finalize phase
-- final chunk: includes `finishReason: "STOP"` and `usageMetadata`
-- Token counting prefers pass-through from upstream DeepSeek SSE (`accumulated_token_usage` / `token_usage`), and only falls back to local estimation when upstream usage is absent
-
----
-
 ## Ollama API
 
-`GET /api/tags` lists only `deepseek-flash`.
+`GET /api/tags` lists `deepseek-flash` and `deepseek-flash-search`.
 
 - `POST /api/show` request body: `{"model":"<model-id>"}`.
 - Response uses lowercase `id` (not `ID`) and includes `capabilities` for Ollama-style clients and strict schemas.
@@ -818,8 +620,8 @@ Returns sanitized config, including both `keys` and `api_keys`.
     }
   ],
   "model_aliases": {
-    "claude-sonnet-4-6": "deepseek-flash",
-    "claude-opus-4-6": "deepseek-flash"
+    "my-model": "deepseek-flash",
+    "my-search-model": "deepseek-flash-search"
   }
 }
 ```
@@ -850,8 +652,8 @@ If both `api_keys` and `keys` are sent, the structured `api_keys` entries win so
     {"email": "user@example.com", "password": "pwd", "token": ""}
   ],
   "model_aliases": {
-    "claude-sonnet-4-6": "deepseek-flash",
-    "claude-opus-4-6": "deepseek-flash"
+    "my-model": "deepseek-flash",
+    "my-search-model": "deepseek-flash-search"
   }
 }
 ```
@@ -1334,7 +1136,7 @@ Clears packet-capture entries:
 
 ## Error Payloads
 
-Compatible routes (`/v1/*`, `/anthropic/*`) use the same error envelope:
+Compatible routes (`/v1/*`) use the same error envelope:
 
 ```json
 {
@@ -1348,18 +1150,6 @@ Compatible routes (`/v1/*`, `/anthropic/*`) use the same error envelope:
 ```
 
 Admin routes keep `{"detail":"..."}`.
-
-Gemini routes use Google-style errors:
-
-```json
-{
-  "error": {
-    "code": 400,
-    "message": "invalid json",
-    "status": "INVALID_ARGUMENT"
-  }
-}
-```
 
 Clients should handle HTTP status code plus `error` / `detail` fields.
 
@@ -1466,67 +1256,6 @@ curl http://localhost:5001/v1/chat/completions \
         }
       }
     ]
-  }'
-```
-
-### Gemini Non-Stream
-
-```bash
-curl "http://localhost:5001/v1beta/models/deepseek-flash:generateContent" \
-  -H "Authorization: Bearer your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "contents": [
-      {
-        "role": "user",
-        "parts": [{"text": "Introduce Go in three sentences"}]
-      }
-    ]
-  }'
-```
-
-### Gemini Stream
-
-```bash
-curl "http://localhost:5001/v1beta/models/deepseek-flash:streamGenerateContent" \
-  -H "Authorization: Bearer your-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "contents": [
-      {
-        "role": "user",
-        "parts": [{"text": "Write a short summary"}]
-      }
-    ]
-  }'
-```
-
-### Claude Non-Stream
-
-```bash
-curl http://localhost:5001/anthropic/v1/messages \
-  -H "x-api-key: your-api-key" \
-  -H "Content-Type: application/json" \
-  -H "anthropic-version: 2023-06-01" \
-  -d '{
-    "model": "deepseek-flash",
-    "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "Hello"}]
-  }'
-```
-
-### Claude Stream
-
-```bash
-curl http://localhost:5001/anthropic/v1/messages \
-  -H "x-api-key: your-api-key" \
-  -H "Content-Type: application/json" \
-  -H "anthropic-version: 2023-06-01" \
-  -d '{
-    "model": "deepseek-flash",
-    "max_tokens": 1024,
-    "messages": [{"role": "user", "content": "Explain relativity"}],
-    "stream": true
   }'
 ```
 

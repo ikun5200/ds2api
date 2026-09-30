@@ -72,12 +72,6 @@ func isKnownJSONRequestPath(method, path string) bool {
 		return true
 	case path == "/v1/embeddings" || path == "/embeddings":
 		return true
-	case path == "/anthropic/v1/messages" || path == "/v1/messages" || path == "/messages":
-		return true
-	case path == "/anthropic/v1/messages/count_tokens" || path == "/v1/messages/count_tokens" || path == "/messages/count_tokens":
-		return true
-	case strings.HasPrefix(path, "/v1beta/models/") || strings.HasPrefix(path, "/v1/models/"):
-		return strings.Contains(path, ":generateContent") || strings.Contains(path, ":streamGenerateContent")
 	case strings.HasPrefix(path, "/admin/"):
 		return true
 	default:

@@ -3,6 +3,8 @@ package promptcompat
 import (
 	"strings"
 	"testing"
+
+	"ds2api/internal/prompt"
 )
 
 func TestBuildOpenAIFinalPrompt_HandlerPathIncludesToolRoundtripSemantics(t *testing.T) {
@@ -40,7 +42,7 @@ func TestBuildOpenAIFinalPrompt_HandlerPathIncludesToolRoundtripSemantics(t *tes
 		},
 	}
 
-	finalPrompt, toolNames := buildOpenAIFinalPrompt(messages, tools, "", false)
+	finalPrompt, toolNames := BuildOpenAIPromptWithPrepareOptions(messages, tools, "", DefaultToolChoicePolicy(), false, prompt.DefaultPrepareOptions())
 	if len(toolNames) != 1 || toolNames[0] != "get_weather" {
 		t.Fatalf("unexpected tool names: %#v", toolNames)
 	}
@@ -73,7 +75,7 @@ func TestBuildOpenAIFinalPrompt_VercelPreparePathKeepsFinalAnswerInstruction(t *
 		},
 	}
 
-	finalPrompt, _ := buildOpenAIFinalPrompt(messages, tools, "", false)
+	finalPrompt, _ := BuildOpenAIPromptWithPrepareOptions(messages, tools, "", DefaultToolChoicePolicy(), false, prompt.DefaultPrepareOptions())
 	if !strings.Contains(finalPrompt, "Remember: The ONLY valid way to use tools is the <tool_calls>...</tool_calls> block at the end of your response.") {
 		t.Fatalf("vercel prepare finalPrompt missing final tool-call anchor instruction: %q", finalPrompt)
 	}
@@ -106,7 +108,7 @@ func TestBuildOpenAIPromptWithToolInstructionsOnlyOmitsSchemas(t *testing.T) {
 		},
 	}
 
-	finalPrompt, toolNames := BuildOpenAIPromptWithToolInstructionsOnly(messages, tools, "", DefaultToolChoicePolicy(), false)
+	finalPrompt, toolNames := BuildOpenAIPromptWithToolInstructionsOnlyOptions(messages, tools, "", DefaultToolChoicePolicy(), false, prompt.DefaultPrepareOptions())
 	if len(toolNames) != 1 || toolNames[0] != "search" {
 		t.Fatalf("unexpected tool names: %#v", toolNames)
 	}
@@ -167,7 +169,7 @@ func TestBuildOpenAIFinalPromptPrependsOutputIntegrityGuard(t *testing.T) {
 		},
 	}
 
-	finalPrompt, _ := buildOpenAIFinalPrompt(messages, tools, "", false)
+	finalPrompt, _ := BuildOpenAIPromptWithPrepareOptions(messages, tools, "", DefaultToolChoicePolicy(), false, prompt.DefaultPrepareOptions())
 	guardIdx := strings.Index(finalPrompt, "Clean-answer directive")
 	toolIdx := strings.Index(finalPrompt, "TOOL CALL FORMAT")
 	if guardIdx < 0 {
@@ -219,7 +221,7 @@ func TestBuildOpenAIFinalPromptReadLikeToolIncludesCacheGuard(t *testing.T) {
 		},
 	}
 
-	finalPrompt, _ := buildOpenAIFinalPrompt(messages, tools, "", false)
+	finalPrompt, _ := BuildOpenAIPromptWithPrepareOptions(messages, tools, "", DefaultToolChoicePolicy(), false, prompt.DefaultPrepareOptions())
 	if !strings.Contains(finalPrompt, "Read-tool cache guard") {
 		t.Fatalf("read-like tool prompt missing cache guard: %q", finalPrompt)
 	}
@@ -248,7 +250,7 @@ func TestBuildOpenAIFinalPromptNonReadToolOmitsCacheGuard(t *testing.T) {
 		},
 	}
 
-	finalPrompt, _ := buildOpenAIFinalPrompt(messages, tools, "", false)
+	finalPrompt, _ := BuildOpenAIPromptWithPrepareOptions(messages, tools, "", DefaultToolChoicePolicy(), false, prompt.DefaultPrepareOptions())
 	if strings.Contains(finalPrompt, "Read-tool cache guard") {
 		t.Fatalf("non-read tool prompt should not include read cache guard: %q", finalPrompt)
 	}
@@ -259,8 +261,8 @@ func TestBuildOpenAIFinalPromptWithThinkingKeepsPromptUnchanged(t *testing.T) {
 		map[string]any{"role": "user", "content": "继续回答上一个问题"},
 	}
 
-	finalPromptThinking, _ := buildOpenAIFinalPrompt(messages, nil, "", true)
-	finalPromptPlain, _ := buildOpenAIFinalPrompt(messages, nil, "", false)
+	finalPromptThinking, _ := BuildOpenAIPromptWithPrepareOptions(messages, nil, "", DefaultToolChoicePolicy(), true, prompt.DefaultPrepareOptions())
+	finalPromptPlain, _ := BuildOpenAIPromptWithPrepareOptions(messages, nil, "", DefaultToolChoicePolicy(), false, prompt.DefaultPrepareOptions())
 	if finalPromptThinking != finalPromptPlain {
 		t.Fatalf("expected thinking flag not to prepend continuation contract, thinking=%q plain=%q", finalPromptThinking, finalPromptPlain)
 	}

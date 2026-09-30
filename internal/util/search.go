@@ -1,7 +1,7 @@
 package util
 
 // ResolveSearchEnabled applies an explicit request override before the model's
-// legacy default. A false value must be distinguished from an absent setting.
+// default. A false value must be distinguished from an absent setting.
 func ResolveSearchEnabled(req map[string]any, defaultEnabled bool) bool {
 	if enabled, ok := ResolveSearchOverride(req); ok {
 		return enabled

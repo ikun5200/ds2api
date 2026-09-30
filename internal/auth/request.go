@@ -257,16 +257,7 @@ func extractCallerToken(req *http.Request) string {
 	if key := strings.TrimSpace(req.Header.Get("x-api-key")); key != "" {
 		return key
 	}
-	// Gemini/Google clients commonly send API key via x-goog-api-key.
-	if key := strings.TrimSpace(req.Header.Get("x-goog-api-key")); key != "" {
-		return key
-	}
-	// Gemini AI Studio compatibility: allow query key fallback only when no
-	// header-based credential is present.
-	if key := strings.TrimSpace(req.URL.Query().Get("key")); key != "" {
-		return key
-	}
-	return strings.TrimSpace(req.URL.Query().Get("api_key"))
+	return ""
 }
 
 func callerTokenID(token string) string {

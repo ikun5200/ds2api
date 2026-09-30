@@ -150,9 +150,3 @@ func TestIsJSONContentType(t *testing.T) {
 		}
 	}
 }
-
-func TestIsKnownJSONRequestPathIncludesGeminiStream(t *testing.T) {
-	if !isKnownJSONRequestPath(http.MethodPost, "/v1beta/models/gemini-pro:streamGenerateContent") {
-		t.Fatal("expected Gemini stream generate path to be recognized as json")
-	}
-}

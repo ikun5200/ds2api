@@ -35,12 +35,9 @@ type DeepSeekCaller interface {
 
 type ConfigReader interface {
 	ModelAliases() map[string]string
-	ToolcallMode() string
-	ToolcallEarlyEmitConfidence() string
 	ResponsesStoreTTLSeconds() int
 	EmbeddingsProvider() string
 	AutoDeleteMode() string
-	AutoDeleteSessions() bool
 	CurrentInputFileEnabled() bool
 	CurrentInputFileMinChars() int
 	ThinkingInjectionEnabled() bool

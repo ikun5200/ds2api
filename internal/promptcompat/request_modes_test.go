@@ -43,3 +43,44 @@ func TestRequestModesOverrideLegacySearchAndRespectNoThinking(t *testing.T) {
 		t.Fatalf("expected explicit search=false and forced thinking=false, got %v/%v", thinking, search)
 	}
 }
+
+func TestSearchModelDefaultsReachCompletionAcrossOpenAISurfaces(t *testing.T) {
+	for _, surface := range []string{"chat", "responses"} {
+		for _, tc := range []struct {
+			name, model      string
+			overrides        map[string]any
+			thinking, search bool
+		}{
+			{"default", "deepseek-flash-search", nil, true, true},
+			{"nothinking", "deepseek-flash-search-nothinking", map[string]any{"thinking_enabled": true}, false, true},
+			{"explicit_off", "deepseek-flash-search", map[string]any{"search_enabled": false}, true, false},
+			{"extra_body_off", "deepseek-flash-search", map[string]any{"extra_body": map[string]any{"search_enabled": false}}, true, false},
+		} {
+			t.Run(surface+"/"+tc.name, func(t *testing.T) {
+				req := map[string]any{"model": tc.model}
+				for key, value := range tc.overrides {
+					req[key] = value
+				}
+				var std StandardRequest
+				var err error
+				if surface == "responses" {
+					req["input"] = "hello"
+					std, err = NormalizeOpenAIResponsesRequest(nil, req, "")
+				} else {
+					req["messages"] = []any{map[string]any{"role": "user", "content": "hello"}}
+					std, err = NormalizeOpenAIChatRequest(nil, req, "")
+				}
+				if err != nil {
+					t.Fatal(err)
+				}
+				payload := std.CompletionPayload("session")
+				if payload["search_enabled"] != tc.search || payload["thinking_enabled"] != tc.thinking || payload["model_type"] != "default" {
+					t.Fatalf("unexpected search model payload: %#v", payload)
+				}
+				if std.ResponseModel != tc.model {
+					t.Fatalf("expected response model %q, got %q", tc.model, std.ResponseModel)
+				}
+			})
+		}
+	}
+}

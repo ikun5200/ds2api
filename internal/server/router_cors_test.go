@@ -50,7 +50,7 @@ func TestCORSPreflightAllowsThirdPartyRequestedHeaders(t *testing.T) {
 
 func TestBuildCORSAllowHeadersKeepsDefaultsWithoutRequest(t *testing.T) {
 	got := strings.ToLower(buildCORSAllowHeaders(nil))
-	for _, want := range []string{"content-type", "x-goog-api-key", "anthropic-version", "x-ds2-source"} {
+	for _, want := range []string{"content-type", "authorization", "x-api-key", "x-ds2-source"} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("expected default allow headers to include %q, got %q", want, got)
 		}
@@ -77,14 +77,14 @@ func TestAppCORSPreflightIsUnifiedAcrossInterfaces(t *testing.T) {
 			headers: "authorization, x-stainless-os",
 		},
 		{
-			name:    "claude",
-			path:    "/anthropic/v1/messages",
-			headers: "x-api-key, anthropic-version, x-stainless-os",
+			name:    "ollama",
+			path:    "/api/tags",
+			headers: "authorization, x-requested-with",
 		},
 		{
-			name:    "gemini",
-			path:    "/v1beta/models/gemini-2.5-pro:generateContent",
-			headers: "x-goog-api-key, x-client-version",
+			name:    "openai-root-alias",
+			path:    "/chat/completions",
+			headers: "authorization, content-type, x-stainless-os",
 		},
 		{
 			name:    "admin",

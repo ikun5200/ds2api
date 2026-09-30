@@ -1,9 +1,6 @@
 package util
 
-const (
-	defaultTokenizerModel = "gpt-4o"
-	claudeTokenizerModel  = "claude"
-)
+const defaultTokenizerModel = "gpt-4o"
 
 func CountPromptTokens(text, model string) int {
 	base := maxTokenCount(

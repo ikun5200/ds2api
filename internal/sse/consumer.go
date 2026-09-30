@@ -22,8 +22,7 @@ type CollectResult struct {
 
 // CollectStream fully consumes a DeepSeek SSE response and separates
 // thinking content from text content. This replaces the duplicated
-// stream-collection logic in openai.handleNonStream, claude.collectDeepSeek,
-// and admin.testAccount.
+// stream-collection logic in admin.testAccount.
 //
 // The caller is responsible for closing resp.Body unless closeBody is true.
 func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) CollectResult {

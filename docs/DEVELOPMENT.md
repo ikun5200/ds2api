@@ -42,7 +42,6 @@ gofmt -w <changed-go-files>
 | --- | --- |
 | 总路由、CORS、健康检查 | `internal/server/router.go` |
 | OpenAI Chat / Responses | `internal/httpapi/openai/chat`、`internal/httpapi/openai/responses` |
-| Claude / Gemini 兼容入口 | `internal/httpapi/claude`、`internal/httpapi/gemini` |
 | API 请求归一到网页纯文本上下文 | `internal/promptcompat`、`docs/prompt-compatibility.md` |
 | 工具调用解析与流式防泄漏 | `internal/toolcall`、`internal/toolstream`、`docs/toolcall-semantics.md` |
 | DeepSeek 上游调用、登录、PoW、代理 | `internal/deepseek/client`、`internal/deepseek/transport` |
@@ -68,7 +67,7 @@ gofmt -w <changed-go-files>
 3. 请求归一化：`internal/promptcompat` 或协议转换包。
 4. 上游请求：`internal/deepseek/client`。
 5. 流式输出：`internal/stream`、`internal/sse`、`internal/toolstream`。
-6. 响应格式：主路径看 `internal/assistantturn` 与 `internal/format/*`；`internal/translatorcliproxy` 只用于 Vercel/fallback/test 桥接。
+6. 响应格式：主路径看 `internal/assistantturn` 与 `internal/format/*`。
 
 对话记录页面问题优先检查：
 

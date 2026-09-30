@@ -3,8 +3,6 @@ package util
 import (
 	"strings"
 	"testing"
-
-	"ds2api/internal/config"
 )
 
 func TestMessagesPrepareBasic(t *testing.T) {
@@ -86,52 +84,6 @@ func TestMessagesPrepareArrayTextVariants(t *testing.T) {
 	}
 	if !strings.Contains(got, "Clean-answer directive") {
 		t.Fatalf("expected output integrity guard in %q", got)
-	}
-}
-
-func TestConvertClaudeToDeepSeek(t *testing.T) {
-	store := config.LoadStore()
-	req := map[string]any{
-		"model":    "claude-opus-4-6",
-		"messages": []any{map[string]any{"role": "user", "content": "Hi"}},
-		"system":   "You are helpful",
-		"stream":   true,
-	}
-	out := ConvertClaudeToDeepSeek(req, store)
-	if out["model"] == "" {
-		t.Fatal("expected mapped model")
-	}
-	msgs, ok := out["messages"].([]any)
-	if !ok || len(msgs) == 0 {
-		t.Fatal("expected messages")
-	}
-	first, _ := msgs[0].(map[string]any)
-	if first["role"] != "system" {
-		t.Fatalf("expected first message system, got %#v", first)
-	}
-}
-
-func TestConvertClaudeToDeepSeekUsesGlobalAliasResolution(t *testing.T) {
-	store := config.LoadStore()
-	req := map[string]any{
-		"model":    "claude-3-5-sonnet-latest",
-		"messages": []any{map[string]any{"role": "user", "content": "Hi"}},
-	}
-	out := ConvertClaudeToDeepSeek(req, store)
-	if out["model"] != "deepseek-v4-flash" {
-		t.Fatalf("expected global alias resolution, got model=%q", out["model"])
-	}
-}
-
-func TestConvertClaudeToDeepSeekUsesNoThinkingAliasResolution(t *testing.T) {
-	store := config.LoadStore()
-	req := map[string]any{
-		"model":    "claude-sonnet-4-6-nothinking",
-		"messages": []any{map[string]any{"role": "user", "content": "Hi"}},
-	}
-	out := ConvertClaudeToDeepSeek(req, store)
-	if out["model"] != "deepseek-v4-flash-nothinking" {
-		t.Fatalf("expected noThinking alias resolution, got model=%q", out["model"])
 	}
 }
 

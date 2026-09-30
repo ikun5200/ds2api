@@ -17,8 +17,6 @@ import (
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
 	dsclient "ds2api/internal/deepseek/client"
-	"ds2api/internal/httpapi/claude"
-	"ds2api/internal/httpapi/gemini"
 )
 
 type fileOwnerResolver struct {
@@ -91,8 +89,6 @@ func fileOwnershipRouter(t *testing.T) (chi.Router, *fileOwnerResolver, *fileOwn
 	h := &openAITestSurface{Store: store, Auth: resolver, DS: ds}
 	router := chi.NewRouter()
 	registerOpenAITestRoutes(router, h)
-	claude.RegisterRoutes(router, &claude.Handler{Store: store, Auth: resolver, DS: ds})
-	gemini.RegisterRoutes(router, &gemini.Handler{Store: store, Auth: resolver, DS: ds})
 	return router, resolver, ds
 }
 
@@ -110,12 +106,10 @@ func uploadOwnedTestFile(t *testing.T, router http.Handler, target string) {
 	}
 }
 
-func TestUploadedFileFollowsOwningAccountAcrossProtocols(t *testing.T) {
+func TestUploadedFileFollowsOwningAccountAcrossOpenAISurfaces(t *testing.T) {
 	for _, tc := range []struct{ path, body string }{
 		{"/v1/chat/completions", `{"model":"deepseek-flash","messages":[{"role":"user","content":"describe"}],"file_ids":["file-a"]}`},
 		{"/v1/responses", `{"model":"deepseek-flash","input":"describe","file_ids":["file-a"]}`},
-		{"/anthropic/v1/messages", `{"model":"deepseek-flash","messages":[{"role":"user","content":[{"type":"image","source":{"type":"file","file_id":"file-a"}}]}]}`},
-		{"/v1beta/models/deepseek-flash:generateContent", `{"contents":[{"role":"user","parts":[{"text":"describe"}]}],"ref_file_ids":["file-a"]}`},
 	} {
 		t.Run(tc.path, func(t *testing.T) {
 			router, resolver, ds := fileOwnershipRouter(t)

@@ -327,7 +327,7 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # 个人账号可留空
 当你需要 **跨冷启动、跨容器、跨实例持久保存 Chat history** 时，可以把存储后端切到外部 SQL 数据库。外部存储目前只负责服务端 Chat history，包括：
 
 - 响应记录列表、详情、状态、模型、账号、调用方、耗时、finish reason、usage 等归档信息；
-- OpenAI Chat、OpenAI Responses、Claude、Gemini 等接口通过共享历史链路写入的记录；
+- OpenAI Chat、OpenAI Responses 等接口通过共享历史链路写入的记录；
 - 管理台「响应记录」页面读取、删除、清空和调整保留条数所需的数据。
 
 外部存储 **不会** 接管账号、API Key、代理、Admin 密码、运行时设置等配置数据。这些仍然由 `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` 负责。这样做是为了避免部署启动配置和历史记录存储互相影响：配置仍可通过环境变量、配置文件和管理台同步管理；历史记录则可以独立放到数据库里。
@@ -762,7 +762,7 @@ go run ./cmd/ds2api-tests \
 
 - ✅ 语法/构建/单测 preflight
 - ✅ 隔离副本配置启动服务（不污染原始 `config.json`）
-- ✅ 真实调用场景验证（OpenAI/Claude/Admin/并发/toolcall/流式）
+- ✅ 真实调用场景验证（OpenAI/Admin/并发/toolcall/流式）
 - ✅ 全量请求与响应日志落盘（用于故障复盘）
 
 详细测试集说明参阅 [TESTING.md](TESTING.md)。PR 前的固定本地门禁以 [TESTING.md](TESTING.md#pr-门禁--pr-gates) 为准。

@@ -6,11 +6,6 @@ import (
 	"time"
 )
 
-func BuildChatCompletion(completionID, model, finalPrompt, finalThinking, finalText string, toolNames []string, toolsRaw any) map[string]any {
-	detected := toolcall.ParseAssistantToolCallsDetailed(finalText, finalThinking, toolNames)
-	return BuildChatCompletionWithToolCalls(completionID, model, finalPrompt, finalThinking, finalText, detected.Calls, toolsRaw)
-}
-
 func BuildChatCompletionWithToolCalls(completionID, model, finalPrompt, finalThinking, finalText string, detected []toolcall.ParsedToolCall, toolsRaw any) map[string]any {
 	finishReason := "stop"
 	messageObj := map[string]any{"role": "assistant", "content": finalText}

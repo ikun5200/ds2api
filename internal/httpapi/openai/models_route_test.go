@@ -9,7 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func TestListModelsRouteOnlyFlash(t *testing.T) {
+func TestListModelsRouteFlashVariants(t *testing.T) {
 	r := chi.NewRouter()
 	registerOpenAITestRoutes(r, &openAITestSurface{})
 	rec := httptest.NewRecorder()
@@ -25,8 +25,8 @@ func TestListModelsRouteOnlyFlash(t *testing.T) {
 	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 		t.Fatalf("decode model list: %v", err)
 	}
-	if len(payload.Data) != 1 || payload.Data[0].ID != "deepseek-flash" {
-		t.Fatalf("expected only deepseek-flash, got %s", rec.Body.String())
+	if len(payload.Data) != 2 || payload.Data[0].ID != "deepseek-flash" || payload.Data[1].ID != "deepseek-flash-search" {
+		t.Fatalf("expected flash and search models, got %s", rec.Body.String())
 	}
 }
 
@@ -35,14 +35,22 @@ func TestGetModelRouteDirectAndAlias(t *testing.T) {
 	r := chi.NewRouter()
 	registerOpenAITestRoutes(r, h)
 
-	for _, model := range []string{
-		"deepseek-flash", "deepseek-flash-nothinking",
-		"deepseek-v4-flash", "deepseek-v4-flash-nothinking",
-		"deepseek-v4-pro", "deepseek-v4-vision", "gpt-4.1",
-		"claude-sonnet-4-6-nothinking",
+	for _, tc := range []struct{ model, want string }{
+		{"deepseek-flash", "deepseek-flash"},
+		{"deepseek-flash-nothinking", "deepseek-flash"},
+		{"deepseek-flash-search", "deepseek-flash-search"},
+		{"deepseek-flash-search-nothinking", "deepseek-flash-search"},
+		{"deepseek-v4-flash", "deepseek-flash"},
+		{"deepseek-v4-flash-nothinking", "deepseek-flash"},
+		{"deepseek-v4-pro", "deepseek-flash"},
+		{"deepseek-v4-vision", "deepseek-flash"},
+		{"deepseek-v4-pro-search", "deepseek-flash-search"},
+		{"gpt-4.1", "deepseek-flash"},
+		{"o3-deep-research", "deepseek-flash-search"},
+		{"gpt-4.1-nothinking", "deepseek-flash"},
 	} {
-		t.Run(model, func(t *testing.T) {
-			req := httptest.NewRequest(http.MethodGet, "/v1/models/"+model, nil)
+		t.Run(tc.model, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/v1/models/"+tc.model, nil)
 			rec := httptest.NewRecorder()
 			r.ServeHTTP(rec, req)
 			if rec.Code != http.StatusOK {
@@ -54,8 +62,8 @@ func TestGetModelRouteDirectAndAlias(t *testing.T) {
 			if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
 				t.Fatalf("decode model: %v", err)
 			}
-			if payload.ID != "deepseek-flash" {
-				t.Fatalf("expected canonical model ID, got %q", payload.ID)
+			if payload.ID != tc.want {
+				t.Fatalf("expected canonical model ID %q, got %q", tc.want, payload.ID)
 			}
 		})
 	}

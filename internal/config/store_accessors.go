@@ -21,14 +21,6 @@ func (s *Store) ModelAliases() map[string]string {
 	return out
 }
 
-func (s *Store) ToolcallMode() string {
-	return "feature_match"
-}
-
-func (s *Store) ToolcallEarlyEmitConfidence() string {
-	return "high"
-}
-
 func (s *Store) ResponsesStoreTTLSeconds() int {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
@@ -139,10 +131,6 @@ func (s *Store) RuntimeTokenRefreshIntervalHours() int {
 		return s.cfg.Runtime.TokenRefreshIntervalHours
 	}
 	return 6
-}
-
-func (s *Store) AutoDeleteSessions() bool {
-	return s.AutoDeleteMode() != "none"
 }
 
 func (s *Store) CurrentInputFileEnabled() bool {

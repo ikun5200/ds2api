@@ -876,11 +876,12 @@ test('node stream path guard allows OpenAI v1 and root alias chat completions pa
   assert.equal(isNodeStreamSupportedPath('/chat/completions?x=1'), true);
   assert.equal(isNodeStreamSupportedPath('/v1beta/models/gemini-2.5-flash:streamGenerateContent'), false);
   assert.equal(isNodeStreamSupportedPath('/anthropic/v1/messages'), false);
+  assert.equal(isNodeStreamSupportedPath('/v1/responses'), false);
 });
 
 test('extractPathname strips query only', () => {
   assert.equal(extractPathname('/v1/chat/completions?stream=true'), '/v1/chat/completions');
-  assert.equal(extractPathname('/v1beta/models/gemini-2.5-flash:streamGenerateContent?key=1'), '/v1beta/models/gemini-2.5-flash:streamGenerateContent');
+  assert.equal(extractPathname('/v1/models/gemini-2.5-flash:streamGenerateContent?key=1'), '/v1/models/gemini-2.5-flash:streamGenerateContent');
   assert.equal(extractPathname('/chat/completions?stream=true'), '/chat/completions');
 });
 

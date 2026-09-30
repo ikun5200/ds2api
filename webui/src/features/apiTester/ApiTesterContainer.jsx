@@ -70,7 +70,7 @@ export default function ApiTesterContainer({ config, onMessage, authFetch }) {
                 const modelIDs = Array.isArray(data?.data)
                     ? data.data
                         .map((item) => String(item?.id || '').trim())
-                        .filter((id) => id === 'deepseek-flash')
+                        .filter((id) => id === 'deepseek-flash' || id === 'deepseek-flash-search')
                     : []
                 if (!disposed) {
                     setAvailableModelIDs(modelIDs)
@@ -97,7 +97,7 @@ export default function ApiTesterContainer({ config, onMessage, authFetch }) {
         () => [...new Set(availableModelIDs)].map((modelID) => ({
             id: modelID,
             name: modelID,
-            desc: t('apiTester.models.flash'),
+            desc: t(modelID.endsWith('-search') ? 'apiTester.models.flashSearch' : 'apiTester.models.flash'),
         })),
         [availableModelIDs, t]
     )

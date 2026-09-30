@@ -30,7 +30,3 @@ func BuildResponsesUsageForModel(model, finalPrompt, finalThinking, finalText st
 		"total_tokens":  promptTokens + reasoningTokens + completionTokens,
 	}
 }
-
-func BuildResponsesUsage(finalPrompt, finalThinking, finalText string) map[string]any {
-	return BuildResponsesUsageForModel("", finalPrompt, finalThinking, finalText, 0)
-}

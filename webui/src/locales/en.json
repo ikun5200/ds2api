@@ -78,11 +78,11 @@
         "visualDocs": "Visual Docs",
         "consoleLabel": "Online Admin Console",
         "kicker": "DeepSeek compatible gateway",
-        "subtitle": "Convert DeepSeek Web chat into OpenAI, Claude, and Gemini compatible APIs, with optional external database storage for response records.",
+        "subtitle": "Convert DeepSeek Web chat into an OpenAI-compatible API, with optional external database storage for response records.",
         "features": {
             "compatibility": {
                 "title": "Full Compatibility",
-                "desc": "OpenAI & Claude format support"
+                "desc": "OpenAI format support"
             },
             "loadBalancing": {
                 "title": "Load Balancing",
@@ -114,12 +114,12 @@
             "title": "Recommended reading order",
             "deploy": "1. Start with deployment options for Docker, Vercel, Zeabur, or local source runs.",
             "config": "2. Review external storage and the config example to decide where response records should live.",
-            "client": "3. Use the API reference to connect OpenAI, Claude, or Gemini-compatible clients."
+            "client": "3. Use the API reference to connect OpenAI-compatible clients."
         },
         "flow": {
             "client": {
                 "title": "Client / SDK",
-                "desc": "Compatible clients call DS2API through OpenAI, Claude, or Gemini-shaped requests."
+                "desc": "Compatible clients call DS2API through OpenAI-shaped requests."
             },
             "adapter": {
                 "title": "Protocol adapter",
@@ -145,7 +145,7 @@
             },
             "api": {
                 "title": "API reference",
-                "desc": "Auth, models, Chat, Responses, Claude, Gemini, and Admin API."
+                "desc": "Auth, models, Chat, Responses, Files, and Admin API."
             },
             "arch": {
                 "title": "Architecture",
@@ -306,7 +306,8 @@
     "apiTester": {
         "defaultMessage": "Hello, please introduce yourself in one sentence.",
         "models": {
-            "flash": "DeepSeek Flash · Thinking, web search, files and images"
+            "flash": "DeepSeek Flash · Thinking, web search, files and images",
+            "flashSearch": "DeepSeek Flash Search · Web search on by default, with thinking, files and images"
         },
         "missingApiKey": "Please provide an API key.",
         "requestFailed": "Request failed.",
@@ -349,7 +350,7 @@
         "loading": "Loading conversation history...",
         "loadFailed": "Failed to load conversation history.",
         "retentionTitle": "Retention",
-        "retentionDesc": "The server keeps only the latest N DeepSeek upstream response records across OpenAI Chat, OpenAI Responses, Claude, and Gemini direct interfaces.",
+        "retentionDesc": "The server keeps only the latest N DeepSeek upstream response records across the OpenAI Chat and OpenAI Responses interfaces.",
         "off": "OFF",
         "refresh": "Refresh",
         "clearAll": "Clear all",

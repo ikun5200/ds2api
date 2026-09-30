@@ -27,23 +27,26 @@ type ModelAliasReader interface {
 	ModelAliases() map[string]string
 }
 
-// DefaultDeepSeekModel is the single model advertised by the API.
+// DefaultDeepSeekModel is the default model advertised by the API.
 const DefaultDeepSeekModel = "deepseek-flash"
+
+const SearchDeepSeekModel = DefaultDeepSeekModel + "-search"
 
 const noThinkingModelSuffix = "-nothinking"
 
-// Only the current upstream model is advertised. Historical model names remain
-// accepted below so existing clients can retain their thinking/search defaults.
+// Both entries use the current upstream model with different search defaults.
+// Historical names remain accepted so clients retain their mode defaults.
 var DeepSeekModels = []ModelInfo{
 	{ID: DefaultDeepSeekModel, Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
+	{ID: SearchDeepSeekModel, Object: "model", Created: 1677610602, OwnedBy: "deepseek", Permission: []any{}},
 }
 
 var OllamaCapabilitiesModels = []OllamaCapabilitiesModelInfo{
 	{ID: DefaultDeepSeekModel, Capabilities: []string{"tools", "thinking", "vision"}},
+	{ID: SearchDeepSeekModel, Capabilities: []string{"tools", "thinking", "vision"}},
 }
 
 var OllamaModels = mapToOllamaModels(DeepSeekModels)
-var ClaudeModels = DeepSeekModels
 
 func GetModelConfig(model string) (thinking bool, search bool, ok bool) {
 	baseModel, noThinking := splitNoThinkingModel(model)
@@ -53,7 +56,7 @@ func GetModelConfig(model string) (thinking bool, search bool, ok bool) {
 	switch baseModel {
 	case DefaultDeepSeekModel, "deepseek-v4-flash", "deepseek-v4-pro", "deepseek-v4-vision":
 		return !noThinking, false, true
-	case "deepseek-v4-flash-search", "deepseek-v4-pro-search":
+	case SearchDeepSeekModel, "deepseek-v4-flash-search", "deepseek-v4-pro-search":
 		return !noThinking, true, true
 	default:
 		return false, false, false
@@ -128,55 +131,6 @@ func DefaultModelAliases() map[string]string {
 		"o4-mini":               "deepseek-v4-pro",
 		"o4-mini-deep-research": "deepseek-v4-pro-search",
 
-		// Claude current and historical aliases
-		"claude-opus-4-6":            "deepseek-v4-pro",
-		"claude-opus-4-1":            "deepseek-v4-pro",
-		"claude-opus-4-1-20250805":   "deepseek-v4-pro",
-		"claude-opus-4-0":            "deepseek-v4-pro",
-		"claude-opus-4-20250514":     "deepseek-v4-pro",
-		"claude-sonnet-4-6":          "deepseek-v4-flash",
-		"claude-sonnet-4-5":          "deepseek-v4-flash",
-		"claude-sonnet-4-5-20250929": "deepseek-v4-flash",
-		"claude-sonnet-4-0":          "deepseek-v4-flash",
-		"claude-sonnet-4-20250514":   "deepseek-v4-flash",
-		"claude-haiku-4-5":           "deepseek-v4-flash",
-		"claude-haiku-4-5-20251001":  "deepseek-v4-flash",
-		"claude-3-7-sonnet":          "deepseek-v4-flash",
-		"claude-3-7-sonnet-latest":   "deepseek-v4-flash",
-		"claude-3-7-sonnet-20250219": "deepseek-v4-flash",
-		"claude-3-5-sonnet":          "deepseek-v4-flash",
-		"claude-3-5-sonnet-latest":   "deepseek-v4-flash",
-		"claude-3-5-sonnet-20240620": "deepseek-v4-flash",
-		"claude-3-5-sonnet-20241022": "deepseek-v4-flash",
-		"claude-3-5-haiku":           "deepseek-v4-flash",
-		"claude-3-5-haiku-latest":    "deepseek-v4-flash",
-		"claude-3-5-haiku-20241022":  "deepseek-v4-flash",
-		"claude-3-opus":              "deepseek-v4-pro",
-		"claude-3-opus-20240229":     "deepseek-v4-pro",
-		"claude-3-sonnet":            "deepseek-v4-flash",
-		"claude-3-sonnet-20240229":   "deepseek-v4-flash",
-		"claude-3-haiku":             "deepseek-v4-flash",
-		"claude-3-haiku-20240307":    "deepseek-v4-flash",
-
-		// Gemini current and historical text / multimodal models
-		"gemini-pro":            "deepseek-v4-pro",
-		"gemini-pro-vision":     "deepseek-v4-vision",
-		"gemini-pro-latest":     "deepseek-v4-pro",
-		"gemini-flash-latest":   "deepseek-v4-flash",
-		"gemini-1.5-pro":        "deepseek-v4-pro",
-		"gemini-1.5-flash":      "deepseek-v4-flash",
-		"gemini-1.5-flash-8b":   "deepseek-v4-flash",
-		"gemini-2.0-flash":      "deepseek-v4-flash",
-		"gemini-2.0-flash-lite": "deepseek-v4-flash",
-		"gemini-2.5-pro":        "deepseek-v4-pro",
-		"gemini-2.5-flash":      "deepseek-v4-flash",
-		"gemini-2.5-flash-lite": "deepseek-v4-flash",
-		"gemini-3.1-pro":        "deepseek-v4-pro",
-		"gemini-3-pro":          "deepseek-v4-pro",
-		"gemini-3-flash":        "deepseek-v4-flash",
-		"gemini-3.1-flash":      "deepseek-v4-flash",
-		"gemini-3.1-flash-lite": "deepseek-v4-flash",
-
 		"llama-3.1-70b-instruct": "deepseek-v4-flash",
 		"qwen-max":               "deepseek-v4-flash",
 	}
@@ -216,10 +170,16 @@ func OpenAIModelsResponse() map[string]any {
 }
 
 func OpenAIModelByID(store ModelAliasReader, id string) (ModelInfo, bool) {
-	if _, ok := ResolveModel(store, id); !ok {
+	modelID, ok := advertisedModelID(store, id)
+	if !ok {
 		return ModelInfo{}, false
 	}
-	return DeepSeekModels[0], true
+	for _, model := range DeepSeekModels {
+		if model.ID == modelID {
+			return model, true
+		}
+	}
+	return ModelInfo{}, false
 }
 
 func OllamaModelsResponse() map[string]any {
@@ -227,23 +187,27 @@ func OllamaModelsResponse() map[string]any {
 }
 
 func OllamaModelByID(store ModelAliasReader, id string) (OllamaCapabilitiesModelInfo, bool) {
-	if _, ok := ResolveModel(store, id); !ok {
+	modelID, ok := advertisedModelID(store, id)
+	if !ok {
 		return OllamaCapabilitiesModelInfo{}, false
 	}
-	return OllamaCapabilitiesModels[0], true
+	for _, model := range OllamaCapabilitiesModels {
+		if model.ID == modelID {
+			return model, true
+		}
+	}
+	return OllamaCapabilitiesModelInfo{}, false
 }
 
-func ClaudeModelsResponse() map[string]any {
-	resp := map[string]any{"object": "list", "data": ClaudeModels}
-	if len(ClaudeModels) > 0 {
-		resp["first_id"] = ClaudeModels[0].ID
-		resp["last_id"] = ClaudeModels[len(ClaudeModels)-1].ID
-	} else {
-		resp["first_id"] = nil
-		resp["last_id"] = nil
+func advertisedModelID(store ModelAliasReader, id string) (string, bool) {
+	resolved, ok := ResolveModel(store, id)
+	if !ok {
+		return "", false
 	}
-	resp["has_more"] = false
-	return resp
+	if _, search, _ := GetModelConfig(resolved); search {
+		return SearchDeepSeekModel, true
+	}
+	return DefaultDeepSeekModel, true
 }
 
 func mapToOllamaModels(models []ModelInfo) []OllamaModelInfo {

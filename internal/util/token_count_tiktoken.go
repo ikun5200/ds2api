@@ -84,8 +84,6 @@ func tokenizerModelForCount(model string) string {
 		return defaultTokenizerModel
 	}
 	switch {
-	case strings.HasPrefix(model, "claude"):
-		return claudeTokenizerModel
 	case strings.HasPrefix(model, "gpt-4"), strings.HasPrefix(model, "gpt-5"), strings.HasPrefix(model, "o1"), strings.HasPrefix(model, "o3"), strings.HasPrefix(model, "o4"):
 		return defaultTokenizerModel
 	case strings.HasPrefix(model, "deepseek-v4"):

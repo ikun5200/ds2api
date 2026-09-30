@@ -36,33 +36,6 @@ func parseSSEFrames(body []byte) ([]map[string]any, bool) {
 	return frames, done
 }
 
-func parseClaudeStreamEvents(body []byte) []string {
-	events := []string{}
-	seen := map[string]bool{}
-	lines := strings.Split(string(body), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if !strings.HasPrefix(line, "data:") {
-			continue
-		}
-		payload := strings.TrimSpace(strings.TrimPrefix(line, "data:"))
-		if payload == "" {
-			continue
-		}
-		var m map[string]any
-		if err := json.Unmarshal([]byte(payload), &m); err != nil {
-			continue
-		}
-		t := asString(m["type"])
-		if t == "" || seen[t] {
-			continue
-		}
-		seen[t] = true
-		events = append(events, t)
-	}
-	return events
-}
-
 func extractModelIDs(body []byte) []string {
 	var m map[string]any
 	if err := json.Unmarshal(body, &m); err != nil {
@@ -190,13 +163,4 @@ func toInt(v any) int {
 	default:
 		return 0
 	}
-}
-
-func contains(xs []string, target string) bool {
-	for _, x := range xs {
-		if x == target {
-			return true
-		}
-	}
-	return false
 }

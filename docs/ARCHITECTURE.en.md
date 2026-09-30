@@ -24,7 +24,6 @@ ds2api/
 │   ├── account/                          # Account pool, inflight slots, waiting queue
 │   ├── auth/                             # Auth/JWT/credential resolution
 │   ├── chathistory/                      # Server-side conversation history storage/query
-│   ├── claudeconv/                       # Claude message conversion helpers
 │   ├── compat/                           # Compatibility and regression helpers
 │   ├── assistantturn/                    # Upstream output to canonical assistant turn / stream event semantics
 │   ├── completionruntime/                # Shared Go DeepSeek completion startup, collection, empty-output/account-switch retry
@@ -35,12 +34,9 @@ ds2api/
 │   │   └── transport/                    # DeepSeek transport details
 │   ├── devcapture/                       # Dev capture and troubleshooting
 │   ├── format/                           # Response formatting layer
-│   │   ├── claude/                       # Claude output formatting
 │   │   └── openai/                       # OpenAI output formatting
-│   ├── httpapi/                          # HTTP surfaces: OpenAI/Claude/Gemini/Admin
+│   ├── httpapi/                          # HTTP surfaces: OpenAI/Ollama/Admin
 │   │   ├── admin/                        # Admin API root assembly and resource packages
-│   │   ├── claude/                       # Claude HTTP protocol adapter
-│   │   ├── gemini/                       # Gemini HTTP protocol adapter
 │   │   ├── ollama/                       # Ollama-compatible model/capability query endpoints
 │   │   ├── openai/                       # OpenAI HTTP surface
 │   │   │   ├── chat/                     # Chat Completions execution entrypoint
@@ -68,7 +64,6 @@ ds2api/
 │   ├── textclean/                        # Text cleanup
 │   ├── toolcall/                         # Tool-call parsing and repair
 │   ├── toolstream/                       # Go streaming tool-call anti-leak and delta detection
-│   ├── translatorcliproxy/               # Vercel/fallback/test protocol translation bridge
 │   ├── util/                             # Shared utility helpers
 │   ├── version/                          # Version query/compare
 │   └── webui/                            # WebUI static hosting logic
@@ -119,8 +114,6 @@ flowchart LR
         CHAT[openai/chat]
         RESP[openai/responses]
         FILES[openai/files + embeddings]
-        CA[internal/httpapi/claude]
-        GA[internal/httpapi/gemini]
         AD[internal/httpapi/admin/*]
         WEB[internal/webui static admin]
     end
@@ -138,7 +131,7 @@ flowchart LR
         TURN[internal/assistantturn]
         STREAM[internal/stream + internal/sse]
         TOOL[internal/toolcall + internal/toolstream]
-        FMT[internal/format/openai + claude]
+        FMT[internal/format/openai]
         DS[internal/deepseek/client]
         POW[pow + internal/deepseek/protocol]
     end
@@ -151,14 +144,10 @@ flowchart LR
     R --> OA --> CHAT
     OA --> RESP
     OA --> FILES
-    R --> CA
-    R --> GA
     R --> AD
     R --> WEB
     R -.Vercel stream.-> NCS
 
-    CA --> PC
-    GA --> PC
     CHAT --> PC
     RESP --> PC
     PC --> PROMPT
@@ -173,8 +162,6 @@ flowchart LR
     AUTH --> POOL
     CHAT --> CR
     RESP --> CR
-    CA --> CR
-    GA --> CR
     CR --> DS
     CR --> STREAM
     CR --> TURN
@@ -190,13 +177,12 @@ flowchart LR
 
 - `internal/server`: router tree + middlewares (health, protocol routes, Admin/WebUI).
 - `internal/httpapi/openai/*`: OpenAI HTTP surface split into chat, responses, files, embeddings, history, and shared packages; chat/responses share the promptcompat, stream, and toolcall semantics.
-- `internal/httpapi/{claude,gemini}`: protocol adapters that normalize into the same prompt compatibility semantics; normal direct paths must share DeepSeek session/PoW/completion execution through `completionruntime`, while `translatorcliproxy` is reserved for Vercel prepare/release, missing-backend fallback, and regression tests.
+- Protocol adapter boundary: HTTP protocol entrypoints first normalize their protocol-specific request shapes into the project-standard request/turn model, run shared business logic (empty-output retry, thinking, tool call, usage, file injection, completion payload assembly, etc.) once on the normalized path, and then render back to the target protocol at the boundary. This "normalize -> share -> render" pattern itself remains a project design principle; the currently adapted protocols are the OpenAI family and the Ollama-compatible query endpoints. Protocol-specific differences stay as explicit adapter concerns and must not sink into shared business logic. Normal direct paths must share DeepSeek session/PoW/completion execution through `completionruntime`.
 - `internal/httpapi/ollama`: Ollama-compatible model list and capability query endpoints.
 - `internal/httpapi/requestbody`: shared HTTP body reading, JSON pre-validation, and UTF-8 error helpers across protocol adapters.
-- `internal/promptcompat`: compatibility core for turning OpenAI/Claude/Gemini requests into DeepSeek web-chat plain-text context.
+- `internal/promptcompat`: compatibility core for turning OpenAI requests into DeepSeek web-chat plain-text context.
 - `internal/assistantturn`: Go output-side canonical semantics, converting DeepSeek SSE collection results and stream finalization state into assistant turns and centralizing thinking, tool call, citation, usage, stop/error behavior.
 - `internal/completionruntime`: shared Go completion execution helpers for DeepSeek session/PoW/call startup, non-stream collection, empty-output retry, and one managed-account fresh retry before a final 429; streaming paths use it to start upstream requests, continue to use `internal/stream` for real-time consumption, and use `assistantturn` during finalization.
-- `internal/translatorcliproxy`: bridge compatibility layer for Claude/Gemini and OpenAI shape translation; it is not the main business protocol conversion center.
 - `internal/deepseek/{client,protocol,transport}`: upstream requests, sessions, PoW adaptation, protocol constants, and transport details.
 - `internal/js/chat-stream` + `api/chat-stream.js`: Vercel Node streaming bridge; Go prepare/release owns auth, account lease, and completion payload assembly, while Node relays real-time SSE with Go-aligned finalization and tool sieve semantics.
 - `internal/stream` + `internal/sse`: Go stream parsing and incremental assembly.
@@ -207,7 +193,6 @@ flowchart LR
 - `internal/config`: config loading/validation + runtime settings hot-reload.
 - `internal/account`: managed account pool, inflight slots, waiting queue.
 - `internal/textclean`: text cleanup helpers, e.g. stripping `[reference: N]` markers.
-- `internal/claudeconv`: Claude API request to DeepSeek format conversion.
 - `internal/compat`: compatibility regression tests using SSE fixtures to verify output consistency.
 - `internal/rawsample`: upstream raw response capture, read/write, and management.
 - `internal/devcapture`: developer debug capture, storing HTTP request/response for troubleshooting.

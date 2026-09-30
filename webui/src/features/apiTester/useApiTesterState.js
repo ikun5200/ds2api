@@ -1,9 +1,13 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export function useApiTesterState({ t }) {
     const [model, setModel] = useState('deepseek-flash')
     const [thinkingEnabled, setThinkingEnabled] = useState(true)
     const [searchEnabled, setSearchEnabled] = useState(false)
+    const selectModel = useCallback((modelID) => {
+        setModel(modelID)
+        setSearchEnabled(modelID.endsWith('-search'))
+    }, [])
     const defaultMessage = t('apiTester.defaultMessage')
     const [message, setMessage] = useState(defaultMessage)
     const [apiKey, setApiKey] = useState('')
@@ -27,7 +31,7 @@ export function useApiTesterState({ t }) {
 
     return {
         model,
-        setModel,
+        setModel: selectModel,
         thinkingEnabled,
         setThinkingEnabled,
         searchEnabled,

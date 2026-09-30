@@ -6,7 +6,7 @@ import (
 )
 
 // ResolveRequestModes is shared by every protocol after adapter-specific mode
-// fields have been normalized. Model aliases only supply compatibility defaults.
+// fields have been normalized. Model names and aliases supply mode defaults.
 func ResolveRequestModes(req map[string]any, model string) (thinking, search bool) {
 	defaultThinking, defaultSearch, _ := config.GetModelConfig(model)
 	thinking = util.ResolveThinkingEnabled(req, defaultThinking)
