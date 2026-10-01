@@ -1,7 +1,6 @@
 import { useState } from 'react'
 import { Key, ArrowRight, ShieldCheck, Lock, Check } from 'lucide-react'
 import { useI18n } from '../i18n'
-import LanguageToggle from './LanguageToggle'
 
 export default function Login({ onLogin, onMessage }) {
     const { t } = useI18n()
@@ -46,8 +45,7 @@ export default function Login({ onLogin, onMessage }) {
     return (
         <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-background text-foreground">
             <div className="absolute top-6 right-6">
-                <LanguageToggle />
-            </div>
+                            </div>
 
             <div className="w-full max-w-[400px] relative z-10 animate-in fade-in zoom-in-95 duration-200">
                 <div className="w-full bg-card border border-border rounded-lg p-8 shadow-sm">

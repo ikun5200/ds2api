@@ -89,8 +89,8 @@ func TestWelcomeAndDocsPagesExposeVisualDocs(t *testing.T) {
 	}
 	indexBody := indexRec.Body.String()
 	if !strings.Contains(indexBody, `href="/docs"`) ||
-		!strings.Contains(indexBody, "图形化文档") ||
-		!strings.Contains(indexBody, "响应记录存储") {
+		!strings.Contains(indexBody, "查看文档") ||
+		!strings.Contains(indexBody, "进入管理面板") {
 		t.Fatalf("index page should link to visual docs, got: %s", indexBody)
 	}
 

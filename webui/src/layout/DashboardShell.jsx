@@ -17,7 +17,6 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 
-import LanguageToggle from '../components/LanguageToggle'
 import { useI18n } from '../i18n'
 
 const AccountManagerContainer = lazy(() => import('../features/account/AccountManagerContainer'))
@@ -63,11 +62,14 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
     const adminBasePath = pathSegments[0] === 'admin' ? '/admin' : ''
     const activeNavItem = navItems.find(n => n.id === activeTab)
 
+    useEffect(() => {
+        if (!tabIds.has(pathTab)) {
+            navigate(`${adminBasePath}/accounts`, { replace: true })
+        }
+    }, [adminBasePath, navigate, pathTab, tabIds])
+
     const navigateToTab = useCallback((tabID) => {
-        const nextPath = tabID === 'accounts'
-            ? `${adminBasePath || ''}/`
-            : `${adminBasePath}/${tabID}`
-        navigate(nextPath)
+        navigate(`${adminBasePath}/${tabID}`)
         setSidebarOpen(false)
     }, [adminBasePath, navigate])
 
@@ -151,8 +153,7 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
                     </div>
                     <div className="flex items-center justify-between mt-2">
                         <p className="text-[10px] text-muted-foreground font-semibold tracking-[0.1em] uppercase opacity-60 px-1">{t('sidebar.onlineAdminConsole')}</p>
-                        <LanguageToggle />
-                    </div>
+                                            </div>
                 </div>
 
                 <nav className="flex-1 px-3 space-y-1 overflow-y-auto pt-2">
@@ -233,8 +234,7 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
                         <span className="font-semibold text-sm">DS2API</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <LanguageToggle />
-                        <button
+                                                <button
                             onClick={() => setSidebarOpen(true)}
                             className="p-2 -mr-2 text-muted-foreground hover:text-foreground"
                         >

@@ -133,7 +133,7 @@ flowchart LR
 | DeepSeek PoW | 纯 Go 高性能实现（DeepSeekHashV1），毫秒级响应 |
 | Tool Calling | 防泄漏处理：非代码块高置信特征识别、`delta.tool_calls` 早发、结构化增量输出 |
 | Admin API | 配置管理、运行时设置热更新、代理管理、账号测试 / 批量测试、会话清理、导入导出、Vercel 同步、版本检查 |
-| WebUI 管理台 | `/admin` 单页应用（中英文双语、深色模式，支持查看服务器端对话记录） |
+| WebUI 管理台 | `/admin` 单页应用（中文界面、深色模式，支持查看服务器端对话记录） |
 | 外部存储 | Chat history 默认使用内置 JSON 文件，也可切换到 PostgreSQL、MySQL 或 MariaDB，适合 Vercel、跨容器和多实例场景 |
 | 运维探针 | `GET /healthz`（存活）、`GET /readyz`（就绪） |
 

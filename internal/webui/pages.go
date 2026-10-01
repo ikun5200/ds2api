@@ -12,36 +12,24 @@ const welcomeHTML = `<!DOCTYPE html>
 body{margin:0;min-height:100vh;font-family:Inter,ui-sans-serif,system-ui,-apple-system,
 BlinkMacSystemFont,"Segoe UI",sans-serif;background:var(--bg);color:var(--fg)}
 main{min-height:100vh;display:grid;place-items:center;padding:32px}
-.shell{width:min(980px,100%);display:grid;grid-template-columns:1.2fr .8fr;gap:28px;align-items:center}
+.shell{width:min(680px,100%);margin:0 auto;text-align:center}
 .eyebrow{margin:0 0 12px;color:var(--primary);font-size:13px;font-weight:700;letter-spacing:0}
 h1{margin:0;font-size:64px;line-height:.98;letter-spacing:0}
 p{color:var(--muted);font-size:17px;line-height:1.7}
-.actions{display:flex;flex-wrap:wrap;gap:12px;margin-top:28px}
+.actions{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin-top:28px}
 a{display:inline-flex;min-height:42px;align-items:center;justify-content:center;
 border:1px solid var(--border);border-radius:8px;padding:10px 14px;color:var(--fg);
 font-weight:700;text-decoration:none;background:var(--card);overflow-wrap:anywhere}
 a.primary{background:var(--primary);border-color:var(--primary);color:#fff}
 a.accent{background:var(--accent);border-color:var(--accent);color:#fff}
-.panel{border:1px solid var(--border);border-radius:8px;background:var(--card);padding:22px;box-shadow:0 16px 40px rgba(16,24,40,.08)}
-.flow{display:grid;gap:12px}
-.node{border:1px solid var(--border);border-radius:8px;padding:14px;background:#f8fafc}
-.node strong{display:block;color:var(--fg);font-size:15px}
-.node span{display:block;margin-top:4px;color:var(--muted);font-size:13px;line-height:1.5}
-.arrow{color:var(--accent);font-weight:800;text-align:center}
 @media (max-width:820px){
 main{place-items:start;padding:22px}
-.shell{grid-template-columns:1fr;gap:20px}
 h1{font-size:48px}
-.panel{order:-1}
 }
 @media (max-width:560px){
 main{padding:18px}
 h1{font-size:40px}
 p{font-size:15px}
-.actions{display:grid;grid-template-columns:1fr;gap:10px;margin-top:22px}
-a{width:100%;min-height:44px}
-.panel{padding:16px}
-.node{padding:12px}
 }
 </style>
 </head>
@@ -51,28 +39,11 @@ a{width:100%;min-height:44px}
 <section>
 <p class="eyebrow">DeepSeek 兼容网关</p>
 <h1>DS2API</h1>
-<p>把 DeepSeek Web 对话能力转换为 OpenAI 兼容 API。
-这里可以进入管理面板、查看接口状态，也可以先阅读中文图形化文档。</p>
+<p>把 DeepSeek Web 对话能力转换为 OpenAI 兼容 API。</p>
 <div class="actions">
-<a class="primary" href="/admin">管理面板</a>
-<a class="accent" href="/docs">图形化文档</a>
-<a href="/v1/models" target="_blank" rel="noreferrer">API 状态</a>
-<a href="https://github.com/ikun5200/ds2api" target="_blank" rel="noreferrer">GitHub</a>
+<a class="primary" href="/admin">进入管理面板</a>
+<a class="accent" href="/docs">查看文档</a>
 </div>
-</section>
-<aside class="panel" aria-label="DS2API 请求链路">
-<div class="flow">
-<div class="node"><strong>客户端 / SDK</strong><span>OpenAI 或兼容客户端统一请求 DS2API。</span></div>
-<div class="arrow">↓</div>
-<div class="node"><strong>协议适配层</strong><span>请求先归一化为共享对话模型，再进入统一运行时。</span></div>
-<div class="arrow">↓</div>
-<div class="node"><strong>DeepSeek 会话</strong><span>账号池、PoW、文件上传和流式响应由后端统一处理。</span></div>
-<div class="arrow">↓</div>
-<div class="node"><strong>响应记录存储</strong><span>Chat history 可使用内置 JSON，也可切换到 PostgreSQL、MySQL 或 MariaDB。</span></div>
-<div class="arrow">↓</div>
-<div class="node"><strong>兼容响应</strong><span>最终按目标协议返回内容、用量、状态和工具调用结果。</span></div>
-</div>
-</aside>
 </div>
 </main>
 </body>

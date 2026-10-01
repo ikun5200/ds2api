@@ -1,20 +1,12 @@
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
-import en from './locales/en.json'
+import { createContext, useContext, useMemo } from 'react'
 import zh from './locales/zh.json'
 
-const STORAGE_KEY = 'ds2api_lang'
-const translations = { en, zh }
+const translations = { zh }
 
 const I18nContext = createContext({
     lang: 'zh',
-    setLang: () => {},
     t: (key) => key,
 })
-
-const getBrowserLang = () => {
-    if (typeof navigator === 'undefined') return 'zh'
-    return navigator.language?.toLowerCase().startsWith('zh') ? 'zh' : 'en'
-}
 
 const getValue = (obj, key) => {
     if (!obj) return undefined
@@ -32,29 +24,15 @@ const formatMessage = (message, vars) => {
 }
 
 export const I18nProvider = ({ children }) => {
-    const [lang, setLang] = useState(() => {
-        if (typeof localStorage === 'undefined') return getBrowserLang()
-        return localStorage.getItem(STORAGE_KEY) || getBrowserLang()
-    })
-
-    useEffect(() => {
-        if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(STORAGE_KEY, lang)
-        }
-        if (typeof document !== 'undefined') {
-            document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'
-        }
-    }, [lang])
-
     const t = useMemo(() => {
         return (key, vars) => {
-            const value = getValue(translations[lang], key) ?? getValue(translations.en, key) ?? key
+            const value = getValue(translations.zh, key)
             if (typeof value !== 'string') return value
             return formatMessage(value, vars)
         }
-    }, [lang])
+    }, [])
 
-    const contextValue = useMemo(() => ({ lang, setLang, t }), [lang, t])
+    const contextValue = useMemo(() => ({ lang: 'zh', t }), [t])
 
     return <I18nContext.Provider value={contextValue}>{children}</I18nContext.Provider>
 }

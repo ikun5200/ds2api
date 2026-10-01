@@ -47,7 +47,6 @@ npm run dev
 WebUI 技术栈：
 - React + Vite
 - Tailwind CSS
-- 中英文语言包：`webui/src/locales/zh.json` / `en.json`
 
 ### Docker 开发环境
 

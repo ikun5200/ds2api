@@ -1,6 +1,5 @@
 import { BookOpen, Brain, Database, Github, LayoutDashboard, Radio, Search, Scale, Workflow } from 'lucide-react'
 import { useI18n } from '../i18n'
-import LanguageToggle from './LanguageToggle'
 
 const featureIcons = {
     compatibility: Workflow,
@@ -32,8 +31,7 @@ export default function LandingPage({ onEnter }) {
                         <div className="text-xs text-muted-foreground">{t('landing.consoleLabel')}</div>
                     </div>
                 </div>
-                <LanguageToggle />
-            </header>
+                            </header>
 
             <main className="mx-auto grid min-h-[calc(100vh-80px)] w-full max-w-6xl content-center gap-8 px-4 pb-10 sm:px-6 lg:grid-cols-[1fr_360px] lg:items-center">
                 <section className="max-w-3xl">

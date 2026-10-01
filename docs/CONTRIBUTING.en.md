@@ -47,7 +47,6 @@ npm run dev
 WebUI tech stack:
 - React + Vite
 - Tailwind CSS
-- Bilingual language packs: `webui/src/locales/zh.json` / `en.json`
 
 ### Docker Development
 

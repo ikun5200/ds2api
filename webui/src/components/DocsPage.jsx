@@ -1,6 +1,5 @@
 import { ArrowLeft, BookOpen, Boxes, CircleGauge, Database, ExternalLink, GitBranch, KeyRound, Workflow } from 'lucide-react'
 import { useI18n } from '../i18n'
-import LanguageToggle from './LanguageToggle'
 
 const repo = 'https://github.com/ikun5200/ds2api'
 
@@ -31,8 +30,7 @@ export default function DocsPage() {
                     <ArrowLeft className="h-4 w-4" />
                     {t('docs.back')}
                 </a>
-                <LanguageToggle />
-            </header>
+                            </header>
 
             <main className="mx-auto w-full max-w-6xl px-4 pb-12 sm:px-6">
                 <section className="grid gap-8 py-8 lg:grid-cols-[1fr_360px] lg:items-center">
