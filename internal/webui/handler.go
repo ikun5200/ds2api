@@ -25,6 +25,13 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 	r.Get("/admin", h.admin)
 }
 
+// ServeAdminDocument writes the admin SPA shell. The router uses it to serve
+// browser document navigations to /admin/{tab} paths that collide with
+// same-path admin API routes.
+func (h *Handler) ServeAdminDocument(w http.ResponseWriter, r *http.Request) {
+	h.admin(w, r)
+}
+
 func (h *Handler) HandleAdminFallback(w http.ResponseWriter, r *http.Request) bool {
 	if r.Method != http.MethodGet {
 		return false

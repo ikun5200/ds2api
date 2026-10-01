@@ -111,6 +111,19 @@ func NewApp() (*App, error) {
 	r.Post("/embeddings", embeddingsHandler.Embeddings)
 	ollama.RegisterRoutes(r, ollamaHandler)
 	r.Route("/admin", func(ar chi.Router) {
+		// Admin SPA tab paths (e.g. /admin/accounts) collide with same-path
+		// admin API routes, and chi resolves static routes ahead of the SPA
+		// fallback. Browser document navigations must render the SPA shell
+		// instead of being answered by the protected API with a 401 JSON body.
+		ar.Use(func(next http.Handler) http.Handler {
+			return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+				if isBrowserDocumentRequest(req) {
+					webuiHandler.ServeAdminDocument(w, req)
+					return
+				}
+				next.ServeHTTP(w, req)
+			})
+		})
 		admin.RegisterRoutes(ar, adminHandler)
 	})
 	webui.RegisterRoutes(r, webuiHandler)
@@ -122,6 +135,23 @@ func NewApp() (*App, error) {
 	})
 
 	return &App{Store: store, Pool: pool, Resolver: resolver, DS: dsClient, Router: r}, nil
+}
+
+// isBrowserDocumentRequest reports whether the request is a browser document
+// navigation (address bar, refresh, link click) rather than an API call.
+func isBrowserDocumentRequest(req *http.Request) bool {
+	if req.Method != http.MethodGet {
+		return false
+	}
+	secFetchMode := strings.TrimSpace(req.Header.Get("Sec-Fetch-Mode"))
+	if strings.EqualFold(secFetchMode, "navigate") {
+		return true
+	}
+	// Older browsers do not send Sec-Fetch-*; fall back to the navigation
+	// Accept header without an Authorization header.
+	return secFetchMode == "" &&
+		strings.Contains(req.Header.Get("Accept"), "text/html") &&
+		strings.TrimSpace(req.Header.Get("Authorization")) == ""
 }
 
 func newChatHistoryStore() *chathistory.Store {
