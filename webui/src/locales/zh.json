@@ -25,10 +25,6 @@
             "label": "批量导入",
             "desc": "批量导入账号配置"
         },
-        "vercel": {
-            "label": "Vercel 同步",
-            "desc": "同步配置到 Vercel"
-        },
         "settings": {
             "label": "设置中心",
             "desc": "在线修改系统设置与配置"
@@ -112,7 +108,7 @@
         "flowTitle": "请求链路",
         "reading": {
             "title": "推荐阅读顺序",
-            "deploy": "1. 先看部署指南，确认 Docker、Vercel、Zeabur 或源码运行方式。",
+            "deploy": "1. 先看部署指南，确认 Docker、Zeabur 或源码运行方式。",
             "config": "2. 再看外部存储说明和配置示例，决定响应记录保存在哪里。",
             "client": "3. 最后按接口文档接入 OpenAI 兼容客户端。"
         },
@@ -137,7 +133,7 @@
         "links": {
             "deploy": {
                 "title": "部署指南",
-                "desc": "Docker、Vercel、Zeabur、源码运行和常见问题。"
+                "desc": "Docker、Zeabur、源码运行和常见问题。"
             },
             "storage": {
                 "title": "外部存储说明",
@@ -255,7 +251,7 @@
         "proxyBadge": "代理: {name}",
         "proxyUpdateSuccess": "账号代理已更新",
         "envModeRiskTitle": "当前为环境变量配置模式（有持久化风险）",
-        "envModeRiskDesc": "检测到 DS2API_CONFIG_JSON。Vercel/环境变量模式下管理台改动只会先进入当前实例内存，不同步并重部署时刷新或切到其它实例可能看到旧配置。",
+        "envModeRiskDesc": "检测到 DS2API_CONFIG_JSON。环境变量模式下管理台改动只会先进入当前实例内存，不同步并重部署时刷新或切到其它实例可能看到旧配置。",
         "envModeWritebackPendingTitle": "环境变量模式 + 自动持久化已开启（等待落盘）",
         "envModeWritebackActiveTitle": "环境变量模式 + 自动持久化已生效",
         "envModeWritebackDesc": "程序会自动创建/写入配置文件并在后续切换为文件模式。当前持久化路径：{path}",
@@ -443,7 +439,7 @@
         "copySuccess": "Base64 配置已复制到剪贴板",
         "quickTemplates": "快速模板",
         "dataExport": "数据导出",
-        "dataExportDesc": "获取配置的 Base64 字符串，用于 Vercel 环境变量。",
+        "dataExportDesc": "获取配置的 Base64 字符串，用于环境变量注入。",
         "copyBase64": "复制 Base64 配置",
         "copied": "已复制",
         "variableName": "变量名",
@@ -524,7 +520,6 @@
         "exportJson": "导出 JSON",
         "invalidJsonField": "{field} 不是有效 JSON 对象",
         "defaultPasswordWarning": "当前使用默认密码 admin，请尽快在此修改。",
-        "vercelSyncHint": "当前配置已更新。Vercel 部署请到 Vercel 同步页面手动同步并重部署。",
         "autoFetchPaused": "自动加载已暂停：连续失败 {count} 次（{error}）",
         "retryLoad": "立即重试"
     },
@@ -539,43 +534,5 @@
         "adminPortal": "DS2API 管理员门户",
         "signInFailed": "登录失败",
         "networkError": "网络错误: {error}"
-    },
-    "vercel": {
-        "tokenRequired": "需要 Vercel 访问令牌",
-        "projectRequired": "需要项目 ID",
-        "syncFailed": "同步失败",
-        "networkError": "网络错误",
-        "title": "Vercel 部署",
-        "description": "将当前密钥和账号配置直接同步到 Vercel 环境变量中。",
-        "tokenLabel": "Vercel 访问令牌",
-        "getToken": "获取令牌",
-        "tokenPlaceholderPreconfig": "正在使用预配置的令牌",
-        "tokenPlaceholder": "输入 Vercel 访问令牌",
-        "projectIdLabel": "项目 ID",
-        "projectIdHint": "可在项目设置 (Project Settings) → 常规 (General) 中找到",
-        "teamIdLabel": "团队 ID",
-        "optional": "可选",
-        "saveCredentials": "记住 Vercel 凭据",
-        "saveCredentialsHint": "保存访问令牌、项目 ID 和团队 ID，供下次同步直接复用。",
-        "syncing": "正在同步...",
-        "syncRedeploy": "同步并重新部署",
-        "redeployHint": "这将触发 Vercel 的重新部署，大约需要 30-60 秒。",
-        "syncSucceeded": "同步成功",
-        "syncFailedLabel": "同步失败",
-        "openDeployment": "访问部署地址",
-        "statusSynced": "已同步",
-        "statusNotSynced": "未同步",
-        "statusNeverSynced": "从未同步",
-        "lastSyncTime": "上次同步: {time}",
-        "draftDiffers": "检测到前端草稿与环境变量配置不一致，请点击“同步并重新部署”。",
-        "pollPaused": "状态轮询已暂停：连续失败 {count} 次。",
-        "manualRefresh": "手动刷新",
-        "howItWorks": "工作原理",
-        "steps": {
-            "one": "当前配置 (密钥和账号) 被导出为 JSON 字符串。",
-            "two": "JSON 被编码为 Base64 以确保格式兼容性。",
-            "three": "更新 Vercel 项目中的环境变量：",
-            "four": "触发重新部署以应用新的环境变量。"
-        }
     }
 }

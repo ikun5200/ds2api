@@ -10,8 +10,6 @@ ENTRY_MAX=120
 
 is_entry_file() {
   case "$1" in
-    api/chat-stream.js|\
-    internal/js/helpers/stream-tool-sieve.js|\
     webui/src/App.jsx)
       return 0
       ;;

@@ -13,7 +13,6 @@ ds2api/
 ├── .github/                              # GitHub collaboration and CI config
 │   ├── ISSUE_TEMPLATE/                   # Issue templates
 │   └── workflows/                        # GitHub Actions workflows
-├── api/                                  # Serverless entrypoints (Vercel Go/Node)
 ├── app/                                  # Application-level handler assembly
 ├── artifacts/                            # Debug artifacts (raw-stream-sim, stream-debug, etc.)
 ├── cmd/                                  # Executable entrypoints
@@ -47,11 +46,6 @@ ds2api/
 │   │   │   └── shared/                   # OpenAI HTTP errors/models/tool formatting
 │   │   └── requestbody/                  # HTTP body reading and UTF-8/JSON validation helpers
 │   ├── inputfiles/                       # Shared attachment decoding, URL downloads, uploads, deduplication and references/tokens
-│   ├── js/                               # Node runtime related logic
-│   │   ├── chat-stream/                  # Node streaming bridge
-│   │   ├── helpers/                      # JS helper modules
-│   │   │   └── stream-tool-sieve/        # JS implementation of tool sieve
-│   │   └── shared/                       # Shared semantics between Go/Node
 │   ├── prompt/                           # Prompt composition
 │   ├── promptcompat/                     # API request -> DeepSeek web-chat plain-text compatibility
 │   ├── rawsample/                        # Raw sample read/write and management
@@ -96,8 +90,7 @@ ds2api/
         │   ├── apiTester/                # API tester page
         │   ├── chatHistory/              # Server-side conversation history page
         │   ├── proxy/                    # Proxy management page
-        │   ├── settings/                 # Settings page
-        │   └── vercel/                   # Vercel sync page
+        │   └── settings/                 # Settings page
         ├── layout/                       # Layout components
         ├── locales/                      # i18n strings
         └── utils/                        # Frontend utilities
@@ -136,17 +129,11 @@ flowchart LR
         POW[pow + internal/deepseek/protocol]
     end
 
-    subgraph NODE[Vercel Node Runtime]
-        NCS[api/chat-stream.js]
-        JS[internal/js/chat-stream + stream-tool-sieve]
-    end
-
     R --> OA --> CHAT
     OA --> RESP
     OA --> FILES
     R --> AD
     R --> WEB
-    R -.Vercel stream.-> NCS
 
     CHAT --> PC
     RESP --> PC
@@ -154,10 +141,6 @@ flowchart LR
     PC -.long history.-> HIST
     PC --> AUTH
     PC --> CR
-
-    NCS -.Go prepare/release.-> CHAT
-    NCS --> JS
-    JS --> TOOL
 
     AUTH --> POOL
     CHAT --> CR
@@ -184,10 +167,9 @@ flowchart LR
 - `internal/assistantturn`: Go output-side canonical semantics, converting DeepSeek SSE collection results and stream finalization state into assistant turns and centralizing thinking, tool call, citation, usage, stop/error behavior.
 - `internal/completionruntime`: shared Go completion execution helpers for DeepSeek session/PoW/call startup, non-stream collection, empty-output retry, and one managed-account fresh retry before a final 429; streaming paths use it to start upstream requests, continue to use `internal/stream` for real-time consumption, and use `assistantturn` during finalization.
 - `internal/deepseek/{client,protocol,transport}`: upstream requests, sessions, PoW adaptation, protocol constants, and transport details.
-- `internal/js/chat-stream` + `api/chat-stream.js`: Vercel Node streaming bridge; Go prepare/release owns auth, account lease, and completion payload assembly, while Node relays real-time SSE with Go-aligned finalization and tool sieve semantics.
 - `internal/stream` + `internal/sse`: Go stream parsing and incremental assembly.
 - `internal/toolcall` + `internal/toolstream`: DSML shell compatibility plus canonical XML tool-call parsing and anti-leak sieve; DSML is normalized back to XML at the entrypoint, and internal parsing remains XML-based.
-- `internal/httpapi/admin/*`: Admin API root assembly plus auth/accounts/config/settings/proxies/rawsamples/vercel/history/devcapture/version resource packages.
+- `internal/httpapi/admin/*`: Admin API root assembly plus auth/accounts/config/settings/proxies/rawsamples/history/devcapture/version resource packages.
 - `internal/chathistory`: server-side conversation history persistence, pagination, detail lookup, and retention policy.
 - `internal/responsehistory`: DeepSeek upstream response archive, saving assistant text, thinking, raw tool-call fragments, and streaming detail before protocol rendering/trimming.
 - `internal/config`: config loading/validation + runtime settings hot-reload.

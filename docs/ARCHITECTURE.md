@@ -13,7 +13,6 @@ ds2api/
 ├── .github/                              # GitHub 协作与 CI 配置
 │   ├── ISSUE_TEMPLATE/                   # Issue 模板
 │   └── workflows/                        # GitHub Actions 工作流
-├── api/                                  # Serverless 入口（Vercel Go/Node）
 ├── app/                                  # 应用级 handler 装配层
 ├── artifacts/                            # 调试产物（raw-stream-sim, stream-debug 等）
 ├── cmd/                                  # 可执行程序入口
@@ -47,11 +46,6 @@ ds2api/
 │   │   │   └── shared/                   # OpenAI HTTP 公共错误/模型/工具格式
 │   │   └── requestbody/                  # HTTP 请求体读取与 UTF-8/JSON 校验辅助
 │   ├── inputfiles/                       # 共享附件解码、URL 下载、上传、去重与引用/token 处理
-│   ├── js/                               # Node Runtime 相关逻辑
-│   │   ├── chat-stream/                  # Node 流式输出桥接
-│   │   ├── helpers/                      # JS 辅助函数
-│   │   │   └── stream-tool-sieve/        # Tool sieve JS 实现
-│   │   └── shared/                       # Go/Node 共用语义片段
 │   ├── prompt/                           # Prompt 组装
 │   ├── promptcompat/                     # API 请求到 DeepSeek 网页纯文本上下文兼容层
 │   ├── rawsample/                        # raw sample 读写与管理
@@ -96,8 +90,7 @@ ds2api/
         │   ├── apiTester/                # API 测试页面
         │   ├── chatHistory/              # 服务器端对话记录页面
         │   ├── proxy/                    # 代理管理页面
-        │   ├── settings/                 # 设置页面
-        │   └── vercel/                   # Vercel 同步页面
+        │   └── settings/                 # 设置页面
         ├── layout/                       # 布局组件
         ├── locales/                      # 国际化文案
         └── utils/                        # 前端工具函数
@@ -136,17 +129,11 @@ flowchart LR
         POW[pow + internal/deepseek/protocol]
     end
 
-    subgraph NODE[Vercel Node Runtime]
-        NCS[api/chat-stream.js]
-        JS[internal/js/chat-stream + stream-tool-sieve]
-    end
-
     R --> OA --> CHAT
     OA --> RESP
     OA --> FILES
     R --> AD
     R --> WEB
-    R -.Vercel stream.-> NCS
 
     CHAT --> PC
     RESP --> PC
@@ -154,10 +141,6 @@ flowchart LR
     PC -.长历史.-> HIST
     PC --> AUTH
     PC --> CR
-
-    NCS -.Go prepare/release.-> CHAT
-    NCS --> JS
-    JS --> TOOL
 
     AUTH --> POOL
     CHAT --> CR
@@ -184,10 +167,9 @@ flowchart LR
 - `internal/assistantturn`：Go 输出侧统一语义层，把 DeepSeek SSE 收集结果和流式收尾状态归一成 assistant turn，集中处理 thinking、tool call、citation、usage、stop/error 语义。
 - `internal/completionruntime`：Go surface 共享的 completion 执行辅助，负责 DeepSeek session/PoW/call 启动、非流式 collect、empty-output retry，以及托管账号在最终 429 前的一次切号 fresh retry；流式路径复用它启动上游请求，继续用 `internal/stream` 做实时消费，并在最终收尾阶段接入 `assistantturn`。
 - `internal/deepseek/{client,protocol,transport}`：上游请求、会话、PoW 适配、协议常量与传输层。
-- `internal/js/chat-stream` + `api/chat-stream.js`：Vercel Node 流式桥；Go prepare/release 管理鉴权、账号租约和 completion payload，Node 侧负责实时 SSE 转发并保持 Go 对齐的终结态和 tool sieve 语义。
 - `internal/stream` + `internal/sse`：Go 流式解析与增量处理。
 - `internal/toolcall` + `internal/toolstream`：DSML 外壳兼容与 canonical XML 工具调用解析、防泄漏筛分；DSML 会在入口归一化回 XML，内部仍按 XML 语义解析。
-- `internal/httpapi/admin/*`：Admin API 根装配与 auth/accounts/config/settings/proxies/rawsamples/vercel/history/devcapture/version 等资源子包。
+- `internal/httpapi/admin/*`：Admin API 根装配与 auth/accounts/config/settings/proxies/rawsamples/history/devcapture/version 等资源子包。
 - `internal/chathistory`：服务器端对话记录持久化、分页、单条详情和保留策略。
 - `internal/responsehistory`：DeepSeek 上游响应归档，会在协议回译/裁剪前保存 assistant text、thinking、tool-call 原始片段和流式详情。
 - `internal/config`：配置加载、校验、运行时 settings 热更新。

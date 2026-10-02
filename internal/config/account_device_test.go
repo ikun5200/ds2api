@@ -13,8 +13,6 @@ func TestAccountDeviceIDSurvivesSaveReloadAndExport(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "config.json")
 	t.Setenv("DS2API_CONFIG_PATH", path)
 	t.Setenv("DS2API_ENV_WRITEBACK", "1")
-	t.Setenv("VERCEL", "")
-	t.Setenv("NOW_REGION", "")
 	t.Setenv("DS2API_CONFIG_JSON", `{"accounts":[{"email":"device@example.com","name":"Device account","password":"password","device_id":" website-issued-device ","token":"ignored-env-token"}]}`)
 	store := LoadStore()
 	if err := store.UpdateAccountToken("device@example.com", "runtime-token"); err != nil {

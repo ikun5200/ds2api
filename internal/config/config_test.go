@@ -411,23 +411,6 @@ func TestParseConfigStringSupportsRawURLBase64(t *testing.T) {
 	}
 }
 
-func TestLoadConfigOnVercelWithoutConfigFileFallsBackToMemory(t *testing.T) {
-	t.Setenv("VERCEL", "1")
-	t.Setenv("DS2API_CONFIG_JSON", "")
-	t.Setenv("DS2API_CONFIG_PATH", "testdata/does-not-exist.json")
-
-	cfg, fromEnv, err := loadConfig()
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if !fromEnv {
-		t.Fatalf("expected fromEnv=true for vercel fallback")
-	}
-	if len(cfg.Keys) != 0 || len(cfg.Accounts) != 0 {
-		t.Fatalf("expected empty bootstrap config, got keys=%d accounts=%d", len(cfg.Keys), len(cfg.Accounts))
-	}
-}
-
 func TestAccountTestStatusIsRuntimeOnlyAndNotPersisted(t *testing.T) {
 	tmp, err := os.CreateTemp(t.TempDir(), "config-*.json")
 	if err != nil {

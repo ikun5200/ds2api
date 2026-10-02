@@ -73,7 +73,7 @@ func Global() *Store {
 }
 
 func NewFromEnv() *Store {
-	enabled := !isVercelRuntime()
+	enabled := true
 	if raw, ok := os.LookupEnv("DS2API_DEV_PACKET_CAPTURE"); ok {
 		enabled = parseBool(raw)
 	}
@@ -94,10 +94,6 @@ func NewFromEnv() *Store {
 		maxBodyBytes: maxBodyBytes,
 		items:        make([]Entry, 0, limit),
 	}
-}
-
-func isVercelRuntime() bool {
-	return strings.TrimSpace(os.Getenv("VERCEL")) != "" || strings.TrimSpace(os.Getenv("NOW_REGION")) != ""
 }
 
 func (s *Store) Enabled() bool {

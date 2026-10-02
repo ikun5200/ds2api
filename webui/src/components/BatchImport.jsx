@@ -41,7 +41,7 @@ export default function BatchImport({ onRefresh, onMessage, authFetch }) {
             if (res.ok) {
                 setResult(data)
                 const successMessage = t('batchImport.importSuccess', { keys: data.imported_keys, accounts: data.imported_accounts })
-                onMessage(mutationMessageType(data), mutationMessage(data, successMessage, t('settings.vercelSyncHint')))
+                onMessage(mutationMessageType(data), mutationMessage(data, successMessage))
                 onRefresh()
             } else {
                 onMessage('error', data.detail || t('messages.importFailed'))

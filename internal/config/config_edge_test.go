@@ -170,13 +170,6 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 		Runtime: RuntimeConfig{
 			TokenRefreshIntervalHours: 12,
 		},
-		Vercel: VercelConfig{
-			Token:     " vercel-token ",
-			ProjectID: " prj_123 ",
-			TeamID:    " team_123 ",
-		},
-		VercelSyncHash: "hash123",
-		VercelSyncTime: 1234567890,
 		AdditionalFields: map[string]any{
 			"custom_field": "custom_value",
 		},
@@ -206,12 +199,6 @@ func TestConfigJSONRoundtrip(t *testing.T) {
 	}
 	if decoded.AutoDelete.Mode != "single" {
 		t.Fatalf("unexpected auto delete mode: %#v", decoded.AutoDelete.Mode)
-	}
-	if decoded.Vercel.Token != "vercel-token" || decoded.Vercel.ProjectID != "prj_123" || decoded.Vercel.TeamID != "team_123" {
-		t.Fatalf("unexpected vercel config: %#v", decoded.Vercel)
-	}
-	if decoded.VercelSyncHash != "hash123" {
-		t.Fatalf("unexpected vercel sync hash: %q", decoded.VercelSyncHash)
 	}
 	if decoded.AdditionalFields["custom_field"] != "custom_value" {
 		t.Fatalf("unexpected additional fields: %#v", decoded.AdditionalFields)
@@ -631,18 +618,6 @@ func TestStoreModelAliasesDefault(t *testing.T) {
 	}
 	if aliases["gpt-4o"] != "deepseek-v4-flash" {
 		t.Fatalf("expected built-in alias, got %q", aliases["gpt-4o"])
-	}
-}
-
-func TestStoreSetVercelSync(t *testing.T) {
-	t.Setenv("DS2API_CONFIG_JSON", `{"keys":[],"accounts":[]}`)
-	store := LoadStore()
-	if err := store.SetVercelSync("hash123", 1234567890); err != nil {
-		t.Fatalf("setVercelSync error: %v", err)
-	}
-	snap := store.Snapshot()
-	if snap.VercelSyncHash != "hash123" || snap.VercelSyncTime != 1234567890 {
-		t.Fatalf("unexpected vercel sync: hash=%q time=%d", snap.VercelSyncHash, snap.VercelSyncTime)
 	}
 }
 

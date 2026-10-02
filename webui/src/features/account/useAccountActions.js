@@ -20,7 +20,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const [updatingProxy, setUpdatingProxy] = useState({})
 
     const notifyMutationSuccess = (data, fallback) => {
-        onMessage(mutationMessageType(data), mutationMessage(data, fallback, t('settings.vercelSyncHint')))
+        onMessage(mutationMessageType(data), mutationMessage(data, fallback))
     }
 
     const openAddKey = () => {

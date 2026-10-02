@@ -13,7 +13,6 @@ import (
 	adminrawsamples "ds2api/internal/httpapi/admin/rawsamples"
 	adminsettings "ds2api/internal/httpapi/admin/settings"
 	adminshared "ds2api/internal/httpapi/admin/shared"
-	adminvercel "ds2api/internal/httpapi/admin/vercel"
 	adminversion "ds2api/internal/httpapi/admin/version"
 )
 
@@ -33,7 +32,6 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 	settingsHandler := &adminsettings.Handler{Store: deps.Store, Pool: deps.Pool, DS: deps.DS, OpenAI: deps.OpenAI, ChatHistory: deps.ChatHistory}
 	proxiesHandler := &adminproxies.Handler{Store: deps.Store, Pool: deps.Pool, DS: deps.DS, OpenAI: deps.OpenAI, ChatHistory: deps.ChatHistory}
 	rawSamplesHandler := &adminrawsamples.Handler{Store: deps.Store, Pool: deps.Pool, DS: deps.DS, OpenAI: deps.OpenAI, ChatHistory: deps.ChatHistory}
-	vercelHandler := &adminvercel.Handler{Store: deps.Store, Pool: deps.Pool, DS: deps.DS, OpenAI: deps.OpenAI, ChatHistory: deps.ChatHistory}
 	historyHandler := &adminhistory.Handler{Store: deps.Store, Pool: deps.Pool, DS: deps.DS, OpenAI: deps.OpenAI, ChatHistory: deps.ChatHistory}
 	devCaptureHandler := &admindevcapture.Handler{Store: deps.Store, Pool: deps.Pool, DS: deps.DS, OpenAI: deps.OpenAI, ChatHistory: deps.ChatHistory}
 	versionHandler := &adminversion.Handler{Store: deps.Store, Pool: deps.Pool, DS: deps.DS, OpenAI: deps.OpenAI, ChatHistory: deps.ChatHistory}
@@ -47,7 +45,6 @@ func RegisterRoutes(r chi.Router, h *Handler) {
 		adminproxies.RegisterRoutes(pr, proxiesHandler)
 		adminaccounts.RegisterRoutes(pr, accountsHandler)
 		adminrawsamples.RegisterRoutes(pr, rawSamplesHandler)
-		adminvercel.RegisterRoutes(pr, vercelHandler)
 		admindevcapture.RegisterRoutes(pr, devCaptureHandler)
 		adminhistory.RegisterRoutes(pr, historyHandler)
 		adminversion.RegisterRoutes(pr, versionHandler)

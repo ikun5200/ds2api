@@ -23,7 +23,6 @@ const AccountManagerContainer = lazy(() => import('../features/account/AccountMa
 const ApiTesterContainer = lazy(() => import('../features/apiTester/ApiTesterContainer'))
 const ChatHistoryContainer = lazy(() => import('../features/chatHistory/ChatHistoryContainer'))
 const BatchImport = lazy(() => import('../components/BatchImport'))
-const VercelSyncContainer = lazy(() => import('../features/vercel/VercelSyncContainer'))
 const SettingsContainer = lazy(() => import('../features/settings/SettingsContainer'))
 const ProxyManagerContainer = lazy(() => import('../features/proxy/ProxyManagerContainer'))
 
@@ -38,7 +37,7 @@ function TabLoadingFallback({ label }) {
     )
 }
 
-export default function DashboardShell({ token, onLogout, config, fetchConfig, showMessage, message, onForceLogout, isVercel }) {
+export default function DashboardShell({ token, onLogout, config, fetchConfig, showMessage, message, onForceLogout }) {
     const { t } = useI18n()
     const location = useLocation()
     const navigate = useNavigate()
@@ -50,7 +49,6 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
         { id: 'test', label: t('nav.test.label'), icon: Server, description: t('nav.test.desc') },
         { id: 'history', label: t('nav.history.label'), icon: History, description: t('nav.history.desc') },
         { id: 'import', label: t('nav.import.label'), icon: Upload, description: t('nav.import.desc') },
-        { id: 'vercel', label: t('nav.vercel.label'), icon: Cloud, description: t('nav.vercel.desc') },
         { id: 'settings', label: t('nav.settings.label'), icon: SettingsIcon, description: t('nav.settings.desc') },
     ]
 
@@ -122,10 +120,8 @@ export default function DashboardShell({ token, onLogout, config, fetchConfig, s
                 return <ChatHistoryContainer onMessage={showMessage} authFetch={authFetch} />
             case 'import':
                 return <BatchImport onRefresh={fetchConfig} onMessage={showMessage} authFetch={authFetch} />
-            case 'vercel':
-                return <VercelSyncContainer onMessage={showMessage} authFetch={authFetch} isVercel={isVercel} config={config} />
             case 'settings':
-                return <SettingsContainer onRefresh={fetchConfig} onMessage={showMessage} authFetch={authFetch} onForceLogout={onForceLogout} isVercel={isVercel} />
+                return <SettingsContainer onRefresh={fetchConfig} onMessage={showMessage} authFetch={authFetch} onForceLogout={onForceLogout} />
             default:
                 return null
         }

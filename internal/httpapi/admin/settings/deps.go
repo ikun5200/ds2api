@@ -26,7 +26,3 @@ func validateRuntimeSettings(runtime config.RuntimeConfig) error {
 func configMutationResponse(store adminshared.ConfigStore, payload map[string]any) map[string]any {
 	return adminshared.WithConfigMutationStatus(store, payload)
 }
-
-func (h *Handler) computeSyncHash() string {
-	return adminshared.ComputeSyncHash(h.Store)
-}

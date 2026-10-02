@@ -146,7 +146,7 @@ p{font-size:15px}
 <div class="card">
 <h2>推荐阅读顺序</h2>
 <ul>
-<li>先看部署指南，确认 Docker、Vercel 或源码运行方式。</li>
+<li>先看部署指南，确认 Docker、Zeabur 或源码运行方式。</li>
 <li>再看外部存储说明，决定使用内置 JSON 还是外部数据库。</li>
 <li>最后按接口文档接入 OpenAI 兼容客户端。</li>
 </ul>
@@ -166,7 +166,7 @@ p{font-size:15px}
 </section>
 
 <section class="grid cols-3" style="margin-top:14px">
-<div class="card mini"><h3>部署入口</h3><p>Docker、Vercel、Zeabur 和源码运行路径集中在部署指南。</p></div>
+<div class="card mini"><h3>部署入口</h3><p>Docker、Zeabur 和源码运行路径集中在部署指南。</p></div>
 <div class="card mini"><h3>管理面板</h3><p>上线后进入 /admin 管理账号、API Key、代理、设置和响应记录。</p></div>
 <div class="card mini"><h3>兼容接口</h3><p>/v1/chat/completions、/v1/responses、/v1/files 等路径统一开放。</p></div>
 </section>

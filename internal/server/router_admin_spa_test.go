@@ -56,7 +56,6 @@ func TestAdminDocumentNavigationServesSPAOnAPIPathCollision(t *testing.T) {
 		{name: "settings", path: "/admin/settings"},
 		{name: "test", path: "/admin/test"},
 		{name: "import", path: "/admin/import"},
-		{name: "vercel", path: "/admin/vercel"},
 	}
 
 	for _, tc := range cases {

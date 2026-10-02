@@ -14,7 +14,7 @@ Doc map: [Index](./README.md) | [Architecture](./ARCHITECTURE.en.md) | [API](../
 - [Prerequisites](#0-prerequisites)
 - [1. Download Release Binaries](#1-download-release-binaries)
 - [2. Docker / GHCR Deployment](#2-docker--ghcr-deployment)
-- [3. Vercel Deployment](#3-vercel-deployment)
+- [3. Configuration and Environment Variables](#3-configuration-and-environment-variables)
 - [4. Local Run from Source](#4-local-run-from-source)
 - [5. Reverse Proxy (Nginx)](#5-reverse-proxy-nginx)
 - [6. Linux systemd Service](#6-linux-systemd-service)
@@ -29,8 +29,7 @@ Recommended order when choosing a deployment method:
 
 1. **Download and run release binaries**: the easiest path for most users because the artifacts are already built.
 2. **Docker / GHCR image deployment**: suitable for containerized, orchestrated, or cloud environments.
-3. **Vercel deployment**: suitable if you already use Vercel and accept its platform constraints.
-4. **Run from source / build locally**: suitable for development, debugging, or when you need to modify the code yourself.
+3. **Run from source / build locally**: suitable for development, debugging, or when you need to modify the code yourself.
 
 ---
 
@@ -45,7 +44,7 @@ Recommended order when choosing a deployment method:
 Config source (choose one):
 
 - **File**: `config.json` (recommended for local/Docker)
-- **Environment variable**: `DS2API_CONFIG_JSON` (recommended for Vercel; supports raw JSON or Base64)
+- **Environment variable**: `DS2API_CONFIG_JSON` (supports raw JSON or Base64)
 
 Unified recommendation (best practice):
 
@@ -56,7 +55,7 @@ cp config.example.json config.json
 
 Use `config.json` as the single source of truth:
 - Local run: read `config.json` directly
-- Docker / Vercel: generate `DS2API_CONFIG_JSON` (Base64) from `config.json` and inject it
+- Docker: generate `DS2API_CONFIG_JSON` (Base64) from `config.json` and inject it
 
 ---
 
@@ -239,56 +238,9 @@ References: Zeabur's official [GitHub/Git integration](https://zeabur.com/docs/e
 
 ---
 
-## 3. Vercel Deployment
+## 3. Configuration and Environment Variables
 
-### 3.1 Steps
-
-1. **Fork** the repo to your GitHub account
-2. **Import** the project on Vercel
-3. **Set environment variables** (minimum required: one variable):
-
-| Variable | Description |
-| --- | --- |
-| `DS2API_ADMIN_KEY` | Admin key (required) |
-| `DS2API_CONFIG_JSON` | Config content, raw JSON or Base64 (optional, recommended) |
-
-4. **Deploy**
-
-### 3.1.1 Recommended Input (avoid `DS2API_CONFIG_JSON` mistakes)
-
-If you prefer faster one-click bootstrap, you can leave `DS2API_CONFIG_JSON` empty first, then open `/admin` after deployment, import config, and sync it back to Vercel env vars from the "Vercel Sync" page.
-
-Recommended: in repo root, copy the template first and fill your real accounts:
-
-```bash
-cp config.example.json config.json
-# Edit config.json
-```
-
-Do not hand-edit large JSON directly in Vercel. Generate Base64 locally and paste it:
-
-```bash
-# Run in repo root
-DS2API_CONFIG_JSON="$(base64 < config.json | tr -d '\n')"
-echo "$DS2API_CONFIG_JSON"
-```
-
-If you choose to preconfigure before first deploy, set these vars in Vercel Project Settings -> Environment Variables:
-
-```text
-DS2API_ADMIN_KEY=replace-with-a-strong-secret
-DS2API_CONFIG_JSON=<the single-line Base64 output above>
-```
-
-Optional but recommended (for WebUI one-click Vercel sync):
-
-```text
-VERCEL_TOKEN=your-vercel-token
-VERCEL_PROJECT_ID=prj_xxxxxxxxxxxx
-VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
-```
-
-### 3.2 Optional Environment Variables
+### 3.1 Optional Environment Variables
 
 | Variable | Description | Default |
 | --- | --- | --- |
@@ -296,21 +248,16 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `DS2API_ACCOUNT_MAX_QUEUE` | Waiting queue limit | `recommended_concurrency` |
 | `DS2API_GLOBAL_MAX_INFLIGHT` | Global inflight limit | `recommended_concurrency` |
 | `DS2API_ENV_WRITEBACK` | When `DS2API_CONFIG_JSON` is present, auto-write to `DS2API_CONFIG_PATH` and switch to file-backed mode after success (`1/true/yes/on`) | Disabled |
-| `DS2API_VERCEL_INTERNAL_SECRET` | Hybrid streaming internal auth | Falls back to `DS2API_ADMIN_KEY` |
-| `DS2API_VERCEL_STREAM_LEASE_TTL_SECONDS` | Stream lease TTL | `900` |
 | `DS2API_RAW_STREAM_SAMPLE_ROOT` | Raw stream sample root for saving/reading samples | `tests/raw_stream_samples` |
 | `DS2API_STATIC_ADMIN_DIR` | WebUI static asset directory | `static/admin` |
-| `DS2API_AUTO_BUILD_WEBUI` | Whether local startup auto-builds missing WebUI assets (`1/true/yes/on` or `0/false/no/off`) | Enabled outside Vercel |
+| `DS2API_AUTO_BUILD_WEBUI` | Whether local startup auto-builds missing WebUI assets (`1/true/yes/on` or `0/false/no/off`) | Enabled by default |
 | `DS2API_DEEPSEEK_CLIENT_VERSION` | Override the DeepSeek upstream `x-client-version` and `x-app-version` baseline | Built-in web shared constants |
 | `DS2API_DEEPSEEK_USER_AGENT` | Override the DeepSeek upstream `User-Agent` | Built-in Chrome/Web UA |
 | `DS2API_DEEPSEEK_ACCEPT_LANGUAGE` | Override the DeepSeek upstream `Accept-Language` | `zh-CN,zh;q=0.9` |
 | `DS2API_DEEPSEEK_CLIENT_LOCALE` | Override the DeepSeek upstream `x-client-locale` | `zh_CN` |
 | `DS2API_DEEPSEEK_DEVICE_ID` | Global override for a website-issued login device ID; otherwise uses the account `device_id` | Empty |
 | `DS2API_BROWSER_PATH` | Chrome / Chromium / Edge executable for the local verification helper; not used by the server | Auto-detect |
-| `VERCEL_TOKEN` | Vercel sync token | — |
-| `VERCEL_PROJECT_ID` | Vercel project ID | — |
-| `VERCEL_TEAM_ID` | Vercel team ID | — |
-| `DS2API_CHAT_HISTORY_PATH` | Chat history storage path (must be set to `/tmp/chat_history.json` on Vercel, otherwise unavailable due to read-only filesystem) | `data/chat_history.json` |
+| `DS2API_CHAT_HISTORY_PATH` | Chat history storage path | `data/chat_history.json` |
 | `DS2API_DATABASE_MODE` | Chat history storage backend: `builtin` keeps the existing JSON files; `external` uses an external SQL database | `builtin` |
 | `DS2API_DATABASE_TYPE` | External database type: `postgres` / `mysql` (`mariadb` is treated as `mysql`) | — |
 | `DS2API_DATABASE_DSN` | External database connection string; `DS2API_DATABASE_URL` is also accepted; explicit external mode may also fall back to `DATABASE_URL` | — |
@@ -318,11 +265,10 @@ VERCEL_TEAM_ID=team_xxxxxxxxxxxx   # optional for personal accounts
 | `DS2API_DATABASE_MAX_OPEN_CONNS` | External database max open connections; `0` keeps the Go default | `0` |
 | `DS2API_DATABASE_MAX_IDLE_CONNS` | External database max idle connections; `0` keeps the Go default | `0` |
 | `DS2API_DATABASE_CONN_MAX_LIFETIME_SECONDS` | External database connection max lifetime in seconds; `0` means unlimited | `0` |
-| `DS2API_VERCEL_PROTECTION_BYPASS` | Deployment protection bypass for internal Node→Go calls | — |
 
 External database mode currently persists Chat history. Accounts, API keys, and runtime settings continue to use the existing `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` configuration flow. PostgreSQL example: `DS2API_DATABASE_TYPE=postgres`, `DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable`. MySQL/MariaDB example: `DS2API_DATABASE_TYPE=mysql`, `DS2API_DATABASE_DSN=user:pass@tcp(host:3306)/ds2api?parseTime=true`.
 
-### 3.2.2 DeepSeek Login Device Verification
+### 3.2 DeepSeek Login Device Verification
 
 Password login uses the website's Web request format and requires a `device_id` issued by its device service. The old 32-character account hash does not satisfy device verification; `DS2API_DEEPSEEK_DEVICE_SEED` no longer generates login IDs. Existing valid DeepSeek tokens and direct-token requests continue to work. Initial password login and later password-based refreshes need a valid device ID.
 
@@ -350,119 +296,14 @@ Paste the output into **Login device ID** when adding or editing an account in t
 }
 ```
 
-Alternatively, set `DS2API_DEEPSEEK_DEVICE_ID`; this global override takes precedence over account values. Docker and Vercel can use an ID obtained locally, without Chrome or a browser service on the deployment. Account device IDs survive configuration save, import/export, and Vercel sync. Account lists expose only a configured flag; leaving the edit field blank preserves its value.
+Alternatively, set `DS2API_DEEPSEEK_DEVICE_ID`; this global override takes precedence over account values. Docker deployments can use an ID obtained locally, without Chrome or a browser service on the deployment. Account device IDs survive configuration save and import/export. Account lists expose only a configured flag; leaving the edit field blank preserves its value.
 
 Go performs subsequent password logins and token refreshes directly. If DeepSeek returns `RISK_DEVICE_DETECTED`, run the helper again, replace the device ID, and retest the account. Errors retain the upstream reason and include renewal guidance. Upstream determines device validity; successful browser login alone does not prove programmatic password login works.
 
-### 3.4 Vercel Architecture
-
-```text
-Request ──────┐
-              │
-              ▼
-         vercel.json routing
-              │
-        ┌─────┴─────┐
-        │           │
-        ▼           ▼
-  api/index.go   api/chat-stream.js
-  (Go Runtime)   (Node Runtime)
-```
-
-- **Go entry**: `api/index.go` (Serverless Go)
-- **Stream entry**: `api/chat-stream.js` (Node Runtime for real-time SSE; `vercel.json` rewrites only the canonical `/v1/chat/completions` path here, while the root shortcut `/chat/completions` stays on the Go entry)
-- **Routing**: `vercel.json`
-- **Build command**: `npm ci --prefix webui && npm run build --prefix webui` (automatic)
-
-#### Streaming Pipeline
-
-Vercel Go Runtime applies platform-level response buffering, so this project uses a hybrid "**Go prepare + Node stream**" path on Vercel:
-
-1. `api/chat-stream.js` receives `/v1/chat/completions` request
-2. Node calls Go internal prepare endpoint (`?__stream_prepare=1`) for session ID, PoW, token
-3. Go prepare creates a stream lease, locking the account
-4. Node connects directly to DeepSeek upstream, relays SSE in real-time to client (including OpenAI chunk framing and tools anti-leak sieve)
-5. After stream ends, Node calls Go release endpoint (`?__stream_release=1`) to free the account
-
-> This adaptation is **Vercel-only**; local and Docker remain pure Go.
-
-#### Non-Stream Fallback and Tool Call Handling
-
-- `api/chat-stream.js` falls back to Go entry (`?__go=1`) for non-stream requests only
-- Streaming requests (including requests with `tools`) stay on the Node path and use Go-aligned tool-call anti-leak handling
-- The Node stream path also mirrors Go finalization semantics: empty visible output returns the same shaped error SSE, and empty `content_filter` returns a `content_filter` error
-- WebUI non-stream test calls `?__go=1` directly to avoid Node hop timeout on long requests
-
-#### Function Duration
-
-`vercel.json` sets `maxDuration: 300` for both `api/chat-stream.js` and `api/index.go` (subject to your Vercel plan limits).
-
-### 3.5 Vercel Troubleshooting
-
-#### Go Build Failure
-
-```text
-Error: Command failed: go build -ldflags -s -w -o .../bootstrap ...
-```
-
-**Cause**: Invalid Go build flag settings in Vercel (`-ldflags` not passed as a single argument).
-
-**Fix**:
-
-1. Open Vercel Project Settings → Build and Development Settings
-2. **Clear** custom Go Build Flags / Build Command (recommended)
-3. If ldflags must be used, set `-ldflags="-s -w"` (ensure it's one argument)
-4. Verify `go.mod` uses a supported version (currently `go 1.26.0`)
-5. Redeploy (recommended: clear cache)
-
-#### Internal Package Import Error
-
-```text
-use of internal package ds2api/internal/server not allowed
-```
-
-**Cause**: Vercel Go entrypoint directly imports `internal/...`.
-
-**Fix**: This repo uses a public bridge package: `api/index.go` → `ds2api/app` → `internal/server`.
-
-#### Output Directory Error
-
-```text
-No Output Directory named "public" found after the Build completed.
-```
-
-**Fix**: This repo uses `static` as output directory (`"outputDirectory": "static"` in `vercel.json`). If you manually changed Output Directory in Project Settings, set it to `static` or clear it.
-
-#### Deployment Protection Blocking
-
-If API responses return Vercel HTML `Authentication Required`:
-
-- **Option A**: Disable Deployment Protection for that environment (recommended for public APIs)
-- **Option B**: Add `x-vercel-protection-bypass` header to requests
-- **Option C**: Set `VERCEL_AUTOMATION_BYPASS_SECRET` (or `DS2API_VERCEL_PROTECTION_BYPASS`) for internal Node→Go calls
-
-#### Chat History Unavailable (read-only file system)
-
-```text
-create chat history dir: mkdir /var/task/data: read-only file system
-```
-
-**Cause**: Vercel Serverless functions have a read-only filesystem (`/var/task`). Chat history fails because it cannot create directories there.
-
-**Fix**: Add the following in Vercel Project Settings → Environment Variables:
-
-```text
-DS2API_CHAT_HISTORY_PATH=/tmp/chat_history.json
-```
-
-`/tmp` is the only writable directory in Vercel Serverless. Data is ephemeral (not persisted across cold starts), but the feature works within a single instance lifetime.
-
-For Chat history persistence across cold starts, you can instead set `DS2API_DATABASE_MODE=external` and configure a PostgreSQL or MySQL/MariaDB database.
-
-### 3.6 Build Artifacts Not Committed
+### 3.3 Build Artifacts Not Committed
 
 - `static/admin` directory is not in Git
-- Vercel / Docker automatically generate WebUI assets during build
+- Docker builds and first local startup automatically generate WebUI assets
 
 ---
 

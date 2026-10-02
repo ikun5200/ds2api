@@ -10,11 +10,10 @@
 [![Release](https://img.shields.io/github/v/release/ikun5200/ds2api?display_name=tag)](https://github.com/ikun5200/ds2api/releases)
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docs/DEPLOY.en.md)
 [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/L4CFHP)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ikun5200/ds2api)
 
 Language: [中文](README.MD) | [English](README.en.md)
 
-DS2API converts DeepSeek Web chat capability into an OpenAI-compatible API. The core backend is Go-based, with a small Node Runtime bridge used for Vercel streaming, and the React WebUI admin panel lives in `webui/` (build output auto-generated to `static/admin` during deployment).
+DS2API converts DeepSeek Web chat capability into an OpenAI-compatible API. The core backend is Go-based, and the React WebUI admin panel lives in `webui/` (build output auto-generated to `static/admin` during deployment).
 
 Documentation entry: [Docs Index](docs/README.md) / [Architecture](docs/ARCHITECTURE.en.md) / [API Reference](API.en.md)
 
@@ -46,8 +45,7 @@ Documentation entry: [Docs Index](docs/README.md) / [Architecture](docs/ARCHITEC
 - [Quick Start](#quick-start)
   - [Option 1: Download Release Binaries](#option-1-download-release-binaries)
   - [Option 2: Docker / GHCR](#option-2-docker--ghcr)
-  - [Option 3: Vercel](#option-3-vercel)
-  - [Option 4: Local Run](#option-4-local-run)
+  - [Option 3: Local Run](#option-3-local-run)
 - [Configuration](#configuration)
 - [Authentication Modes](#authentication-modes)
 - [Concurrency Model](#concurrency-model)
@@ -72,7 +70,6 @@ flowchart LR
             OA["OpenAI\nchat / responses / files / embeddings"]
             Admin["Admin API\nresource packages"]
             WebUI["WebUI\n/admin (static hosting)"]
-            Vercel["Vercel Node Stream\n/v1/chat/completions"]
         end
 
         subgraph Runtime["Runtime + Core Capabilities"]
@@ -92,14 +89,11 @@ flowchart LR
     Router --> OA
     Router --> Admin
     Router --> WebUI
-    Router --> Vercel
 
     OA --> Compat
     Compat --> Completion
     Completion -.full context.-> History
     Completion --> Turn
-    Vercel -.Go prepare.-> Completion
-    Vercel -.Node SSE.-> Tool
     Completion --> Auth
     Completion -.account rotation.-> Pool
     Completion -.tool-call parsing.-> Tool
@@ -108,14 +102,13 @@ flowchart LR
     DSClient --> Upstream
     Upstream --> DSClient
     Turn --> Client
-    Vercel --> Client
 ```
 
 For the full module-by-module architecture and directory responsibilities, see [docs/ARCHITECTURE.en.md](docs/ARCHITECTURE.en.md).
 
-- **Backend**: Go (`cmd/ds2api/`, `api/`, `internal/`), no Python runtime
+- **Backend**: Go (`cmd/ds2api/`, `internal/`), no Python runtime
 - **Frontend**: React admin panel (`webui/`), served as static build at runtime
-- **Deployment**: local run, Docker, Vercel serverless, Linux systemd
+- **Deployment**: local run, Docker, Linux systemd
 
 ## Key Capabilities
 
@@ -123,12 +116,12 @@ For the full module-by-module architecture and directory responsibilities, see [
 | --- | --- |
 | OpenAI compatible | `GET /v1/models`, `GET /v1/models/{id}`, `POST /v1/chat/completions`, `POST /v1/responses`, `GET /v1/responses/{response_id}`, `POST /v1/embeddings`, `POST /v1/files`, `GET /v1/files/{file_id}` |
 | Ollama compatible | `GET /api/version`, `GET /api/tags`, `POST /api/show` |
-| Unified CORS compatibility | `/v1/*`, `/api/*`, and `/admin/*` share one CORS policy; on Vercel, the Node Runtime for `/v1/chat/completions` mirrors the same relaxed preflight behavior for third-party clients |
+| Unified CORS compatibility | `/v1/*`, `/api/*`, and `/admin/*` share one CORS policy for relaxed third-party preflight behavior |
 | Multi-account rotation | Auto token refresh, email/mobile dual login |
 | Concurrency control | Per-account in-flight limit + waiting queue, dynamic recommended concurrency |
 | DeepSeek PoW | Pure Go high-performance solver (DeepSeekHashV1), ms-level response |
 | Tool Calling | Anti-leak handling: non-code-block feature match, early `delta.tool_calls`, structured incremental output |
-| Admin API | Config management, runtime settings hot-reload, proxy management, account testing/batch test, session cleanup, import/export, Vercel sync, version check |
+| Admin API | Config management, runtime settings hot-reload, proxy management, account testing/batch test, session cleanup, import/export, version check |
 | WebUI Admin Panel | SPA at `/admin` (Chinese UI, dark mode, with server-side conversation history) |
 | Health Probes | `GET /healthz` (liveness), `GET /readyz` (readiness) |
 
@@ -140,7 +133,6 @@ OpenAI `/v1/*` routes remain canonical, and DS2API also accepts root shortcuts s
 | --- | --- | --- |
 | P0 | Codex CLI/SDK (`wire_api=chat` / `wire_api=responses`) | ✅ |
 | P0 | OpenAI SDK (JS/Python, chat + responses) | ✅ |
-| P0 | Vercel AI SDK (openai-compatible) | ✅ |
 | P1 | LangChain / LlamaIndex / OpenWebUI (OpenAI-compatible integration) | ✅ |
 
 ## Model Support
@@ -179,8 +171,7 @@ Recommended order when choosing a deployment method:
 
 1. **Download and run release binaries**: the easiest path for most users because the artifacts are already built.
 2. **Docker / GHCR image deployment**: suitable for containerized, orchestrated, or cloud environments.
-3. **Vercel deployment**: suitable if you already use Vercel and accept its platform constraints.
-4. **Run from source / build locally**: suitable for development, debugging, or when you need to modify the code yourself.
+3. **Run from source / build locally**: suitable for development, debugging, or when you need to modify the code yourself.
 
 ### Universal First Step (all deployment modes)
 
@@ -193,7 +184,7 @@ cp config.example.json config.json
 
 Recommended per deployment mode:
 - Local run: read `config.json` directly
-- Docker / Vercel: generate Base64 from `config.json` and inject as `DS2API_CONFIG_JSON`, or paste raw JSON directly
+- Docker: generate Base64 from `config.json` and inject as `DS2API_CONFIG_JSON`, or paste raw JSON directly
 
 The WebUI admin panel’s “Full configuration template” is loaded from the same `config.example.json`, so updating that file keeps the frontend template in sync.
 
@@ -244,33 +235,7 @@ For manual deployment without the template, create a Zeabur GitHub service, keep
 
 Note: when Zeabur builds directly from the repo `Dockerfile`, you do not need to pass `BUILD_VERSION`. The image prefers that build arg when provided, and automatically falls back to the repo-root `VERSION` file when it is absent.
 
-### Option 3: Vercel
-
-1. Fork this repo to your GitHub account
-2. Import the project on Vercel
-3. Set environment variables (minimum: `DS2API_ADMIN_KEY`; recommended to also set `DS2API_CONFIG_JSON`)
-4. Deploy
-
-Recommended first step in repo root:
-
-```bash
-cp config.example.json config.json
-# Edit config.json
-```
-
-Recommended: convert `config.json` to Base64 locally, then paste into `DS2API_CONFIG_JSON` to avoid JSON formatting mistakes:
-
-```bash
-base64 < config.json | tr -d '\n'
-```
-
-> **Vercel config saves**: Vercel function instances are stateless. Disabling accounts or changing keys, proxies, and settings in the Admin UI first hot-reloads only the current instance. To make the new config stable across refreshes, cold starts, and other instances, use **Vercel Sync** in the Admin UI to update `DS2API_CONFIG_JSON` and redeploy. Otherwise saved state can appear to flip after refresh.
-
-> **Streaming note**: OpenAI Chat streaming on Vercel is routed to `api/chat-stream.js` (Node Runtime), but `vercel.json` rewrites only the canonical `/v1/chat/completions` path to Node; the root shortcut `/chat/completions` stays on the Go main path. Auth, account selection, and session/PoW preparation are still handled by the Go internal prepare endpoint; streaming output (including `tools`) is assembled on Node with Go-aligned anti-leak handling. Use `/v1/chat/completions` on Vercel when real-time streaming is required.
-
-For detailed deployment instructions, see the [Deployment Guide](docs/DEPLOY.en.md).
-
-### Option 4: Local Run
+### Option 3: Local Run
 
 **Prerequisites**: Go 1.26+, Node.js `20.19+` or `22.12+` (only if building WebUI locally; CI / Docker builds use Node 24), and npm available; npm 10+ is recommended
 
@@ -303,7 +268,7 @@ The server actually binds to `0.0.0.0:5001`, so devices on the same LAN can usua
 Common fields:
 
 - `keys` / `api_keys`: client API keys; `api_keys` adds `name` and `remark` metadata while `keys` remains compatible.
-- `accounts`: managed DeepSeek accounts, supporting `email` or `mobile` login plus proxy/name/remark metadata and the `disabled` flag. Password login also needs a website-issued `device_id`, supplied per account or through the environment; see [login device verification](docs/DEPLOY.en.md#322-deepseek-login-device-verification).
+- `accounts`: managed DeepSeek accounts, supporting `email` or `mobile` login plus proxy/name/remark metadata and the `disabled` flag. Password login also needs a website-issued `device_id`, supplied per account or through the environment; see [login device verification](docs/DEPLOY.en.md#32-deepseek-login-device-verification).
 - `model_aliases`: one shared alias map for OpenAI-compatible client model names.
 - `runtime`: account concurrency, queueing, and token refresh behavior, hot-reloadable via Admin Settings.
 - `auto_delete.mode`: remote session cleanup after each request, supporting `none` / `single` / `all`.
@@ -388,7 +353,7 @@ The save endpoint can target a chain by `query`, `chain_key`, or `capture_id`. E
 | Document | Description |
 | --- | --- |
 | [API.md](API.md) / [API.en.md](API.en.md) | API reference with request/response examples |
-| [DEPLOY.md](docs/DEPLOY.md) / [DEPLOY.en.md](docs/DEPLOY.en.md) | Deployment guide (local/Docker/Vercel/systemd) |
+| [DEPLOY.md](docs/DEPLOY.md) / [DEPLOY.en.md](docs/DEPLOY.en.md) | Deployment guide (local/Docker/systemd) |
 | [CONTRIBUTING.md](docs/CONTRIBUTING.md) / [CONTRIBUTING.en.md](docs/CONTRIBUTING.en.md) | Contributing guide |
 | [TESTING.md](docs/TESTING.md) | Testsuite guide |
 

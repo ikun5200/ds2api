@@ -247,7 +247,7 @@ func (h *Handler) testAPI(w http.ResponseWriter, r *http.Request) {
 	}
 	host := r.Host
 	scheme := "http"
-	if strings.Contains(strings.ToLower(host), "vercel") || strings.Contains(strings.ToLower(r.Header.Get("X-Forwarded-Proto")), "https") {
+	if strings.EqualFold(r.Header.Get("X-Forwarded-Proto"), "https") {
 		scheme = "https"
 	}
 	payload := map[string]any{"model": model, "messages": []map[string]any{{"role": "user", "content": message}}, "stream": false}

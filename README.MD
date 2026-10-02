@@ -11,13 +11,12 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](docs/DEPLOY.md)
 
 [![Deploy on Zeabur](https://zeabur.com/button.svg)](https://zeabur.com/templates/L4CFHP)
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/ikun5200/ds2api)
 
 语言 / Language: [中文](README.MD) | [English](README.en.md)
 
-将 DeepSeek Web 对话能力转换为 OpenAI 兼容 API。核心后端以 **Go** 实现，Vercel 流式桥接额外使用少量 Node Runtime，前端为 React WebUI 管理台（源码在 `webui/`，部署时自动构建到 `static/admin`）。
+将 DeepSeek Web 对话能力转换为 OpenAI 兼容 API。核心后端以 **Go** 实现，前端为 React WebUI 管理台（源码在 `webui/`，部署时自动构建到 `static/admin`）。
 
-文档入口：[文档导航](docs/README.md) / [架构说明](docs/ARCHITECTURE.md) / [接口文档](API.md) / [外部存储说明](docs/DEPLOY.md#321-外部存储chat-history详细说明)
+文档入口：[文档导航](docs/README.md) / [架构说明](docs/ARCHITECTURE.md) / [接口文档](API.md) / [外部存储说明](docs/DEPLOY.md#32-外部存储chat-history详细说明)
 
 【感谢Linux.do社区及GitHub社区各位开发者对项目的支持与贡献】
 
@@ -49,8 +48,7 @@
 - [快速开始](#快速开始)
   - [方式一：下载 Release 构建包](#方式一下载-release-构建包)
   - [方式二：Docker 运行](#方式二docker-运行)
-  - [方式三：Vercel 部署](#方式三vercel-部署)
-  - [方式四：本地源码运行](#方式四本地源码运行)
+  - [方式三：本地源码运行](#方式三本地源码运行)
 - [配置说明](#配置说明)
   - [外部存储怎么选](#外部存储怎么选)
 - [鉴权模式](#鉴权模式)
@@ -76,7 +74,6 @@ flowchart LR
             OA["OpenAI\nchat / responses / files / embeddings"]
             Admin["Admin API\n资源子包"]
             WebUI["WebUI\n/admin（静态托管）"]
-            Vercel["Vercel Node Stream\n/v1/chat/completions"]
         end
 
         subgraph Runtime["运行时核心能力"]
@@ -96,14 +93,11 @@ flowchart LR
     Router --> OA
     Router --> Admin
     Router --> WebUI
-    Router --> Vercel
 
     OA --> Compat
     Compat --> Completion
     Completion -.完整上下文.-> History
     Completion --> Turn
-    Vercel -.Go prepare.-> Completion
-    Vercel -.Node SSE.-> Tool
     Completion --> Auth
     Completion -.账号轮询.-> Pool
     Completion -.工具调用解析.-> Tool
@@ -112,14 +106,13 @@ flowchart LR
     DSClient --> Upstream
     Upstream --> DSClient
     Turn --> Client
-    Vercel --> Client
 ```
 
 详细架构拆分与目录职责见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
-- **后端**：Go（`cmd/ds2api/`、`api/`、`internal/`），不依赖 Python 运行时
+- **后端**：Go（`cmd/ds2api/`、`internal/`），不依赖 Python 运行时
 - **前端**：React 管理台（`webui/`），运行时托管静态构建产物
-- **部署**：本地运行、Docker、Vercel Serverless、Linux systemd
+- **部署**：本地运行、Docker、Linux systemd
 
 ## 核心能力
 
@@ -127,14 +120,14 @@ flowchart LR
 | --- | --- |
 | OpenAI 兼容 | `GET /v1/models`、`GET /v1/models/{id}`、`POST /v1/chat/completions`、`POST /v1/responses`、`GET /v1/responses/{response_id}`、`POST /v1/embeddings`、`POST /v1/files`、`GET /v1/files/{file_id}` |
 | Ollama 兼容 | `GET /api/version`、`GET /api/tags`、`POST /api/show` |
-| 统一 CORS 兼容 | `/v1/*`、`/api/*`、`/admin/*` 统一走同一套 CORS 策略；Vercel 上 `/v1/chat/completions` 的 Node Runtime 也对齐相同放行规则，尽量减少第三方预检请求头限制 |
+| 统一 CORS 兼容 | `/v1/*`、`/api/*`、`/admin/*` 统一走同一套 CORS 策略，尽量减少第三方预检请求头限制 |
 | 多账号轮询 | 自动 token 刷新、邮箱/手机号双登录方式 |
 | 并发队列控制 | 每账号 in-flight 上限 + 等待队列，动态计算建议并发值 |
 | DeepSeek PoW | 纯 Go 高性能实现（DeepSeekHashV1），毫秒级响应 |
 | Tool Calling | 防泄漏处理：非代码块高置信特征识别、`delta.tool_calls` 早发、结构化增量输出 |
-| Admin API | 配置管理、运行时设置热更新、代理管理、账号测试 / 批量测试、会话清理、导入导出、Vercel 同步、版本检查 |
+| Admin API | 配置管理、运行时设置热更新、代理管理、账号测试 / 批量测试、会话清理、导入导出、版本检查 |
 | WebUI 管理台 | `/admin` 单页应用（中文界面、深色模式，支持查看服务器端对话记录） |
-| 外部存储 | Chat history 默认使用内置 JSON 文件，也可切换到 PostgreSQL、MySQL 或 MariaDB，适合 Vercel、跨容器和多实例场景 |
+| 外部存储 | Chat history 默认使用内置 JSON 文件，也可切换到 PostgreSQL、MySQL 或 MariaDB，适合跨容器和多实例场景 |
 | 运维探针 | `GET /healthz`（存活）、`GET /readyz`（就绪） |
 
 OpenAI `/v1/*` 仍是推荐的规范路径；同时支持 `/models`、`/chat/completions`、`/responses`、`/embeddings`、`/files`、`/files/{file_id}` 等根路径快捷路由，方便只配置 DS2API 根地址的第三方客户端。
@@ -145,7 +138,6 @@ OpenAI `/v1/*` 仍是推荐的规范路径；同时支持 `/models`、`/chat/com
 | --- | --- | --- |
 | P0 | Codex CLI/SDK（`wire_api=chat` / `wire_api=responses`） | ✅ |
 | P0 | OpenAI SDK（JS/Python，chat + responses） | ✅ |
-| P0 | Vercel AI SDK（openai-compatible） | ✅ |
 | P1 | LangChain / LlamaIndex / OpenWebUI（OpenAI 兼容接入） | ✅ |
 
 ## 模型支持
@@ -184,8 +176,7 @@ Ollama `GET /api/tags` 同样列出 `deepseek-flash` 和 `deepseek-flash-search`
 
 1. **下载 Release 构建包运行**：最省事，产物已编译完成，最适合大多数用户。
 2. **Docker / GHCR 镜像部署**：适合需要容器化、编排或云环境部署。
-3. **Vercel 部署**：适合已有 Vercel 环境且接受其平台约束的场景。
-4. **本地源码运行 / 自行编译**：适合开发、调试或需要自行修改代码的场景。
+3. **本地源码运行 / 自行编译**：适合开发、调试或需要自行修改代码的场景。
 
 ### 通用第一步（所有部署方式）
 
@@ -198,7 +189,7 @@ cp config.example.json config.json
 
 后续部署建议：
 - 本地运行：直接读取 `config.json`
-- Docker / Vercel：由 `config.json` 生成 `DS2API_CONFIG_JSON`（Base64）注入环境变量，也可以直接写原始 JSON
+- Docker：由 `config.json` 生成 `DS2API_CONFIG_JSON`（Base64）注入环境变量，也可以直接写原始 JSON
 
 WebUI 管理台里的“全量配置模板”也直接复用同一份 `config.example.json`，所以更新示例文件后，前端模板会自动保持一致。
 
@@ -250,33 +241,7 @@ Zeabur 首次空卷启动时可以没有 `/data/config.json`；DS2API 会先使�
 
 说明：Zeabur 使用仓库内 `Dockerfile` 直接构建时，不需要额外传入 `BUILD_VERSION`；镜像会优先读取该构建参数，未提供时自动回退到仓库根目录的 `VERSION` 文件。
 
-### 方式三：Vercel 部署
-
-1. Fork 仓库到自己的 GitHub
-2. 在 Vercel 上导入项目
-3. 配置环境变量（最少设置 `DS2API_ADMIN_KEY`；推荐同时设置 `DS2API_CONFIG_JSON`）
-4. 部署
-
-建议先在仓库目录复制模板并填写：
-
-```bash
-cp config.example.json config.json
-# 编辑 config.json
-```
-
-推荐：先本地把 `config.json` 转成 Base64，再粘贴到 `DS2API_CONFIG_JSON`，避免 JSON 格式错误：
-
-```bash
-base64 < config.json | tr -d '\n'
-```
-
-> **Vercel 配置保存说明**：Vercel 函数实例是无状态的。管理台里禁用账号、修改 Key/代理/设置等操作会先热更新当前实例；要让刷新、冷启动和其它实例都稳定读取新配置，需要到管理台的 **Vercel 同步** 页面同步 `DS2API_CONFIG_JSON` 并重新部署。否则可能看到保存状态在刷新后反复变化。
-
-> **流式说明**：OpenAI Chat 流式在 Vercel 上会由 `api/chat-stream.js`（Node Runtime）承接，但 `vercel.json` 只把规范路径 `/v1/chat/completions` 重写到 Node；根路径快捷别名 `/chat/completions` 仍走 Go 主链路。鉴权、账号选择、会话/PoW 准备仍由 Go 内部 prepare 接口完成；流式响应（含 `tools`）在 Node 侧执行与 Go 对齐的输出组装与防泄漏处理。Vercel 上需要实时流式时请使用 `/v1/chat/completions`。
-
-详细部署说明请参阅 [部署指南](docs/DEPLOY.md)。
-
-### 方式四：本地源码运行
+### 方式三：本地源码运行
 
 **前置要求**：Go 1.26+，Node.js `20.19+` 或 `22.12+`（仅在需要构建 WebUI 时；CI / Docker 构建使用 Node 24）；同时确保 `npm` 可用，建议 `npm 10+`
 
@@ -309,7 +274,7 @@ go run ./cmd/ds2api
 常用字段：
 
 - `keys` / `api_keys`：客户端访问密钥，`api_keys` 支持 `name` 与 `remark` 元信息，`keys` 继续兼容。
-- `accounts`：DeepSeek 托管账号，支持 `email` 或 `mobile` 登录，可配置代理、名称、备注和 `disabled` 禁用状态。密码登录还需官网签发的 `device_id`，可填在账号中或通过环境变量设置，详见[登录设备验证](docs/DEPLOY.md#322-deepseek-登录设备验证)。
+- `accounts`：DeepSeek 托管账号，支持 `email` 或 `mobile` 登录，可配置代理、名称、备注和 `disabled` 禁用状态。密码登录还需官网签发的 `device_id`，可填在账号中或通过环境变量设置，详见[登录设备验证](docs/DEPLOY.md#33-deepseek-登录设备验证)。
 - `model_aliases`：OpenAI 兼容客户端共用的模型 alias 映射。
 - `runtime`：账号并发、队列与 token 刷新策略，可通过 Admin Settings 热更新。
 - `auto_delete.mode`：请求结束后的远端会话清理策略，支持 `none` / `single` / `all`。
@@ -330,7 +295,7 @@ DS2API_DATABASE_TYPE=postgres   # 也支持 mysql / mariadb
 DS2API_DATABASE_DSN=postgres://user:pass@host:5432/ds2api?sslmode=disable
 ```
 
-外部存储目前只保存 Chat history，也就是管理台「响应记录」页面和各协议共享历史链路使用的数据；账号、API Key、代理、Admin 密码和运行时设置仍由 `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` 管理。完整字段、MySQL 示例、自动建表和注意事项见 [外部存储详细说明](docs/DEPLOY.md#321-外部存储chat-history详细说明)。
+外部存储目前只保存 Chat history，也就是管理台「响应记录」页面和各协议共享历史链路使用的数据；账号、API Key、代理、Admin 密码和运行时设置仍由 `DS2API_CONFIG_JSON` / `DS2API_CONFIG_PATH` 管理。完整字段、MySQL 示例、自动建表和注意事项见 [外部存储详细说明](docs/DEPLOY.md#32-外部存储chat-history详细说明)。
 
 环境变量完整列表见 [部署指南](docs/DEPLOY.md)，接口鉴权规则见 [API.md](API.md#鉴权规则)。
 
@@ -412,7 +377,7 @@ go run ./cmd/ds2api
 | 文档 | 说明 |
 | --- | --- |
 | [API.md](API.md) / [API.en.md](API.en.md) | API 接口文档（含请求/响应示例） |
-| [DEPLOY.md](docs/DEPLOY.md) / [DEPLOY.en.md](docs/DEPLOY.en.md) | 部署指南（本地/Docker/Vercel/systemd） |
+| [DEPLOY.md](docs/DEPLOY.md) / [DEPLOY.en.md](docs/DEPLOY.en.md) | 部署指南（本地/Docker/systemd） |
 | [CONTRIBUTING.md](docs/CONTRIBUTING.md) / [CONTRIBUTING.en.md](docs/CONTRIBUTING.en.md) | 贡献指南 |
 | [TESTING.md](docs/TESTING.md) | 测试集使用指南 |
 

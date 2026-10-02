@@ -57,39 +57,6 @@ func TestBuildOpenAIFinalPrompt_HandlerPathIncludesToolRoundtripSemantics(t *tes
 	}
 }
 
-func TestBuildOpenAIFinalPrompt_VercelPreparePathKeepsFinalAnswerInstruction(t *testing.T) {
-	messages := []any{
-		map[string]any{"role": "system", "content": "You are helpful"},
-		map[string]any{"role": "user", "content": "请调用工具"},
-	}
-	tools := []any{
-		map[string]any{
-			"type": "function",
-			"function": map[string]any{
-				"name":        "search",
-				"description": "search docs",
-				"parameters": map[string]any{
-					"type": "object",
-				},
-			},
-		},
-	}
-
-	finalPrompt, _ := BuildOpenAIPromptWithPrepareOptions(messages, tools, "", DefaultToolChoicePolicy(), false, prompt.DefaultPrepareOptions())
-	if !strings.Contains(finalPrompt, "Remember: The ONLY valid way to use tools is the <tool_calls>...</tool_calls> block at the end of your response.") {
-		t.Fatalf("vercel prepare finalPrompt missing final tool-call anchor instruction: %q", finalPrompt)
-	}
-	if !strings.Contains(finalPrompt, "TOOL CALL FORMAT") {
-		t.Fatalf("vercel prepare finalPrompt missing xml format instruction: %q", finalPrompt)
-	}
-	if !strings.Contains(finalPrompt, "Do NOT wrap XML in markdown fences") {
-		t.Fatalf("vercel prepare finalPrompt missing no-fence xml instruction: %q", finalPrompt)
-	}
-	if strings.Contains(finalPrompt, "```json") {
-		t.Fatalf("vercel prepare finalPrompt should not require fenced tool calls: %q", finalPrompt)
-	}
-}
-
 func TestBuildOpenAIPromptWithToolInstructionsOnlyOmitsSchemas(t *testing.T) {
 	messages := []any{
 		map[string]any{"role": "system", "content": "You are helpful"},

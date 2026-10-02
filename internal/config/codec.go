@@ -51,15 +51,6 @@ func (c Config) MarshalJSON() ([]byte, error) {
 	if c.OutputIntegrity.Enabled != nil || strings.TrimSpace(c.OutputIntegrity.Prompt) != "" {
 		m["output_integrity_guard"] = c.OutputIntegrity
 	}
-	if strings.TrimSpace(c.Vercel.Token) != "" || strings.TrimSpace(c.Vercel.ProjectID) != "" || strings.TrimSpace(c.Vercel.TeamID) != "" {
-		m["vercel"] = NormalizeVercelConfig(c.Vercel)
-	}
-	if c.VercelSyncHash != "" {
-		m["_vercel_sync_hash"] = c.VercelSyncHash
-	}
-	if c.VercelSyncTime != 0 {
-		m["_vercel_sync_time"] = c.VercelSyncTime
-	}
 	return json.Marshal(m)
 }
 
@@ -135,18 +126,6 @@ func (c *Config) UnmarshalJSON(b []byte) error {
 			if err := json.Unmarshal(v, &c.OutputIntegrity); err != nil {
 				return fmt.Errorf("invalid field %q: %w", k, err)
 			}
-		case "vercel":
-			if err := json.Unmarshal(v, &c.Vercel); err != nil {
-				return fmt.Errorf("invalid field %q: %w", k, err)
-			}
-		case "_vercel_sync_hash":
-			if err := json.Unmarshal(v, &c.VercelSyncHash); err != nil {
-				return fmt.Errorf("invalid field %q: %w", k, err)
-			}
-		case "_vercel_sync_time":
-			if err := json.Unmarshal(v, &c.VercelSyncTime); err != nil {
-				return fmt.Errorf("invalid field %q: %w", k, err)
-			}
 		default:
 			var anyVal any
 			if err := json.Unmarshal(v, &anyVal); err == nil {
@@ -182,9 +161,6 @@ func (c Config) Clone() Config {
 			Enabled: cloneBoolPtr(c.OutputIntegrity.Enabled),
 			Prompt:  c.OutputIntegrity.Prompt,
 		},
-		Vercel:           c.Vercel,
-		VercelSyncHash:   c.VercelSyncHash,
-		VercelSyncTime:   c.VercelSyncTime,
 		AdditionalFields: map[string]any{},
 	}
 	for k, v := range c.AdditionalFields {

@@ -319,7 +319,7 @@ export default function ProxyManagerContainer({ config, onRefresh, onMessage, au
     const [testResults, setTestResults] = useState({})
 
     const notifyMutationSuccess = (data, fallback) => {
-        onMessage(mutationMessageType(data), mutationMessage(data, fallback, t('settings.vercelSyncHint')))
+        onMessage(mutationMessageType(data), mutationMessage(data, fallback))
     }
 
     const proxies = config?.proxies || []

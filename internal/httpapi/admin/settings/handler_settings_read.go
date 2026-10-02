@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	authn "ds2api/internal/auth"
-	"ds2api/internal/config"
 	"ds2api/internal/prompt"
 	"ds2api/internal/promptcompat"
 )
@@ -13,7 +12,6 @@ import (
 func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 	snap := h.Store.Snapshot()
 	recommended := defaultRuntimeRecommended(len(snap.Accounts), h.Store.RuntimeAccountMaxInflight())
-	needsSync := config.IsVercel() && snap.VercelSyncHash != "" && snap.VercelSyncHash != h.computeSyncHash()
 	writeJSON(w, http.StatusOK, map[string]any{
 		"success": true,
 		"admin": map[string]any{
@@ -45,8 +43,7 @@ func (h *Handler) getSettings(w http.ResponseWriter, _ *http.Request) {
 			"prompt":         h.Store.OutputIntegrityGuardPrompt(),
 			"default_prompt": prompt.DefaultOutputIntegrityGuardPrompt,
 		},
-		"model_aliases":     snap.ModelAliases,
-		"env_backed":        h.Store.IsEnvBacked(),
-		"needs_vercel_sync": needsSync,
+		"model_aliases": snap.ModelAliases,
+		"env_backed":    h.Store.IsEnvBacked(),
 	})
 }

@@ -146,12 +146,6 @@ func TestUpdateAccountDisabledResponseMarksEnvBackedMutation(t *testing.T) {
 	if envBacked, _ := payload["env_backed"].(bool); !envBacked {
 		t.Fatalf("expected env_backed=true, got %#v", payload)
 	}
-	if needsSync, _ := payload["needs_vercel_sync"].(bool); !needsSync {
-		t.Fatalf("expected needs_vercel_sync=true, got %#v", payload)
-	}
-	if msg, _ := payload["manual_sync_message"].(string); msg == "" {
-		t.Fatalf("expected manual_sync_message, got %#v", payload)
-	}
 }
 
 func TestListAccountsMasksTokenPreview(t *testing.T) {

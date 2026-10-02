@@ -14,10 +14,6 @@ func BaseDir() string {
 	return cwd
 }
 
-func IsVercel() bool {
-	return strings.TrimSpace(os.Getenv("VERCEL")) != "" || strings.TrimSpace(os.Getenv("NOW_REGION")) != ""
-}
-
 func ResolvePath(envKey, defaultRel string) string {
 	raw := strings.TrimSpace(os.Getenv(envKey))
 	if raw != "" {
@@ -58,11 +54,6 @@ func RawStreamSampleRoot() string {
 }
 
 func ChatHistoryPath() string {
-	// On Vercel, /var/task is read-only at runtime. If no explicit path is set,
-	// default to /tmp/chat_history.json (the only writable directory).
-	if IsVercel() && strings.TrimSpace(os.Getenv("DS2API_CHAT_HISTORY_PATH")) == "" {
-		return "/tmp/chat_history.json"
-	}
 	return ResolvePath("DS2API_CHAT_HISTORY_PATH", "data/chat_history.json")
 }
 

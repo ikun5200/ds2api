@@ -15,6 +15,3 @@ type Handler struct {
 
 var writeJSON = adminshared.WriteJSON
 var intFrom = adminshared.IntFrom
-var maskSecretPreview = adminshared.MaskSecretPreview
-
-func nilIfEmpty(s string) any { return adminshared.NilIfEmpty(s) }

@@ -24,7 +24,6 @@ type ConfigStore interface {
 	IsEnvWritebackEnabled() bool
 	HasEnvConfigSource() bool
 	ConfigPath() string
-	SetVercelSync(hash string, ts int64) error
 	AdminPasswordHash() string
 	AdminJWTExpireHours() int
 	AdminJWTValidAfterUnix() int64

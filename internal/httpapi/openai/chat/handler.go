@@ -3,8 +3,6 @@ package chat
 import (
 	"context"
 	"net/http"
-	"sync"
-	"time"
 
 	"ds2api/internal/auth"
 	"ds2api/internal/chathistory"
@@ -26,16 +24,6 @@ type Handler struct {
 	Auth        shared.AuthResolver
 	DS          shared.DeepSeekCaller
 	ChatHistory *chathistory.Store
-
-	leaseMu      sync.Mutex
-	streamLeases map[string]streamLease
-}
-
-type streamLease struct {
-	Auth      *auth.RequestAuth
-	Standard  promptcompat.StandardRequest
-	SessionID string
-	ExpiresAt time.Time
 }
 
 func stripReferenceMarkersEnabled() bool {

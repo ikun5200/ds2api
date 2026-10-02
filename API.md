@@ -30,7 +30,7 @@
 | Base URL | `http://localhost:5001` 或你的部署域名 |
 | 默认 Content-Type | `application/json` |
 | 健康检查 | `GET /healthz`、`GET /readyz` |
-| CORS | 已启用（统一覆盖 `/v1/*`、`/api/*`、`/admin/*`；浏览器有 `Origin` 时回显该 Origin，否则为 `*`；默认允许 `Content-Type`, `Authorization`, `X-API-Key`, `X-Ds2-Target-Account`, `X-Ds2-Source`, `X-Vercel-Protection-Bypass`，并会放行预检里声明的第三方请求头，如 `x-stainless-*`；Vercel 上 `/v1/chat/completions` 的 Node Runtime 也对齐相同行为；内部专用头 `X-Ds2-Internal-Token` 仍被拦截） |
+| CORS | 已启用（统一覆盖 `/v1/*`、`/api/*`、`/admin/*`；浏览器有 `Origin` 时回显该 Origin，否则为 `*`；默认允许 `Content-Type`, `Authorization`, `X-API-Key`, `X-Ds2-Target-Account`, `X-Ds2-Source`，并会放行预检里声明的第三方请求头，如 `x-stainless-*`；内部专用头 `X-Ds2-Internal-Token` 仍被拦截） |
 
 - 所有 JSON 请求体都必须是合法 UTF-8；非法字节序列会在入站阶段被拒绝为 `400 invalid json`。
 
@@ -40,7 +40,7 @@
 - 适配器层职责收敛为：**请求归一化 → DeepSeek 调用 → 协议形态渲染**，减少历史版本中“同能力多处实现”的分叉。
 - Tool Calling 的解析策略在 Go 与 Node Runtime 间保持一致：推荐模型输出半角管道符 DSML 外壳 `<|DSML|tool_calls>` → `<|DSML|invoke name="...">` → `<|DSML|parameter name="...">`；兼容层也接受 DSML wrapper 别名 `<dsml|tool_calls>`、`<|tool_calls>`、常见 DSML 分隔符漏写形态（如 `<|DSML tool_calls>`）、`DSML` 与工具标签名黏连的常见 typo（如 `<DSMLtool_calls>`）、控制分隔符漂移（如 `<DSML␂tool_calls>` / 原始 STX `\x02`）、CJK 尖括号、全角感叹号、顿号、PascalCase 本地名、弯引号属性值与属性尾部分隔符漂移（如 `<DSM|parameter name="command"|>...〈/DSM|parameter〉` / `<！DSML！invoke name=“Bash”>` / `<、DSML、tool_calls>` / `<DSmartToolCalls>` / `<DSMLtool_calls※>`）、任意协议前缀壳（如 `<proto💥tool_calls>`），以及旧式 canonical XML `<tool_calls>` → `<invoke name="...">` → `<parameter name="...">`。实现上采用结构扫描：只要固定本地标签名是 `tool_calls` / `invoke` / `parameter`，标签名前或标签名后的非结构性分隔符会在解析入口归一化；CDATA 开头也会容错 `<！[CDATA[` / `<、[CDATA[` 这类分隔符漂移；只有 `tool_calls` wrapper 或可修复的缺失 opening wrapper 会进入工具路径，裸 `<invoke>` 不计为已支持语法；流式场景继续执行防泄漏筛分。若参数体本身是合法 JSON 字面量（如 `123`、`true`、`null`、数组或对象），会按结构化值输出，不再一律当作字符串；显式空字符串和纯空白参数会结构化保留为空字符串，是否拒绝缺参由工具执行侧决定；完整但 malformed 的 wrapper 会作为普通文本释放，不会吞掉或伪造成工具调用；若 CDATA 偶发漏闭合，则会在最终 parse / flush 恢复阶段做窄修复，尽量保住已完整包裹的外层工具调用。
 - `Admin API` 将配置与运行时策略分开：`/admin/config*` 管静态配置，`/admin/settings*` 管运行时行为。
-- 当上游返回 thinking-only 响应（模型输出了推理链但无可见文本）时，Go 主路径与 Vercel Node 流式路径都会先自动重试一次：以多轮对话 follow-up 方式追加 prompt 后缀 `"Previous reply had no visible output. Please regenerate the visible final answer or tool call now."` 并设置 `parent_message_id` 在同一 DeepSeek session 内让模型重新输出；同账号重试最大 1 次。若同账号重试后仍即将返回 `429 upstream_empty_output`，未固定账号且不含用户附件/外部文件引用的托管请求，会在返回 429 前切换到下一个可用账号，新建 session，用原始 payload 再 fresh retry 一次。含附件请求固定使用原账号，以保持 file ID 有效。
+- 当上游返回 thinking-only 响应（模型输出了推理链但无可见文本）时，Go 主路径会先自动重试一次：以多轮对话 follow-up 方式追加 prompt 后缀 `"Previous reply had no visible output. Please regenerate the visible final answer or tool call now."` 并设置 `parent_message_id` 在同一 DeepSeek session 内让模型重新输出；同账号重试最大 1 次。若同账号重试后仍即将返回 `429 upstream_empty_output`，未固定账号且不含用户附件/外部文件引用的托管请求，会在返回 429 前切换到下一个可用账号，新建 session，用原始 payload 再 fresh retry 一次。含附件请求固定使用原账号，以保持 file ID 有效。
 - 引用标记处理边界：流式输出默认隐藏 `[citation:N]` / `[reference:N]` 这类上游内部占位符；非流式输出默认把 DeepSeek 搜索引用标记转换为 Markdown 引用链接。
 
 ---
@@ -57,13 +57,11 @@ cp config.example.json config.json
 按部署方式使用：
 
 - 本地运行：直接读取 `config.json`
-- Docker / Vercel：从 `config.json` 生成 Base64，填入 `DS2API_CONFIG_JSON`，也可以直接填原始 JSON
+- Docker：从 `config.json` 生成 Base64，填入 `DS2API_CONFIG_JSON`，也可以直接填原始 JSON
 
 ```bash
 DS2API_CONFIG_JSON="$(base64 < config.json | tr -d '\n')"
 ```
-
-Vercel 一键部署可先只填 `DS2API_ADMIN_KEY`，部署后在 `/admin` 导入配置，再通过 “Vercel 同步” 写回环境变量。
 
 ---
 
@@ -116,7 +114,6 @@ Vercel 一键部署可先只填 `DS2API_ADMIN_KEY`，部署后在 `/admin` 导�
 | POST | `/api/show` | 无 | Ollama 单模型能力查询（返回 `id` 与 `capabilities`） |
 | POST | `/admin/login` | 无 | 管理登录 |
 | GET | `/admin/verify` | JWT | 校验管理 JWT |
-| GET | `/admin/vercel/config` | Admin | 读取 Vercel 预配置 |
 | GET | `/admin/config` | Admin | 读取配置（脱敏） |
 | POST | `/admin/config` | Admin | 更新配置 |
 | GET | `/admin/settings` | Admin | 读取运行时设置 |
@@ -146,9 +143,6 @@ Vercel 一键部署可先只填 `DS2API_ADMIN_KEY`，部署后在 `/admin` 导�
 | POST | `/admin/dev/raw-samples/capture` | Admin | 直接发起一次请求并保存为 raw sample |
 | GET | `/admin/dev/raw-samples/query` | Admin | 按问题关键词查询当前内存抓包链 |
 | POST | `/admin/dev/raw-samples/save` | Admin | 把命中的内存抓包链保存为 raw sample |
-| POST | `/admin/vercel/sync` | Admin | 同步配置到 Vercel |
-| GET | `/admin/vercel/status` | Admin | Vercel 同步状态 |
-| POST | `/admin/vercel/status` | Admin | Vercel 同步状态 / 草稿对比 |
 | GET | `/admin/export` | Admin | 导出配置 JSON/Base64 |
 | GET | `/admin/dev/captures` | Admin | 查看本地抓包记录 |
 | DELETE | `/admin/dev/captures` | Admin | 清空本地抓包记录 |
@@ -247,7 +241,7 @@ OpenAI Chat / Responses 共用以下模式设置：
 
 ### `POST /v1/chat/completions`
 
-> 路径说明：除规范路径 `/v1/chat/completions` 外，也支持根路径快捷别名 `/chat/completions`。在 Vercel Runtime 上，`vercel.json` 仅把规范路径 `/v1/chat/completions` 重写到 Node 流式桥接；根路径快捷别名仍走 Go 主链路。因此 Vercel 上需要实时流式时请使用 `/v1/chat/completions`。
+> 路径说明：除规范路径 `/v1/chat/completions` 外，也支持根路径快捷别名 `/chat/completions`。
 
 **请求头**：
 
@@ -480,11 +474,11 @@ data: [DONE]
 
 同一附件块中已有 `file_id`（含 `file.file_id` / `file.id`）时，优先校验和使用既有引用，不再下载附带 URL 或重复上传；缺少有效 URL、内联数据或文件 ID 的图片块返回 `400`。
 
-OpenAI 主路径与 Vercel 准备/proxy 路径都会保留这些图片、文档和既有文件引用，再由共享服务处理。附件识别只针对明确的协议附件块或标准文件字段；普通工具结果的 `name` / `data` / `url`，以及业务 JSON 中同名的 `output`，不会被泛化为文件上传。
+OpenAI 主路径会保留这些图片、文档和既有文件引用，再由共享服务处理。附件识别只针对明确的协议附件块或标准文件字段；普通工具结果的 `name` / `data` / `url`，以及业务 JSON 中同名的 `output`，不会被泛化为文件上传。
 
 独立上传与后续生成、文件查询共用归属处理。托管模式的缓存键为调用方身份与原始 `file_id`，因此同一调用凭据复用已知文件时无需手动传账号头。多个已知文件属于不同账号，或显式 `X-Ds2-Target-Account` 与已知归属不一致时，返回 `409`；不会随机选择一个账号后继续生成。
 
-归属缓存有效期为 **24 小时**（成功上传或访问验证时刷新），每个 Resolver 最多 **10,000 条**，**仅保存在当前进程内存中**。重启、过期、其他实例或其他调用凭据下的未知 ID，只在当前选定账号验证文件是否可访问，不逐账号探测；无法访问时明确返回 `404`，应指定正确的 `X-Ds2-Target-Account` 或重新上传。该机制不承诺跨 Vercel 实例自动恢复归属。直通 Token 模式始终使用调用方提供的 Token，不通过托管归属缓存切换账号。
+归属缓存有效期为 **24 小时**（成功上传或访问验证时刷新），每个 Resolver 最多 **10,000 条**，**仅保存在当前进程内存中**。重启、过期、其他实例或其他调用凭据下的未知 ID，只在当前选定账号验证文件是否可访问，不逐账号探测；无法访问时明确返回 `404`，应指定正确的 `X-Ds2-Target-Account` 或重新上传。直通 Token 模式始终使用调用方提供的 Token，不通过托管归属缓存切换账号。
 
 生成前校验文件时，`404` 表示当前账号未找到匹配文件；尚未就绪返回 `409`，处理失败返回 `400`，上游校验请求失败返回 `502`，已知所属账号不可用返回 `503`，自定义后端不提供文件校验能力返回 `501`。这些情况都会停止生成，不会把无法使用的图片静默省略。
 
@@ -575,20 +569,6 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
 }
 ```
 
-### `GET /admin/vercel/config`
-
-返回 Vercel 预配置状态。优先读取环境变量，其次回退到已保存的 `vercel` 配置块。
-
-```json
-{
-  "has_token": true,
-  "token_preview": "vc****en",
-  "token_source": "config",
-  "project_id": "prj_xxx",
-  "team_id": null
-}
-```
-
 ### `GET /admin/config`
 
 返回脱敏后的配置，包含 `keys` 与 `api_keys`。
@@ -601,16 +581,9 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
     {"key": "k2", "name": "备用 Key", "remark": "压测"}
   ],
   "env_backed": false,
-  "needs_vercel_sync": false,
   "env_source_present": true,
   "env_writeback_enabled": true,
   "config_path": "/data/config.json",
-  "vercel": {
-    "has_token": true,
-    "token_preview": "vc****en",
-    "project_id": "prj_xxx",
-    "team_id": ""
-  },
   "accounts": [
     {
       "identifier": "user@example.com",
@@ -632,10 +605,6 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
 会修改配置的管理接口（例如 `/admin/config`、`/admin/config/import`、`/admin/import`、`/admin/keys`、`/admin/accounts`、`/admin/proxies`、`/admin/settings`）会返回：
 
 - `env_backed`：当前运行配置是否来自环境变量/不可直接落盘来源。
-- `needs_vercel_sync`：本次保存后是否需要到 Vercel 同步并重新部署，才能让刷新、冷启动或其它实例稳定读取新配置。
-- `manual_sync_message`：当 `needs_vercel_sync=true` 时返回给管理台展示的提示文案。
-
-在 Vercel 上，管理台保存会先热更新当前函数实例；若未执行 Vercel Sync 并重部署，不同请求可能命中不同实例或重新从旧 `DS2API_CONFIG_JSON` 启动，看起来就会出现禁用/保存状态刷新后反复变化。
 
 ### `POST /admin/config`
 
@@ -674,7 +643,7 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
 - `thinking_injection`（`enabled` 默认返回 `true`、`prompt`、`default_prompt`）
 - `output_integrity_guard`（`enabled` 默认返回 `true`、`prompt`、`default_prompt`）
 - `model_aliases`
-- `env_backed`、`needs_vercel_sync`
+- `env_backed`
 - `toolcall` 策略已固定为 `feature_match + high`，不再通过 settings 返回或修改
 
 ### `PUT /admin/settings`
@@ -713,18 +682,13 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
 
 请求可直接传配置对象，或使用 `{"config": {...}, "mode":"merge"}` 包裹格式。
 也支持在查询参数里传 `?mode=merge` / `?mode=replace`。
-`replace` 模式会按完整配置结构替换（保留 Vercel 同步元信息）；`merge` 模式会合并 `keys`、`api_keys`、`accounts`、`model_aliases`，并覆盖 `admin`、`runtime`、`responses`、`embeddings`、`output_integrity_guard` 中的非空字段。`auto_delete`、`current_input_file` 建议通过 `/admin/settings` 或配置文件管理；`compat` 与 `toolcall` 相关字段会被忽略。
+`replace` 模式会按完整配置结构替换；`merge` 模式会合并 `keys`、`api_keys`、`accounts`、`model_aliases`，并覆盖 `admin`、`runtime`、`responses`、`embeddings`、`output_integrity_guard` 中的非空字段。`auto_delete`、`current_input_file` 建议通过 `/admin/settings` 或配置文件管理；`compat` 与 `toolcall` 相关字段会被忽略。
 
 > 注意：`merge` 模式不会更新 `auto_delete`、`current_input_file`。
 
 ### `GET /admin/config/export`
 
 导出完整配置，返回 `config`、`json`、`base64` 三种格式。
-
-响应示例：
-
-
-> 注：`_vercel_sync_hash` 和 `_vercel_sync_time` 为内部同步元数据字段，用于 Vercel 配置漂移检测。
 
 ### `POST /admin/keys`
 
@@ -819,7 +783,7 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
 
 **响应**：`{"success": true, "total_accounts": 6}`
 
-`device_id` 为官网签发的设备标识，用于密码登录。新增、更新和 JSON 批量导入的新账号均支持；批量导入对已存在账号仍按原有规则跳过，不会替换其设备标识。不提供或传 `null` 时保留原值，字符串会去除首尾空白，显式空字符串可清除；非字符串返回 `400`。普通配置/账号列表只返回 `has_device_id`，配置导出和 Vercel 同步保留原值。获取方式见[登录设备验证](docs/DEPLOY.md#322-deepseek-登录设备验证)。管理台编辑输入框留空时不会发送清除操作。
+`device_id` 为官网签发的设备标识，用于密码登录。新增、更新和 JSON 批量导入的新账号均支持；批量导入对已存在账号仍按原有规则跳过，不会替换其设备标识。不提供或传 `null` 时保留原值，字符串会去除首尾空白，显式空字符串可清除；非字符串返回 `400`。普通配置/账号列表只返回 `has_device_id`，配置导出保留原值。获取方式见[登录设备验证](docs/DEPLOY.md#33-deepseek-登录设备验证)。管理台编辑输入框留空时不会发送清除操作。
 
 ### `DELETE /admin/accounts/{identifier}`
 
@@ -1036,57 +1000,6 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
 ```
 
 成功响应会返回 `sample_id`、`dir`、`meta_path`、`upstream_path`。
-
-### `POST /admin/vercel/sync`
-
-| 字段 | 必填 | 说明 |
-| --- | --- | --- |
-| `vercel_token` | ❌ | 空或 `__USE_PRECONFIG__` 则读环境变量，再回退到已保存配置 |
-| `project_id` | ❌ | 空则读 `VERCEL_PROJECT_ID`，再回退到已保存配置 |
-| `team_id` | ❌ | 空则读 `VERCEL_TEAM_ID`，再回退到已保存配置 |
-| `auto_validate` | ❌ | 默认 `true` |
-| `save_credentials` | ❌ | 默认 `true`；保存本次 Vercel 凭据，供下次同步复用；使用预配置 token 时不会回写 token，但仍会保存 project/team |
-
-**成功响应**：
-
-```json
-{
-  "success": true,
-  "validated_accounts": 3,
-  "message": "配置已同步，正在重新部署...",
-  "deployment_url": "https://..."
-}
-```
-
-或需要手动部署：
-
-```json
-{
-  "success": true,
-  "validated_accounts": 3,
-  "message": "配置已同步到 Vercel，请手动触发重新部署",
-  "manual_deploy_required": true
-}
-```
-
-失败校验的账号会通过 `failed_accounts` 返回；成功保存到 Vercel 的凭据会通过 `saved_credentials` 返回。
-
-### `GET /admin/vercel/status`
-
-```json
-{
-  "synced": true,
-  "last_sync_time": 1738400000,
-  "has_synced_before": true,
-  "env_backed": false,
-  "config_hash": "....",
-  "last_synced_hash": "....",
-  "draft_hash": "....",
-  "draft_differs": false
-}
-```
-
-`POST /admin/vercel/status` 还可以携带 `config_override`，用于对比“草稿配置”和当前已同步配置。
 
 ### `GET /admin/export`
 

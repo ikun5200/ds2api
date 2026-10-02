@@ -11,16 +11,12 @@ export async function readMutationResponse(res) {
 }
 
 export function mutationMessageType(data) {
-    return data?.needs_vercel_sync ? 'warning' : 'success'
+    return data?.env_backed ? 'warning' : 'success'
 }
 
-export function mutationMessage(data, fallback, syncFallback = '') {
-    const localizedSyncMessage = String(syncFallback || '').trim()
+export function mutationMessage(data, fallback) {
     const syncMessage = String(data?.manual_sync_message || '').trim()
-    if (data?.needs_vercel_sync && localizedSyncMessage) {
-        return localizedSyncMessage
-    }
-    if (data?.needs_vercel_sync && syncMessage) {
+    if (syncMessage) {
         return syncMessage
     }
     return fallback

@@ -19,7 +19,7 @@ permissions. Existing files and symlinks are rejected. Omitting `--output` write
 the identifier to stdout. Progress and errors always go to stderr, and a successful
 run reports only the identifier's length there.
 
-Use the file's value as `DS2API_DEEPSEEK_DEVICE_ID` for local, container, or Vercel
+Use the file's value as `DS2API_DEEPSEEK_DEVICE_ID` for local or container
 deployments. Treat it as private device metadata and keep it out of commits and
 shared logs. Device registration does not authenticate an account or guarantee
 that a later login passes DeepSeek's checks; the account still needs valid login

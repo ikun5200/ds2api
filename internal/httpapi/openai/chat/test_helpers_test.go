@@ -60,24 +60,6 @@ func (streamStatusAuthStub) DetermineCaller(_ *http.Request) (*auth.RequestAuth,
 
 func (streamStatusAuthStub) Release(_ *auth.RequestAuth) {}
 
-type streamStatusManagedAuthStub struct{}
-
-func (streamStatusManagedAuthStub) Determine(_ *http.Request) (*auth.RequestAuth, error) {
-	return &auth.RequestAuth{
-		UseConfigToken: true,
-		DeepSeekToken:  "managed-token",
-		CallerID:       "caller:test",
-		AccountID:      "acct:test",
-		TriedAccounts:  map[string]bool{},
-	}, nil
-}
-
-func (streamStatusManagedAuthStub) DetermineCaller(_ *http.Request) (*auth.RequestAuth, error) {
-	return (&streamStatusManagedAuthStub{}).Determine(nil)
-}
-
-func (streamStatusManagedAuthStub) Release(_ *auth.RequestAuth) {}
-
 type streamStatusDSStub struct {
 	resp *http.Response
 }
@@ -174,30 +156,4 @@ func (m *inlineUploadDSStub) DeleteSessionForToken(_ context.Context, _ string, 
 
 func (m *inlineUploadDSStub) DeleteAllSessionsForToken(_ context.Context, _ string) error {
 	return nil
-}
-
-func historySplitTestMessages() []any {
-	toolCalls := []any{
-		map[string]any{
-			"name":      "search",
-			"arguments": map[string]any{"query": "docs"},
-		},
-	}
-	return []any{
-		map[string]any{"role": "system", "content": "system instructions"},
-		map[string]any{"role": "user", "content": "first user turn"},
-		map[string]any{
-			"role":              "assistant",
-			"content":           "",
-			"reasoning_content": "hidden reasoning",
-			"tool_calls":        toolCalls,
-		},
-		map[string]any{
-			"role":         "tool",
-			"name":         "search",
-			"tool_call_id": "call-1",
-			"content":      "tool result",
-		},
-		map[string]any{"role": "user", "content": "latest user turn"},
-	}
 }

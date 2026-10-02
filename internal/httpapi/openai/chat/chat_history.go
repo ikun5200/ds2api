@@ -75,13 +75,7 @@ func startChatHistory(store *chathistory.Store, r *http.Request, a *auth.Request
 }
 
 func shouldCaptureChatHistory(r *http.Request) bool {
-	if r == nil {
-		return false
-	}
-	if isVercelStreamPrepareRequest(r) || isVercelStreamReleaseRequest(r) {
-		return false
-	}
-	return true
+	return r != nil
 }
 
 func extractSingleUserInput(messages []any) string {

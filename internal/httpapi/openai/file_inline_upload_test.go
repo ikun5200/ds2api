@@ -294,42 +294,6 @@ func TestResponsesInlineUploadFailureReturnsInternalServerError(t *testing.T) {
 	}
 }
 
-func TestVercelPrepareUploadsInlineFilesBeforeLeasePayload(t *testing.T) {
-	t.Setenv("VERCEL", "1")
-	t.Setenv("DS2API_VERCEL_INTERNAL_SECRET", "stream-secret")
-	ds := &inlineUploadDSStub{}
-	h := &openAITestSurface{Store: mockOpenAIConfig{}, Auth: streamStatusAuthStub{}, DS: ds}
-	r := chi.NewRouter()
-	registerOpenAITestRoutes(r, h)
-	reqBody := `{"model":"deepseek-v4-flash","messages":[{"role":"user","content":[{"type":"input_text","text":"hi"},{"type":"image_url","image_url":{"url":"data:image/png;base64,QUJDRA=="}}]}],"stream":true}`
-	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions?__stream_prepare=1", strings.NewReader(reqBody))
-	req.Header.Set("Authorization", "Bearer direct-token")
-	req.Header.Set("X-Ds2-Internal-Token", "stream-secret")
-	req.Header.Set("Content-Type", "application/json")
-	rec := httptest.NewRecorder()
-
-	r.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d body=%s", rec.Code, rec.Body.String())
-	}
-	if len(ds.uploadCalls) != 1 {
-		t.Fatalf("expected 1 upload call, got %d", len(ds.uploadCalls))
-	}
-	var out map[string]any
-	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
-		t.Fatalf("decode response failed: %v body=%s", err, rec.Body.String())
-	}
-	payload, _ := out["payload"].(map[string]any)
-	if payload == nil {
-		t.Fatalf("expected payload in prepare response, got %#v", out)
-	}
-	refIDs, _ := payload["ref_file_ids"].([]any)
-	if len(refIDs) != 1 || refIDs[0] != "file-inline-1" {
-		t.Fatalf("unexpected payload ref_file_ids: %#v", payload["ref_file_ids"])
-	}
-}
-
 type managedAttachmentAuth struct {
 	streamStatusAuthStub
 	a *auth.RequestAuth

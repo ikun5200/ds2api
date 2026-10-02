@@ -10,7 +10,6 @@ import (
 func TestNewFromEnvDefaults(t *testing.T) {
 	t.Setenv("DS2API_DEV_PACKET_CAPTURE_LIMIT", "")
 	t.Setenv("DS2API_DEV_PACKET_CAPTURE_MAX_BODY_BYTES", "")
-	t.Setenv("VERCEL", "")
 	t.Setenv("NOW_REGION", "")
 
 	s := NewFromEnv()
@@ -25,7 +24,6 @@ func TestNewFromEnvDefaults(t *testing.T) {
 func TestNewFromEnvHonorsOverrides(t *testing.T) {
 	t.Setenv("DS2API_DEV_PACKET_CAPTURE_LIMIT", "7")
 	t.Setenv("DS2API_DEV_PACKET_CAPTURE_MAX_BODY_BYTES", "8192")
-	t.Setenv("VERCEL", "")
 	t.Setenv("NOW_REGION", "")
 	s := NewFromEnv()
 	if s.Limit() != 7 {

@@ -17,7 +17,7 @@ func ResolveRequestModes(req map[string]any, model string) (thinking, search boo
 }
 
 // PreserveModeOverrides keeps explicit options when a third-party protocol
-// translator drops extension fields, including during Vercel stream preparation.
+// translator drops extension fields, including during stream preparation.
 func PreserveModeOverrides(translated, original map[string]any) {
 	if enabled, ok := util.ResolveThinkingOverride(original); ok {
 		translated["thinking_enabled"] = enabled

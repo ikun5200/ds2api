@@ -16,5 +16,4 @@ func RegisterPublicRoutes(r chi.Router, h *Handler) {
 }
 
 func RegisterProtectedRoutes(r chi.Router, h *Handler) {
-	r.Get("/vercel/config", h.getVercelConfig)
 }

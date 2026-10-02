@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { detectRuntimeEnv } from '../utils/runtimeEnv'
 
 export function useAdminAuth({ isProduction, location, t }) {
     const [message, setMessage] = useState(null)
@@ -7,8 +6,6 @@ export function useAdminAuth({ isProduction, location, t }) {
     const [authChecking, setAuthChecking] = useState(true)
 
     const isAdminRoute = location.pathname.startsWith('/admin') || isProduction
-    const runtimeEnv = useMemo(() => detectRuntimeEnv(), [])
-    const isVercel = runtimeEnv.isVercel
 
     const showMessage = useCallback((type, text) => {
         setMessage({ type, text })
@@ -62,7 +59,6 @@ export function useAdminAuth({ isProduction, location, t }) {
         authChecking,
         message,
         isAdminRoute,
-        isVercel,
         showMessage,
         handleLogin,
         handleLogout,

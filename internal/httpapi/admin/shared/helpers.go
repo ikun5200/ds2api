@@ -17,8 +17,6 @@ var intFrom = util.IntFrom
 var WriteJSON = util.WriteJSON
 var IntFrom = util.IntFrom
 
-const manualVercelSyncMessage = "配置已保存。Vercel 部署请在 Vercel Sync 页面手动同步并重新部署。"
-
 func WithConfigMutationStatus(store ConfigStore, payload map[string]any) map[string]any {
 	if payload == nil {
 		payload = map[string]any{}
@@ -27,12 +25,7 @@ func WithConfigMutationStatus(store ConfigStore, payload map[string]any) map[str
 	if store != nil {
 		envBacked = store.IsEnvBacked()
 	}
-	needsSync := config.IsVercel() || envBacked
 	payload["env_backed"] = envBacked
-	payload["needs_vercel_sync"] = needsSync
-	if needsSync {
-		payload["manual_sync_message"] = manualVercelSyncMessage
-	}
 	return payload
 }
 
@@ -94,29 +87,12 @@ func FindAccountByIdentifier(store ConfigStore, identifier string) (config.Accou
 	return findAccountByIdentifier(store, identifier)
 }
 
-func ComputeSyncHash(store ConfigStore) string {
-	if store == nil {
-		return ""
-	}
-	snap := store.Snapshot()
-	snap.ClearAccountTokens()
-	snap.ClearVercelCredentials()
-	snap.VercelSyncHash = ""
-	snap.VercelSyncTime = 0
-	b, _ := json.Marshal(snap)
-	sum := md5.Sum(b)
-	return fmt.Sprintf("%x", sum)
-}
-
 func SyncHashForJSON(s string) string {
 	var cfg config.Config
 	if err := json.Unmarshal([]byte(s), &cfg); err != nil {
 		return ""
 	}
-	cfg.VercelSyncHash = ""
-	cfg.VercelSyncTime = 0
 	cfg.ClearAccountTokens()
-	cfg.ClearVercelCredentials()
 	b, err := json.Marshal(cfg)
 	if err != nil {
 		return ""

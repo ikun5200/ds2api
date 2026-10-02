@@ -28,12 +28,3 @@ func TestTagKeepsPreviewStyle(t *testing.T) {
 		t.Fatalf("expected preview tag unchanged, got %q", got)
 	}
 }
-
-func TestVersionFromVercelEnv(t *testing.T) {
-	t.Setenv("VERCEL_GIT_COMMIT_TAG", "")
-	t.Setenv("VERCEL_GIT_COMMIT_REF", "dev")
-	t.Setenv("VERCEL_GIT_COMMIT_SHA", "abcdef123456")
-	if got := versionFromVercelEnv(); got != "preview-dev.abcdef1" {
-		t.Fatalf("unexpected vercel preview version: %q", got)
-	}
-}
