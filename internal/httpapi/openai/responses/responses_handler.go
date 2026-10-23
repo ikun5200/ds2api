@@ -82,8 +82,9 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 	}
 	stdReq, err = h.applyCurrentInputFile(r.Context(), a, stdReq)
 	if err != nil {
-		status, message := mapCurrentInputFileError(err)
-		writeOpenAIError(w, status, message)
+		status, message, code, retryAfter := mapCurrentInputFileError(err)
+		setRetryAfter(w, retryAfter)
+		writeOpenAIErrorWithCode(w, status, message, code)
 		return
 	}
 

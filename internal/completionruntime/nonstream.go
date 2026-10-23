@@ -86,8 +86,8 @@ func prepareCurrentInputFile(ctx context.Context, ds DeepSeekCaller, a *auth.Req
 	}
 	out, err := (history.Service{Store: opts.CurrentInputFile, DS: ds}).ApplyCurrentInputFile(ctx, a, stdReq)
 	if err != nil {
-		status, message := history.MapError(err)
-		return out, &assistantturn.OutputError{Status: status, Message: message, Code: "error"}
+		status, message, code, retryAfter := history.MapErrorWithRetry(err)
+		return out, &assistantturn.OutputError{Status: status, Message: message, Code: code, RetryAfter: retryAfter}
 	}
 	return out, nil
 }
@@ -248,8 +248,8 @@ func reuploadCurrentInputFileForAccount(ctx context.Context, ds DeepSeekCaller, 
 	}
 	out, err := (history.Service{Store: opts.CurrentInputFile, DS: ds}).ReuploadAppliedCurrentInputFile(ctx, a, stdReq)
 	if err != nil {
-		status, message := history.MapError(err)
-		return out, &assistantturn.OutputError{Status: status, Message: message, Code: "error"}
+		status, message, code, retryAfter := history.MapErrorWithRetry(err)
+		return out, &assistantturn.OutputError{Status: status, Message: message, Code: code, RetryAfter: retryAfter}
 	}
 	return out, nil
 }

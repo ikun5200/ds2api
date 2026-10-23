@@ -3,9 +3,11 @@ package inputfiles
 import (
 	"context"
 	"crypto/sha256"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
@@ -41,10 +43,43 @@ func (h *Service) Apply(ctx context.Context, a *auth.RequestAuth, req promptcomp
 }
 
 func MapError(err error) (int, string) {
+	status, message, _ := MapErrorWithRetry(err)
+	return status, message
+}
+
+func MapErrorWithRetry(err error) (int, string, time.Duration) {
 	if e, ok := err.(*inlineFileUploadError); ok {
-		return e.status, e.Error()
+		return e.status, e.Error(), 0
 	}
-	return http.StatusInternalServerError, "Failed to process file input."
+	switch {
+	case dsclient.IsAccountMutedError(err):
+		var failure *dsclient.RequestFailure
+		if errors.As(err, &failure) {
+			retryAfter := failure.RetryAfter
+			if retryAfter <= 0 && !failure.MuteUntil.IsZero() {
+				retryAfter = time.Until(failure.MuteUntil)
+				if retryAfter < 0 {
+					retryAfter = 0
+				}
+			}
+			return http.StatusTooManyRequests, failure.Message, retryAfter
+		}
+		return http.StatusTooManyRequests, err.Error(), 0
+	case dsclient.IsRateLimitedError(err):
+		var failure *dsclient.RequestFailure
+		if errors.As(err, &failure) {
+			retryAfter := failure.RetryAfter
+			if retryAfter <= 0 {
+				retryAfter = time.Minute
+			}
+			return http.StatusTooManyRequests, failure.Message, retryAfter
+		}
+		return http.StatusTooManyRequests, err.Error(), time.Minute
+	case dsclient.IsRiskDeviceError(err):
+		return http.StatusForbidden, err.Error(), 0
+	default:
+		return http.StatusInternalServerError, "Failed to process file input.", 0
+	}
 }
 
 const maxInlineFilesPerRequest = promptcompat.MaxRefFileIDs
