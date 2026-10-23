@@ -18,12 +18,7 @@ import (
 func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 	a, err := h.Auth.Determine(r)
 	if err != nil {
-		status := http.StatusUnauthorized
-		detail := err.Error()
-		if err == auth.ErrNoAccount {
-			status = http.StatusTooManyRequests
-		}
-		writeOpenAIError(w, status, detail)
+		writeAuthDetermineError(w, err)
 		return
 	}
 	var sessionID string
@@ -71,6 +66,7 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 			if historySession != nil {
 				historySession.error(outErr.Status, outErr.Message, outErr.Code, historyThinkingForArchive(result.Turn.RawThinking, result.Turn.DetectionThinking, result.Turn.Thinking), historyTextForArchive(result.Turn.RawText, result.Turn.Text))
 			}
+			setRetryAfter(w, outErr.RetryAfter)
 			writeOpenAIErrorWithCode(w, outErr.Status, outErr.Message, outErr.Code)
 			return
 		}
@@ -92,6 +88,7 @@ func (h *Handler) ChatCompletions(w http.ResponseWriter, r *http.Request) {
 		if historySession != nil {
 			historySession.error(outErr.Status, outErr.Message, outErr.Code, "", "")
 		}
+		setRetryAfter(w, outErr.RetryAfter)
 		writeOpenAIErrorWithCode(w, outErr.Status, outErr.Message, outErr.Code)
 		return
 	}

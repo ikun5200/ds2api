@@ -81,7 +81,7 @@ Two header formats accepted:
 - Token is in `config.keys` → **Managed account mode**: DS2API auto-selects an account via rotation
 - Token is not in `config.keys` → **Direct token mode**: treated as a DeepSeek token directly
 
-**Optional header**: `X-Ds2-Target-Account: <email_or_mobile>` — Pin a specific managed account; if the target account does not exist or the managed-account queue is exhausted, the request returns `429`, and current responses do not include `Retry-After`. If the account exists but login/refresh fails, the request returns the underlying `401` or upstream error. Without an account pin or user attachment/external file reference, managed completion requests try one alternate-account fresh retry before returning an empty-output 429. Requests with a pinned target, attachments/file references, or no other available account do not switch.
+**Optional header**: `X-Ds2-Target-Account: <email_or_mobile>` — Pin a specific managed account; if the target account does not exist or the managed-account queue is exhausted, the request returns `429`. If the target or every enabled account is muted upstream, the response includes `Retry-After` (seconds) and `error.code=account_muted`, with the estimated unmute time from upstream `biz_data.mute_until` in the message. If the account exists but login/refresh fails, the request returns the underlying `401` or upstream error. Without an account pin or user attachment/external file reference, managed completion requests try one alternate-account fresh retry before returning an empty-output 429. Requests with a pinned target, attachments/file references, or no other available account do not switch.
 
 ### Admin Endpoints (`/admin/*`)
 
@@ -752,7 +752,15 @@ Tests proxy connectivity: provide `proxy_id` to test a saved proxy; omit it to r
       "has_device_id": true,
       "has_token": true,
       "token_preview": "abc...",
-      "test_status": "ok"
+      "test_status": "ok",
+      "muted": true,
+      "mute_reason": "user is muted",
+      "muted_at": 1792740000,
+      "muted_until": 1792994003,
+      "next_probe_at": 1792994123,
+      "last_probe_at": 0,
+      "mute_probe_count": 0,
+      "mute_last_error": ""
     }
   ],
   "total": 25,
@@ -762,7 +770,7 @@ Tests proxy connectivity: provide `proxy_id` to test a saved proxy; omit it to r
 }
 ```
 
-Returned items also include `test_status`, usually `ok` or `failed`.
+Returned items also include `test_status`, usually `ok` or `failed`. `muted` / `muted_until` / `next_probe_at` come from the persisted account health state. `muted_until` is the upstream `biz_data.mute_until` unmute timestamp (Unix seconds); `next_probe_at` is the next automatic probe time. Accounts that are not muted only return `muted: false`.
 
 ### `POST /admin/accounts`
 
@@ -811,7 +819,21 @@ Updates proxy binding for a specific account.
   "global_max_inflight": 8,
   "recommended_concurrency": 8,
   "waiting": 0,
-  "max_queue_size": 8
+  "max_queue_size": 8,
+  "muted": 1,
+  "muted_accounts": [
+    {
+      "account": "a@example.com",
+      "reason": "user is muted",
+      "muted_at": 1792740000,
+      "muted_until": 1792994003,
+      "next_probe_at": 1792994123,
+      "last_probe_at": 0,
+      "probe_count": 0,
+      "last_error": ""
+    }
+  ],
+  "earliest_unmute_at": 1792994003
 }
 ```
 
@@ -827,6 +849,9 @@ Updates proxy binding for a specific account.
 | `recommended_concurrency` | Suggested concurrency (`total × max_inflight_per_account`) |
 | `waiting` | Number of queued requests currently waiting |
 | `max_queue_size` | Waiting queue limit |
+| `muted` | Number of accounts currently muted upstream |
+| `muted_accounts` | Muted account details (`muted_until`, `next_probe_at`, probe count, etc.) |
+| `earliest_unmute_at` | Earliest unmute time (Unix seconds) |
 
 ### `POST /admin/accounts/test`
 

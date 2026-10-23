@@ -45,12 +45,7 @@ func (h *Handler) GetResponseByID(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 	a, err := h.Auth.Determine(r)
 	if err != nil {
-		status := http.StatusUnauthorized
-		detail := err.Error()
-		if err == auth.ErrNoAccount {
-			status = http.StatusTooManyRequests
-		}
-		writeOpenAIError(w, status, detail)
+		writeAuthDetermineError(w, err)
 		return
 	}
 	defer h.Auth.Release(a)
@@ -109,6 +104,7 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 			if historySession != nil {
 				historySession.ErrorTurn(outErr.Status, outErr.Message, outErr.Code, result.Turn)
 			}
+			setRetryAfter(w, outErr.RetryAfter)
 			writeOpenAIErrorWithCode(w, outErr.Status, outErr.Message, outErr.Code)
 			return
 		}
@@ -129,6 +125,7 @@ func (h *Handler) Responses(w http.ResponseWriter, r *http.Request) {
 		if historySession != nil {
 			historySession.Error(outErr.Status, outErr.Message, outErr.Code, "", "")
 		}
+		setRetryAfter(w, outErr.RetryAfter)
 		writeOpenAIErrorWithCode(w, outErr.Status, outErr.Message, outErr.Code)
 		return
 	}

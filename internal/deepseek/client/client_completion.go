@@ -5,7 +5,10 @@ import (
 	"context"
 	dsprotocol "ds2api/internal/deepseek/protocol"
 	"encoding/json"
+	"io"
 	"net/http"
+	"strings"
+	"time"
 
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
@@ -23,6 +26,38 @@ func (c *Client) CallCompletion(ctx context.Context, a *auth.RequestAuth, payloa
 	resp, err := c.streamPostOnce(ctx, clients.stream, dsprotocol.DeepSeekCompletionURL, headers, payload)
 	if err != nil {
 		return nil, err
+	}
+	if !strings.Contains(strings.ToLower(resp.Header.Get("Content-Type")), "text/event-stream") {
+		body, readErr := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+		closeErr := resp.Body.Close()
+		if closeErr != nil {
+			config.Logger.Warn("[completion] failed to close non-SSE response body", "error", closeErr)
+		}
+		if readErr != nil {
+			return nil, readErr
+		}
+		parsed := map[string]any{}
+		if len(body) > 0 && json.Unmarshal(body, &parsed) == nil {
+			if info, muted := c.detectMute(a, parsed); muted {
+				return nil, c.muteFailure("completion", info)
+			}
+			if isRateLimitedResponse(parsed) {
+				return nil, &RequestFailure{
+					Op:         "completion",
+					Kind:       FailureRateLimited,
+					Message:    failureMessage(asString(parsed["msg"]), "", "rate limit reached"),
+					RetryAfter: time.Minute,
+				}
+			}
+			if isRiskDeviceResponse(parsed) {
+				return nil, &RequestFailure{
+					Op:      "completion",
+					Kind:    FailureRiskDevice,
+					Message: failureMessage(asString(parsed["msg"]), "", "RISK_DEVICE_DETECTED"),
+				}
+			}
+		}
+		resp.Body = io.NopCloser(bytes.NewReader(body))
 	}
 	if captureSession != nil {
 		resp.Body = captureSession.WrapBody(resp.Body, resp.StatusCode)

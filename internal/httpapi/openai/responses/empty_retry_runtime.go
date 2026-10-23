@@ -55,6 +55,7 @@ func (h *Handler) handleResponsesNonStreamWithRetry(w http.ResponseWriter, ctx c
 		if historySession != nil {
 			historySession.ErrorTurn(outErr.Status, outErr.Message, outErr.Code, result.Turn)
 		}
+		setRetryAfter(w, outErr.RetryAfter)
 		writeOpenAIErrorWithCode(w, outErr.Status, outErr.Message, outErr.Code)
 		return
 	}

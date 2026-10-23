@@ -258,6 +258,7 @@ healthcheck:
 | `DS2API_DEEPSEEK_DEVICE_ID` | 全局覆盖官网签发的登录设备标识；未设置时读取账号 `device_id` | 空 |
 | `DS2API_BROWSER_PATH` | 本地设备验证助手使用的 Chrome / Chromium / Edge 可执行文件路径，服务端不使用 | 自动查找 |
 | `DS2API_CHAT_HISTORY_PATH` | Chat history 存储路径 | `data/chat_history.json` |
+| `DS2API_ACCOUNT_HEALTH_PATH` | 账号禁言/冷却状态持久化路径；重启后会恢复未到期的禁言状态 | `data/account_health.json` |
 | `DS2API_DATABASE_MODE` | Chat history 存储后端：`builtin` 使用内置 JSON 文件；`external` 使用外部 SQL 数据库 | `builtin` |
 | `DS2API_DATABASE_TYPE` | 外部存储数据库类型，支持 `postgres` / `mysql`（`mariadb` 作为 `mysql` 处理） | — |
 | `DS2API_DATABASE_DSN` | 外部存储连接串；也可用 `DS2API_DATABASE_URL`；显式外部模式下还可回退使用 `DATABASE_URL` | — |
@@ -350,6 +351,17 @@ node scripts/deepseek-device.mjs --output .tmp/deepseek-device-id
 
 助手使用独立临时浏览器配置打开真实 DeepSeek 登录页，等待官网 SDK 完成设备注册，输出签发的标识后关闭该浏览器并清理临时配置；不需要输入账号密码。不自动处理需要人工完成的验证，超时或注册失败会明确报错。找不到浏览器时，可通过 `DS2API_BROWSER_PATH` 指定浏览器可执行文件完整路径。
 
+Linux 服务器（包括无桌面、只有 KasmVNC/Xvfb 虚拟显示的 NAS）可以使用服务器端助手：
+
+```bash
+# 需要真实 Chromium/Chrome + X display；Node 22+ 或 Docker 二选一
+scripts/deepseek-device-linux.sh --display :12
+# 保存到新文件，权限 0600
+scripts/deepseek-device-linux.sh --display :12 --output .tmp/deepseek-device-id
+```
+
+该助手会自动定位 Chromium（包括飞牛 `fygo-browser` 的 Chromium）、通过 CDP 等待 `SMSdk.getDeviceId()`，并对 `fp-it-acc.portal101.cn` 做 `--host-resolver-rules` 覆盖。部分 NAS DNS 会把这个域名解析成 `0.0.0.0`，导致官网 SDK 只返回 `D...` 兜底串而不是可登录的 89 字符 `B...` 设备号；助手会从公共 DNS 解析并覆盖。实测在飞牛 NAS 的 `DISPLAY=:12` + `fygo-browser` Chromium 上可以稳定拿到合法 `B...` 设备号。
+
 将输出填入管理台“添加账号 / 编辑账号”的“登录设备标识”，或配置 JSON：
 
 ```json
@@ -372,6 +384,7 @@ node scripts/deepseek-device.mjs --output .tmp/deepseek-device-id
 
 部分运行时行为无法通过环境变量直接配置，需要在部署后通过 Admin API 设置，例如：
 
+- **账号禁言自动检测**：上游返回 `biz_code=14` / `user is muted` 或 `biz_data.is_muted=1` 时，程序会记录 `muted_until`（上游 `biz_data.mute_until`）、从账号池跳过该账号，并在解禁时间后自动用一次轻量上传探测；探测成功会清除禁言状态。禁言状态默认持久化到 `DS2API_ACCOUNT_HEALTH_PATH`。管理台账号列表会显示 `muted`、`muted_until`、`next_probe_at` 等字段。
 - **自动删除会话模式** (`auto_delete.mode`)：支持 `none` / `single` / `all`，默认为 `none`。可通过 `PUT /admin/settings` 更新。
 - **每账号并发上限** (`account_max_inflight`)：环境变量已支持，但也可通过 Admin API 热更新。
 - **全局并发上限** (`global_max_inflight`)：同上。

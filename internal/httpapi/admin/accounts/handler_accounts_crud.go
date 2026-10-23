@@ -6,11 +6,24 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 
+	"ds2api/internal/account"
 	"ds2api/internal/config"
 )
+
+type muteStateReader interface {
+	MuteState(accountID string) (account.MuteState, bool)
+}
+
+func unixOrZero(t time.Time) int64 {
+	if t.IsZero() {
+		return 0
+	}
+	return t.Unix()
+}
 
 func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 	page := intFromQuery(r, "page", 1)
@@ -55,10 +68,11 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 		end = total
 	}
 	items := make([]map[string]any, 0, end-start)
+	muteReader, _ := h.Pool.(muteStateReader)
 	for _, acc := range accounts[start:end] {
 		testStatus, _ := h.Store.AccountTestStatus(acc.Identifier())
 		token := strings.TrimSpace(acc.Token)
-		items = append(items, map[string]any{
+		item := map[string]any{
 			"identifier":    acc.Identifier(),
 			"name":          acc.Name,
 			"remark":        acc.Remark,
@@ -71,7 +85,21 @@ func (h *Handler) listAccounts(w http.ResponseWriter, r *http.Request) {
 			"has_token":     token != "",
 			"token_preview": maskSecretPreview(token),
 			"test_status":   testStatus,
-		})
+			"muted":         false,
+		}
+		if muteReader != nil {
+			if state, ok := muteReader.MuteState(acc.Identifier()); ok {
+				item["muted"] = true
+				item["mute_reason"] = state.Reason
+				item["muted_at"] = unixOrZero(state.MutedAt)
+				item["muted_until"] = unixOrZero(state.MutedUntil)
+				item["next_probe_at"] = unixOrZero(state.NextProbeAt)
+				item["last_probe_at"] = unixOrZero(state.LastProbeAt)
+				item["mute_probe_count"] = state.ProbeCount
+				item["mute_last_error"] = state.LastError
+			}
+		}
+		items = append(items, item)
 	}
 	writeJSON(w, http.StatusOK, map[string]any{"items": items, "total": total, "page": page, "page_size": pageSize, "total_pages": totalPages})
 }

@@ -63,6 +63,9 @@ func (p *Pool) canAcquireIDLocked(accountID string) bool {
 	if accountID == "" {
 		return false
 	}
+	if p.isMutedLocked(accountID) {
+		return false
+	}
 	if p.inUse[accountID] >= p.maxInflightPerAccount {
 		return false
 	}

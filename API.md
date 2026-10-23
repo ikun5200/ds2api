@@ -81,7 +81,7 @@ DS2API_CONFIG_JSON="$(base64 < config.json | tr -d '\n')"
 - token 在 `config.keys` 中 → **托管账号模式**，自动轮询选择账号
 - token 不在 `config.keys` 中 → **直通 token 模式**，直接作为 DeepSeek token 使用
 
-**可选请求头**：`X-Ds2-Target-Account: <email_or_mobile>` — 指定使用某个托管账号；如果目标账号不存在，或管理账号队列已耗尽，相关业务请求会返回 `429`，当前不会附带 `Retry-After` 头。若账号存在但登录/刷新失败，则返回对应的 `401` 或上游错误。未指定目标账号且不含用户附件/外部文件引用时，托管账号模式的 completion 空输出 429 会先尝试切到另一个可用账号 fresh retry 一次；指定目标账号、含附件/文件引用或无其他可用账号时不会切号。
+**可选请求头**：`X-Ds2-Target-Account: <email_or_mobile>` — 指定使用某个托管账号；如果目标账号不存在，或管理账号队列已耗尽，相关业务请求会返回 `429`。如果目标账号或全部账号处于上游禁言状态，响应会附带 `Retry-After`（秒）和 `error.code=account_muted`，错误信息里包含预计解禁时间（来自上游 `biz_data.mute_until`）。若账号存在但登录/刷新失败，则返回对应的 `401` 或上游错误。未指定目标账号且不含用户附件/外部文件引用时，托管账号模式的 completion 空输出 429 会先尝试切到另一个可用账号 fresh retry 一次；指定目标账号、含附件/文件引用或无其他可用账号时不会切号。
 
 ### Admin 接口（`/admin/*`）
 
@@ -755,7 +755,15 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
       "has_device_id": true,
       "has_token": true,
       "token_preview": "abc...",
-      "test_status": "ok"
+      "test_status": "ok",
+      "muted": true,
+      "mute_reason": "user is muted",
+      "muted_at": 1792740000,
+      "muted_until": 1792994003,
+      "next_probe_at": 1792994123,
+      "last_probe_at": 0,
+      "mute_probe_count": 0,
+      "mute_last_error": ""
     }
   ],
   "total": 25,
@@ -764,6 +772,8 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
   "total_pages": 3
 }
 ```
+
+`muted` / `muted_until` / `next_probe_at` 来自账号健康状态。`muted_until` 是上游 `biz_data.mute_until` 的解禁时间（Unix 秒）；`next_probe_at` 是下一次自动探测时间。未禁言的账号只返回 `muted: false`。禁言状态默认持久化到 `DS2API_ACCOUNT_HEALTH_PATH`。
 
 ### `POST /admin/accounts`
 
@@ -812,7 +822,21 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
   "global_max_inflight": 8,
   "recommended_concurrency": 8,
   "waiting": 0,
-  "max_queue_size": 8
+  "max_queue_size": 8,
+  "muted": 1,
+  "muted_accounts": [
+    {
+      "account": "a@example.com",
+      "reason": "user is muted",
+      "muted_at": 1792740000,
+      "muted_until": 1792994003,
+      "next_probe_at": 1792994123,
+      "last_probe_at": 0,
+      "probe_count": 0,
+      "last_error": ""
+    }
+  ],
+  "earliest_unmute_at": 1792994003
 }
 ```
 
@@ -828,6 +852,9 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
 | `recommended_concurrency` | 建议并发值（`total × max_inflight_per_account`） |
 | `waiting` | 当前等待中的请求数 |
 | `max_queue_size` | 等待队列上限 |
+| `muted` | 当前处于禁言状态的账号数 |
+| `muted_accounts` | 禁言账号详情（`muted_until`、`next_probe_at`、探测次数等） |
+| `earliest_unmute_at` | 最早解禁时间（Unix 秒） |
 
 ### `POST /admin/accounts/test`
 

@@ -59,16 +59,22 @@ func StartCompletion(ctx context.Context, ds DeepSeekCaller, a *auth.RequestAuth
 	}
 	sessionID, err := ds.CreateSession(ctx, a, maxAttempts)
 	if err != nil {
-		return StartResult{Request: stdReq}, authOutputError(a)
+		return StartResult{Request: stdReq}, startOutputError(err, a)
 	}
 	a.BindUpstreamAccount()
 	pow, err := ds.GetPow(ctx, a, maxAttempts)
 	if err != nil {
+		if out := deepSeekOutputError(err); out != nil {
+			return StartResult{SessionID: sessionID, Request: stdReq}, out
+		}
 		return StartResult{SessionID: sessionID, Request: stdReq}, &assistantturn.OutputError{Status: http.StatusUnauthorized, Message: "Failed to get PoW (invalid token or unknown error).", Code: "error"}
 	}
 	payload := stdReq.CompletionPayload(sessionID)
 	resp, err := ds.CallCompletion(ctx, a, payload, pow, maxAttempts)
 	if err != nil {
+		if out := deepSeekOutputError(err); out != nil {
+			return StartResult{SessionID: sessionID, Payload: payload, Pow: pow, Request: stdReq}, out
+		}
 		return StartResult{SessionID: sessionID, Payload: payload, Pow: pow, Request: stdReq}, &assistantturn.OutputError{Status: http.StatusInternalServerError, Message: "Failed to get completion.", Code: "error"}
 	}
 	return StartResult{SessionID: sessionID, Payload: payload, Pow: pow, Response: resp, Request: stdReq}, nil
@@ -215,16 +221,22 @@ func startStandardCompletionOnAlternateAccount(ctx context.Context, ds DeepSeekC
 	}
 	sessionID, err := ds.CreateSession(ctx, a, maxAttempts)
 	if err != nil {
-		return StartResult{}, authOutputError(a)
+		return StartResult{}, startOutputError(err, a)
 	}
 	a.BindUpstreamAccount()
 	pow, err := ds.GetPow(ctx, a, maxAttempts)
 	if err != nil {
+		if out := deepSeekOutputError(err); out != nil {
+			return StartResult{SessionID: sessionID}, out
+		}
 		return StartResult{SessionID: sessionID}, &assistantturn.OutputError{Status: http.StatusUnauthorized, Message: "Failed to get PoW (invalid token or unknown error).", Code: "error"}
 	}
 	payload := stdReq.CompletionPayload(sessionID)
 	resp, err := ds.CallCompletion(ctx, a, payload, pow, maxAttempts)
 	if err != nil {
+		if out := deepSeekOutputError(err); out != nil {
+			return StartResult{SessionID: sessionID, Payload: payload, Pow: pow}, out
+		}
 		return StartResult{SessionID: sessionID, Payload: payload, Pow: pow}, &assistantturn.OutputError{Status: http.StatusInternalServerError, Message: "Failed to get completion.", Code: "error"}
 	}
 	return StartResult{SessionID: sessionID, Payload: payload, Pow: pow, Response: resp, Request: stdReq}, nil

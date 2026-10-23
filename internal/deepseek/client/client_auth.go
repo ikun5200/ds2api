@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strings"
+	"time"
 	"unicode"
 
 	"ds2api/internal/auth"
@@ -50,6 +51,9 @@ func (c *Client) Login(ctx context.Context, acc config.Account) (string, error) 
 	}
 	code, bizCode, msg, bizMsg := extractResponseStatus(resp)
 	if status != http.StatusOK || code != 0 || bizCode != 0 {
+		if info, muted := c.detectMuteForAccount(acc.Identifier(), resp); muted {
+			return "", c.muteFailure("login", info)
+		}
 		message := failureMessage(msg, bizMsg, "upstream rejected login")
 		if strings.Contains(strings.ToUpper(message), "RISK_DEVICE_DETECTED") {
 			message += "; renew the website device verification and update device_id (node scripts/deepseek-device.mjs)"
@@ -96,6 +100,15 @@ func (c *Client) CreateSession(ctx context.Context, a *auth.RequestAuth, maxAtte
 			}
 		}
 		config.Logger.Warn("[create_session] failed", "status", status, "code", code, "biz_code", bizCode, "msg", msg, "biz_msg", bizMsg, "use_config_token", a.UseConfigToken, "account", a.AccountID)
+		if info, muted := c.detectMute(a, resp); muted {
+			return "", c.muteFailure("create session", info)
+		}
+		if isRateLimitedResponse(resp) {
+			return "", &RequestFailure{Op: "create session", Kind: FailureRateLimited, Message: failureMessage(msg, bizMsg, "rate limit reached"), RetryAfter: time.Minute}
+		}
+		if isRiskDeviceResponse(resp) {
+			return "", &RequestFailure{Op: "create session", Kind: FailureRiskDevice, Message: failureMessage(msg, bizMsg, "RISK_DEVICE_DETECTED")}
+		}
 		if a.UseConfigToken {
 			if !refreshed && shouldAttemptRefresh(status, code, bizCode, msg, bizMsg) {
 				if c.Auth.RefreshToken(ctx, a) {
@@ -155,6 +168,15 @@ func (c *Client) GetPowForTarget(ctx context.Context, a *auth.RequestAuth, targe
 		}
 		config.Logger.Warn("[get_pow] failed", "status", status, "code", code, "biz_code", bizCode, "msg", msg, "biz_msg", bizMsg, "use_config_token", a.UseConfigToken, "account", a.AccountID, "target_path", targetPath)
 		lastFailureMessage = failureMessage(msg, bizMsg, "get pow failed")
+		if info, muted := c.detectMute(a, resp); muted {
+			return "", c.muteFailure("get pow", info)
+		}
+		if isRateLimitedResponse(resp) {
+			return "", &RequestFailure{Op: "get pow", Kind: FailureRateLimited, Message: lastFailureMessage, RetryAfter: time.Minute}
+		}
+		if isRiskDeviceResponse(resp) {
+			return "", &RequestFailure{Op: "get pow", Kind: FailureRiskDevice, Message: lastFailureMessage}
+		}
 		if isTokenInvalid(status, code, bizCode, msg, bizMsg) || isAuthIndicativeBizFailure(msg, bizMsg) {
 			lastFailureKind = authFailureKind(a.UseConfigToken)
 		} else {
