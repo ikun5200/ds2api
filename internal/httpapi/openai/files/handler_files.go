@@ -123,7 +123,8 @@ func (h *Handler) RetrieveFile(w http.ResponseWriter, r *http.Request) {
 	}
 	files, err := inputfiles.ResolveFileReferences(r.Context(), a, h.DS, []string{fileID})
 	if err != nil {
-		status, message := inputfiles.MapError(err)
+		status, message, retryAfter := inputfiles.MapErrorWithRetry(err)
+		setFileRetryAfter(w, retryAfter)
 		shared.WriteOpenAIError(w, status, message)
 		return
 	}

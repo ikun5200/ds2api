@@ -118,8 +118,8 @@ func writeOpenAIInlineFileError(w http.ResponseWriter, err error) {
 	files.WriteInlineFileError(w, err)
 }
 
-func mapCurrentInputFileError(err error) (int, string) {
-	return history.MapError(err)
+func mapCurrentInputFileError(err error) (int, string, string, time.Duration) {
+	return history.MapErrorWithRetry(err)
 }
 
 func requestTraceID(r *http.Request) string {
