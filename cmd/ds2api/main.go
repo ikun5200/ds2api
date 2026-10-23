@@ -29,6 +29,7 @@ func main() {
 		config.Logger.Error("server initialization failed", "error", err)
 		os.Exit(1)
 	}
+	go app.DS.RunMuteProber(context.Background())
 	port := strings.TrimSpace(os.Getenv("PORT"))
 	if port == "" {
 		port = "5001"

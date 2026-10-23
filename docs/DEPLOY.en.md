@@ -258,6 +258,7 @@ References: Zeabur's official [GitHub/Git integration](https://zeabur.com/docs/e
 | `DS2API_DEEPSEEK_DEVICE_ID` | Global override for a website-issued login device ID; otherwise uses the account `device_id` | Empty |
 | `DS2API_BROWSER_PATH` | Chrome / Chromium / Edge executable for the local verification helper; not used by the server | Auto-detect |
 | `DS2API_CHAT_HISTORY_PATH` | Chat history storage path | `data/chat_history.json` |
+| `DS2API_ACCOUNT_HEALTH_PATH` | Persisted account mute/cooldown state; unexpired mute state is restored after restart | `data/account_health.json` |
 | `DS2API_DATABASE_MODE` | Chat history storage backend: `builtin` keeps the existing JSON files; `external` uses an external SQL database | `builtin` |
 | `DS2API_DATABASE_TYPE` | External database type: `postgres` / `mysql` (`mariadb` is treated as `mysql`) | — |
 | `DS2API_DATABASE_DSN` | External database connection string; `DS2API_DATABASE_URL` is also accepted; explicit external mode may also fall back to `DATABASE_URL` | — |
@@ -281,6 +282,17 @@ node scripts/deepseek-device.mjs --output .tmp/deepseek-device-id
 ```
 
 The helper opens the real DeepSeek sign-in page in a temporary browser profile, waits for its original SDK to register the device, outputs the issued ID, and closes its browser and removes that profile. No account password is required. It does not automatically complete verification that requires human input; registration failures and timeouts are reported. Set `DS2API_BROWSER_PATH` to the browser executable if automatic discovery cannot find it.
+
+On a Linux server, including a headless NAS with a KasmVNC/Xvfb virtual display, use the server-side helper:
+
+```bash
+# Requires a real Chromium/Chrome plus an X display; Node 22+ or Docker
+scripts/deepseek-device-linux.sh --display :12
+# Save to a new 0600 file
+scripts/deepseek-device-linux.sh --display :12 --output .tmp/deepseek-device-id
+```
+
+It auto-detects Chromium (including the fygo-browser Chromium), drives it through CDP, and adds a `--host-resolver-rules` override for `fp-it-acc.portal101.cn`. Some NAS DNS resolvers return `0.0.0.0` for that host, which makes the official SDK fall back to a non-login `D...` payload instead of an 89-character `B...` device ID. Verified on a fnOS NAS with `DISPLAY=:12` and the fygo-browser Chromium.
 
 Paste the output into **Login device ID** when adding or editing an account in the admin UI, or use the configuration JSON:
 

@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"sync"
@@ -22,6 +23,40 @@ var (
 	ErrUnauthorized = errors.New("unauthorized: missing auth token")
 	ErrNoAccount    = errors.New("no accounts configured or all accounts are busy")
 )
+
+// AllAccountsMutedError is returned when every enabled account is in upstream
+// mute state. Handlers expose RetryAfter through the Retry-After header.
+type AllAccountsMutedError struct {
+	Until      time.Time
+	RetryAfter time.Duration
+}
+
+func (e *AllAccountsMutedError) Error() string {
+	if e == nil {
+		return "all accounts are muted"
+	}
+	if !e.Until.IsZero() {
+		return fmt.Sprintf("all accounts are muted until %s", e.Until.Format(time.RFC3339))
+	}
+	return "all accounts are muted"
+}
+
+// AccountMutedError is returned when a pinned account is muted.
+type AccountMutedError struct {
+	Account    string
+	Until      time.Time
+	RetryAfter time.Duration
+}
+
+func (e *AccountMutedError) Error() string {
+	if e == nil {
+		return "account is muted"
+	}
+	if !e.Until.IsZero() {
+		return fmt.Sprintf("account %s is muted until %s", e.Account, e.Until.Format(time.RFC3339))
+	}
+	return fmt.Sprintf("account %s is muted", e.Account)
+}
 
 type RequestAuth struct {
 	UseConfigToken  bool
@@ -85,6 +120,9 @@ func (r *Resolver) acquireManagedRequestAuth(ctx context.Context, callerID, targ
 	var lastEnsureErr error
 	for {
 		if target == "" && len(tried) >= len(r.Store.Accounts()) {
+			if err := r.noAccountError(target); err != ErrNoAccount {
+				return nil, err
+			}
 			if lastEnsureErr != nil {
 				return nil, lastEnsureErr
 			}
@@ -92,6 +130,9 @@ func (r *Resolver) acquireManagedRequestAuth(ctx context.Context, callerID, targ
 		}
 		acc, ok := r.Pool.AcquireWait(ctx, target, tried)
 		if !ok {
+			if err := r.noAccountError(target); err != ErrNoAccount {
+				return nil, err
+			}
 			if lastEnsureErr != nil {
 				return nil, lastEnsureErr
 			}
@@ -119,6 +160,34 @@ func (r *Resolver) acquireManagedRequestAuth(ctx context.Context, callerID, targ
 		}
 		return a, nil
 	}
+}
+
+func (r *Resolver) noAccountError(target string) error {
+	if target != "" {
+		if state, ok := r.Pool.MuteState(target); ok {
+			return &AccountMutedError{
+				Account:    target,
+				Until:      state.MutedUntil,
+				RetryAfter: durationUntil(state.MutedUntil),
+			}
+		}
+	}
+	if r.Pool.AllMuted() {
+		until, _ := r.Pool.EarliestMutedUntil()
+		return &AllAccountsMutedError{Until: until, RetryAfter: durationUntil(until)}
+	}
+	return ErrNoAccount
+}
+
+func durationUntil(until time.Time) time.Duration {
+	if until.IsZero() {
+		return 0
+	}
+	left := time.Until(until)
+	if left < 0 {
+		return 0
+	}
+	return left
 }
 
 // DetermineCaller resolves caller identity without acquiring any pooled account.
@@ -183,6 +252,29 @@ func (r *Resolver) MarkTokenInvalid(a *RequestAuth) {
 	a.DeepSeekToken = ""
 	r.clearTokenRefreshMark(a.AccountID)
 	_ = r.Store.UpdateAccountToken(a.AccountID, "")
+}
+
+// MarkAccountMuted records an upstream account-level mute. The pool skips the
+// account until a probe confirms it is usable again.
+func (r *Resolver) MarkAccountMuted(accountID string, until time.Time, reason string) {
+	if r == nil || r.Pool == nil {
+		return
+	}
+	r.Pool.MarkMuted(accountID, until, reason)
+}
+
+func (r *Resolver) ClearAccountMute(accountID string) {
+	if r == nil || r.Pool == nil {
+		return
+	}
+	r.Pool.ClearMute(accountID)
+}
+
+func (r *Resolver) MarkAuthMuted(a *RequestAuth, until time.Time, reason string) {
+	if a == nil {
+		return
+	}
+	r.MarkAccountMuted(a.AccountID, until, reason)
 }
 
 func (r *Resolver) SwitchAccount(ctx context.Context, a *RequestAuth) bool {

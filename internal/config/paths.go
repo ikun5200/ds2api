@@ -57,6 +57,10 @@ func ChatHistoryPath() string {
 	return ResolvePath("DS2API_CHAT_HISTORY_PATH", "data/chat_history.json")
 }
 
+func AccountHealthPath() string {
+	return ResolvePath("DS2API_ACCOUNT_HEALTH_PATH", "data/account_health.json")
+}
+
 func StaticAdminDir() string {
 	return ResolvePath("DS2API_STATIC_ADMIN_DIR", "static/admin")
 }

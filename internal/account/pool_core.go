@@ -17,6 +17,9 @@ type Pool struct {
 	recommendedConcurrency int
 	maxQueueSize           int
 	globalMaxInflight      int
+	mute                   map[string]MuteState
+	mutePath               string
+	muteLoaded             bool
 }
 
 func NewPool(store *config.Store) *Pool {
@@ -28,6 +31,8 @@ func NewPool(store *config.Store) *Pool {
 		store:                 store,
 		inUse:                 map[string]int{},
 		maxInflightPerAccount: maxPer,
+		mute:                  map[string]MuteState{},
+		mutePath:              config.AccountHealthPath(),
 	}
 	p.Reset()
 	return p
@@ -71,6 +76,11 @@ func (p *Pool) Reset() {
 	}
 	p.drainWaitersLocked()
 	p.queue = ids
+	if p.mute == nil {
+		p.mute = map[string]MuteState{}
+	}
+	p.loadMuteStateLocked()
+	p.pruneMuteStateLocked()
 	// Config reloads cannot cancel active leases. Removed or disabled accounts
 	// still count toward the global limit until their requests release them.
 	if p.inUse == nil {
@@ -116,6 +126,9 @@ func (p *Pool) Status() map[string]any {
 	inUseAccounts := make([]string, 0, len(p.inUse))
 	inUseSlots := 0
 	for _, id := range p.queue {
+		if p.isMutedLocked(id) {
+			continue
+		}
 		if p.inUse[id] < p.maxInflightPerAccount {
 			available = append(available, id)
 		}
@@ -127,7 +140,8 @@ func (p *Pool) Status() map[string]any {
 		}
 	}
 	sort.Strings(inUseAccounts)
-	return map[string]any{
+	muted := p.mutedStatusLocked()
+	status := map[string]any{
 		"available":                len(available),
 		"in_use":                   inUseSlots,
 		"total":                    len(p.queue),
@@ -140,5 +154,11 @@ func (p *Pool) Status() map[string]any {
 		"recommended_concurrency":  p.recommendedConcurrency,
 		"waiting":                  len(p.waiters),
 		"max_queue_size":           p.maxQueueSize,
+		"muted":                    len(muted),
+		"muted_accounts":           muted,
 	}
+	if until, ok := p.earliestMutedUntilLocked(); ok {
+		status["earliest_unmute_at"] = until.Unix()
+	}
+	return status
 }

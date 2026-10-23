@@ -2,6 +2,7 @@ package account
 
 import (
 	"context"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -13,6 +14,7 @@ func newPoolForTest(t *testing.T, maxInflight string) *Pool {
 	t.Helper()
 	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", maxInflight)
 	t.Setenv("DS2API_ACCOUNT_MAX_QUEUE", "")
+	t.Setenv("DS2API_ACCOUNT_HEALTH_PATH", filepath.Join(t.TempDir(), "account_health.json"))
 	t.Setenv("DS2API_CONFIG_JSON", `{
 		"keys":["k1"],
 		"accounts":[
@@ -28,6 +30,7 @@ func newSingleAccountPoolForTest(t *testing.T, maxInflight string) *Pool {
 	t.Helper()
 	t.Setenv("DS2API_ACCOUNT_MAX_INFLIGHT", maxInflight)
 	t.Setenv("DS2API_ACCOUNT_MAX_QUEUE", "")
+	t.Setenv("DS2API_ACCOUNT_HEALTH_PATH", filepath.Join(t.TempDir(), "account_health.json"))
 	t.Setenv("DS2API_CONFIG_JSON", `{
 		"keys":["k1"],
 		"accounts":[{"email":"acc1@example.com","token":"token1"}]

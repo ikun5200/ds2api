@@ -158,11 +158,14 @@ func startPayloadCompletionOnAlternateAccount(ctx context.Context, ds DeepSeekCa
 	}
 	sessionID, err := ds.CreateSession(ctx, a, maxAttempts)
 	if err != nil {
-		return StartResult{}, authOutputError(a)
+		return StartResult{}, startOutputError(err, a)
 	}
 	a.BindUpstreamAccount()
 	pow, err := ds.GetPow(ctx, a, maxAttempts)
 	if err != nil {
+		if out := deepSeekOutputError(err); out != nil {
+			return StartResult{SessionID: sessionID}, out
+		}
 		return StartResult{SessionID: sessionID}, &assistantturn.OutputError{Status: http.StatusUnauthorized, Message: "Failed to get PoW (invalid token or unknown error).", Code: "error"}
 	}
 	nextPayload := clonePayload(payload)
@@ -173,6 +176,9 @@ func startPayloadCompletionOnAlternateAccount(ctx context.Context, ds DeepSeekCa
 	nextPayload["parent_message_id"] = nil
 	resp, err := ds.CallCompletion(ctx, a, nextPayload, pow, maxAttempts)
 	if err != nil {
+		if out := deepSeekOutputError(err); out != nil {
+			return StartResult{SessionID: sessionID, Payload: nextPayload, Pow: pow}, out
+		}
 		return StartResult{SessionID: sessionID, Payload: nextPayload, Pow: pow}, &assistantturn.OutputError{Status: http.StatusInternalServerError, Message: "Failed to get completion.", Code: "error"}
 	}
 	return StartResult{SessionID: sessionID, Payload: nextPayload, Pow: pow, Response: resp}, nil

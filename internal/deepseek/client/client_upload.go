@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"ds2api/internal/auth"
 	"ds2api/internal/config"
@@ -149,6 +150,25 @@ func (c *Client) UploadFile(ctx context.Context, a *auth.RequestAuth, req Upload
 			return result, nil
 		}
 		config.Logger.Warn("[upload_file] failed", "status", resp.StatusCode, "code", code, "biz_code", bizCode, "msg", msg, "biz_msg", bizMsg, "account", a.AccountID, "filename", filename)
+		if muteInfo := extractMuteInfo(parsed); muteInfo.Muted {
+			c.markMuted(a, muteInfo)
+			return nil, c.muteFailure("upload file", muteInfo)
+		}
+		if isRateLimitedResponse(parsed) {
+			return nil, &RequestFailure{
+				Op:         "upload file",
+				Kind:       FailureRateLimited,
+				Message:    failureMessage(msg, bizMsg, "rate limit reached"),
+				RetryAfter: time.Minute,
+			}
+		}
+		if isRiskDeviceResponse(parsed) {
+			return nil, &RequestFailure{
+				Op:      "upload file",
+				Kind:    FailureRiskDevice,
+				Message: failureMessage(msg, bizMsg, "RISK_DEVICE_DETECTED"),
+			}
+		}
 		powHeader = ""
 		lastFailureMessage = failureMessage(msg, bizMsg, "upload file failed")
 		if isTokenInvalid(resp.StatusCode, code, bizCode, msg, bizMsg) || isAuthIndicativeBizFailure(msg, bizMsg) {

@@ -2,7 +2,10 @@ package chat
 
 import (
 	"context"
+	"errors"
 	"net/http"
+	"strconv"
+	"time"
 
 	"ds2api/internal/auth"
 	"ds2api/internal/chathistory"
@@ -70,6 +73,38 @@ func writeOpenAIError(w http.ResponseWriter, status int, message string) {
 
 func writeOpenAIErrorWithCode(w http.ResponseWriter, status int, message, code string) {
 	shared.WriteOpenAIErrorWithCode(w, status, message, code)
+}
+
+func setRetryAfter(w http.ResponseWriter, d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	seconds := int(d.Seconds())
+	if seconds < 1 {
+		seconds = 1
+	}
+	w.Header().Set("Retry-After", strconv.Itoa(seconds))
+}
+
+func writeAuthDetermineError(w http.ResponseWriter, err error) bool {
+	if err == nil {
+		return false
+	}
+	var allMuted *auth.AllAccountsMutedError
+	var accountMuted *auth.AccountMutedError
+	switch {
+	case errors.As(err, &allMuted):
+		setRetryAfter(w, allMuted.RetryAfter)
+		writeOpenAIErrorWithCode(w, http.StatusTooManyRequests, err.Error(), "account_muted")
+	case errors.As(err, &accountMuted):
+		setRetryAfter(w, accountMuted.RetryAfter)
+		writeOpenAIErrorWithCode(w, http.StatusTooManyRequests, err.Error(), "account_muted")
+	case err == auth.ErrNoAccount:
+		writeOpenAIErrorWithCode(w, http.StatusTooManyRequests, err.Error(), "rate_limit_exceeded")
+	default:
+		writeOpenAIError(w, http.StatusUnauthorized, err.Error())
+	}
+	return true
 }
 
 func openAIErrorType(status int) string {
