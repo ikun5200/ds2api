@@ -107,10 +107,11 @@ func (s Service) ApplyCurrentInputFile(ctx context.Context, a *auth.RequestAuth,
 		}
 	}
 
+	hasToolResults := messagesContainToolResults(stdReq.Messages)
 	messages := []any{
 		map[string]any{
 			"role":    "user",
-			"content": currentInputFilePrompt(toolFileID != ""),
+			"content": currentInputFilePrompt(toolFileID != "", hasToolResults),
 		},
 	}
 
@@ -212,12 +213,29 @@ func latestUserInputForFile(messages []any) (int, string) {
 	return -1, ""
 }
 
-func currentInputFilePrompt(hasToolsFile bool) string {
+func currentInputFilePrompt(hasToolsFile bool, hasToolResults bool) string {
 	prompt := "Use the attached conversation notes as the current context and answer the latest user request directly."
+	if hasToolResults {
+		prompt += " Every tool call in the notes that has a matching tool result has already been executed. Do not repeat a completed tool call unless the latest user request explicitly asks to run it again; only call a tool when no matching result is already present in the notes, and otherwise continue from the existing results."
+	}
 	if hasToolsFile {
 		prompt += " Tool details are provided in a separate attachment; use only those listed tools and follow the XML tool-call rules in this prompt."
 	}
 	return prompt
+}
+
+func messagesContainToolResults(messages []any) bool {
+	for _, raw := range messages {
+		msg, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		role := strings.ToLower(strings.TrimSpace(shared.AsString(msg["role"])))
+		if role == "tool" || role == "function" {
+			return true
+		}
+	}
+	return false
 }
 
 func prependUniqueRefFileIDs(existing []string, fileIDs ...string) []string {

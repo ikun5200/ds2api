@@ -43,6 +43,7 @@ type chatStreamRuntime struct {
 	streamToolNames   map[int]string
 	accumulator       shared.StreamAccumulator
 	responseMessageID int
+	upstreamUsage     int
 
 	finalThinking     string
 	finalText         string
@@ -227,6 +228,7 @@ func (s *chatStreamRuntime) finalize(finishReason string, deferEmptyOutput bool)
 		DetectionThinking:     finalToolDetectionThinking,
 		ContentFilter:         finishReason == "content_filter",
 		ResponseMessageID:     s.responseMessageID,
+		AccumulatedTokenUsage: s.upstreamUsage,
 		AlreadyEmittedCalls:   s.toolCallsEmitted,
 		AlreadyEmittedToolRaw: s.toolCallsDoneEmitted,
 	}, assistantturn.BuildOptions{
@@ -305,6 +307,9 @@ func (s *chatStreamRuntime) onParsed(parsed sse.LineResult) streamengine.ParsedD
 	}
 	if parsed.ResponseMessageID > 0 {
 		s.responseMessageID = parsed.ResponseMessageID
+	}
+	if parsed.AccumulatedTokenUsage > s.upstreamUsage {
+		s.upstreamUsage = parsed.AccumulatedTokenUsage
 	}
 	if parsed.ContentFilter {
 		if strings.TrimSpace(s.accumulator.Text.String()) == "" {

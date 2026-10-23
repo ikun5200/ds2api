@@ -38,13 +38,17 @@ func buildOpenAIHistoryTranscript(messages []any) string {
 	b.WriteString("\n\n")
 
 	entry := 0
+	callNameByID := map[string]string{}
 	for _, raw := range messages {
 		msg, ok := raw.(map[string]any)
 		if !ok {
 			continue
 		}
 		role := normalizeOpenAIRoleForPrompt(strings.ToLower(strings.TrimSpace(asString(msg["role"]))))
-		content := strings.TrimSpace(buildOpenAIHistoryEntry(role, msg))
+		if role == "assistant" {
+			registerAssistantToolCallNames(msg, callNameByID)
+		}
+		content := strings.TrimSpace(buildOpenAIHistoryEntry(role, msg, callNameByID))
 		if content == "" {
 			continue
 		}
@@ -59,12 +63,12 @@ func buildOpenAIHistoryTranscript(messages []any) string {
 	return transcript + "\n"
 }
 
-func buildOpenAIHistoryEntry(role string, msg map[string]any) string {
+func buildOpenAIHistoryEntry(role string, msg map[string]any, callNameByID map[string]string) string {
 	switch role {
 	case "assistant":
 		return strings.TrimSpace(buildAssistantContentForPrompt(msg))
 	case "tool", "function":
-		return strings.TrimSpace(buildToolHistoryContent(msg))
+		return strings.TrimSpace(buildToolHistoryContent(msg, callNameByID))
 	case "system", "user":
 		return strings.TrimSpace(NormalizeOpenAIContentForPrompt(msg["content"]))
 	default:
@@ -72,13 +76,18 @@ func buildOpenAIHistoryEntry(role string, msg map[string]any) string {
 	}
 }
 
-func buildToolHistoryContent(msg map[string]any) string {
+func buildToolHistoryContent(msg map[string]any, callNameByID map[string]string) string {
 	content := strings.TrimSpace(NormalizeOpenAIContentForPrompt(msg["content"]))
+	name := strings.TrimSpace(asString(msg["name"]))
+	callID := strings.TrimSpace(asString(msg["tool_call_id"]))
+	if name == "" && callID != "" {
+		name = strings.TrimSpace(callNameByID[callID])
+	}
 	parts := make([]string, 0, 2)
-	if name := strings.TrimSpace(asString(msg["name"])); name != "" {
+	if name != "" {
 		parts = append(parts, "name="+name)
 	}
-	if callID := strings.TrimSpace(asString(msg["tool_call_id"])); callID != "" {
+	if callID != "" {
 		parts = append(parts, "tool_call_id="+callID)
 	}
 	header := ""
@@ -92,6 +101,35 @@ func buildToolHistoryContent(msg map[string]any) string {
 		return header
 	default:
 		return content
+	}
+}
+
+// registerAssistantToolCallNames records the assistant tool call id -> name
+// mapping so later tool messages can keep an explicit name even when the
+// client only sent tool_call_id.
+func registerAssistantToolCallNames(msg map[string]any, out map[string]string) {
+	if msg == nil || out == nil {
+		return
+	}
+	calls, _ := msg["tool_calls"].([]any)
+	for _, raw := range calls {
+		call, ok := raw.(map[string]any)
+		if !ok {
+			continue
+		}
+		id := strings.TrimSpace(asString(call["id"]))
+		if id == "" {
+			continue
+		}
+		name := strings.TrimSpace(asString(call["name"]))
+		if name == "" {
+			if fn, ok := call["function"].(map[string]any); ok {
+				name = strings.TrimSpace(asString(fn["name"]))
+			}
+		}
+		if name != "" {
+			out[id] = name
+		}
 	}
 }
 

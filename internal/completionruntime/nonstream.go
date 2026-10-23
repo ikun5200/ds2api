@@ -147,6 +147,7 @@ func ExecuteNonStreamStartedWithRetry(ctx context.Context, ds DeepSeekCaller, a 
 			ContentFilter:         turn.ContentFilter,
 			CitationLinks:         turn.CitationLinks,
 			ResponseMessageID:     turn.ResponseMessageID,
+			AccumulatedTokenUsage: turn.UpstreamOutputTokens,
 		}, buildOptions(stdReq, usagePrompt, opts))
 
 		retryMax := opts.RetryMaxAttempts

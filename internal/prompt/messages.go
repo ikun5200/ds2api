@@ -59,6 +59,11 @@ func MessagesPrepareWithThinkingOptions(messages []map[string]any, _ bool, opts 
 	for _, m := range messages {
 		role, _ := m["role"].(string)
 		text := NormalizeContent(m["content"])
+		if role == "tool" {
+			if header := toolResultMetadataHeader(m); header != "" {
+				text = header + text
+			}
+		}
 		processed = append(processed, block{Role: role, Text: text})
 	}
 	if len(processed) == 0 {
@@ -132,6 +137,25 @@ func hasOutputIntegrityGuard(msg map[string]any) bool {
 	}
 	content := strings.TrimSpace(NormalizeContent(msg["content"]))
 	return strings.Contains(content, outputIntegrityGuardMarker) || strings.Contains(content, legacyOutputIntegrityGuardLabel)
+}
+
+// toolResultMetadataHeader renders the call identity above a tool result so the
+// model can match the result to the assistant tool call that produced it.
+func toolResultMetadataHeader(msg map[string]any) string {
+	if msg == nil {
+		return ""
+	}
+	parts := make([]string, 0, 2)
+	if name := strings.TrimSpace(asString(msg["name"])); name != "" {
+		parts = append(parts, "name="+name)
+	}
+	if callID := strings.TrimSpace(asString(msg["tool_call_id"])); callID != "" {
+		parts = append(parts, "tool_call_id="+callID)
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(parts, " ") + "]\n"
 }
 
 // formatRoleBlock produces a single concatenated block: marker + text + endMarker.

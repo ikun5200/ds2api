@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"ds2api/internal/httpapi/openai/shared"
+	"ds2api/internal/prompt"
 	"ds2api/internal/promptcompat"
 	"ds2api/internal/sse"
 	"ds2api/internal/toolcall"
@@ -34,21 +35,22 @@ type OutputError struct {
 }
 
 type Turn struct {
-	Model             string
-	Prompt            string
-	RawText           string
-	RawThinking       string
-	DetectionThinking string
-	Text              string
-	Thinking          string
-	ToolCalls         []toolcall.ParsedToolCall
-	ParsedToolCalls   toolcall.ToolCallParseResult
-	CitationLinks     map[int]string
-	ContentFilter     bool
-	ResponseMessageID int
-	StopReason        StopReason
-	Usage             Usage
-	Error             *OutputError
+	Model                string
+	Prompt               string
+	RawText              string
+	RawThinking          string
+	DetectionThinking    string
+	Text                 string
+	Thinking             string
+	ToolCalls            []toolcall.ParsedToolCall
+	ParsedToolCalls      toolcall.ToolCallParseResult
+	CitationLinks        map[int]string
+	ContentFilter        bool
+	ResponseMessageID    int
+	UpstreamOutputTokens int
+	StopReason           StopReason
+	Usage                Usage
+	Error                *OutputError
 }
 
 type FinalizeOptions struct {
@@ -85,6 +87,7 @@ type StreamSnapshot struct {
 	ContentFilter         bool
 	CitationLinks         map[int]string
 	ResponseMessageID     int
+	AccumulatedTokenUsage int
 	AlreadyEmittedCalls   bool
 	AdditionalToolCalls   []toolcall.ParsedToolCall
 	AlreadyEmittedToolRaw bool
@@ -110,21 +113,22 @@ func BuildTurnFromCollected(result sse.CollectResult, opts BuildOptions) Turn {
 	}
 
 	turn := Turn{
-		Model:             opts.Model,
-		Prompt:            opts.Prompt,
-		RawText:           result.Text,
-		RawThinking:       result.Thinking,
-		DetectionThinking: result.ToolDetectionThinking,
-		Text:              text,
-		Thinking:          thinking,
-		ToolCalls:         calls,
-		ParsedToolCalls:   parsed,
-		CitationLinks:     result.CitationLinks,
-		ContentFilter:     result.ContentFilter,
-		ResponseMessageID: result.ResponseMessageID,
-		StopReason:        stopReason,
+		Model:                opts.Model,
+		Prompt:               opts.Prompt,
+		RawText:              result.Text,
+		RawThinking:          result.Thinking,
+		DetectionThinking:    result.ToolDetectionThinking,
+		Text:                 text,
+		Thinking:             thinking,
+		ToolCalls:            calls,
+		ParsedToolCalls:      parsed,
+		CitationLinks:        result.CitationLinks,
+		ContentFilter:        result.ContentFilter,
+		ResponseMessageID:    result.ResponseMessageID,
+		UpstreamOutputTokens: result.AccumulatedTokenUsage,
+		StopReason:           stopReason,
 	}
-	turn.Usage = BuildUsage(opts.Model, opts.Prompt, thinking, text, opts.RefFileTokens)
+	turn.Usage = BuildUsage(opts.Model, opts.Prompt, thinking, text, calls, opts.RefFileTokens, result.AccumulatedTokenUsage)
 	turn.Error = ValidateTurn(turn, opts.ToolChoice)
 	if turn.Error != nil {
 		turn.StopReason = StopReasonError
@@ -156,21 +160,22 @@ func BuildTurnFromStreamSnapshot(snapshot StreamSnapshot, opts BuildOptions) Tur
 	}
 
 	turn := Turn{
-		Model:             opts.Model,
-		Prompt:            opts.Prompt,
-		RawText:           snapshot.RawText,
-		RawThinking:       snapshot.RawThinking,
-		DetectionThinking: snapshot.DetectionThinking,
-		Text:              text,
-		Thinking:          thinking,
-		ToolCalls:         calls,
-		ParsedToolCalls:   parsed,
-		CitationLinks:     snapshot.CitationLinks,
-		ContentFilter:     snapshot.ContentFilter,
-		ResponseMessageID: snapshot.ResponseMessageID,
-		StopReason:        stopReason,
+		Model:                opts.Model,
+		Prompt:               opts.Prompt,
+		RawText:              snapshot.RawText,
+		RawThinking:          snapshot.RawThinking,
+		DetectionThinking:    snapshot.DetectionThinking,
+		Text:                 text,
+		Thinking:             thinking,
+		ToolCalls:            calls,
+		ParsedToolCalls:      parsed,
+		CitationLinks:        snapshot.CitationLinks,
+		ContentFilter:        snapshot.ContentFilter,
+		ResponseMessageID:    snapshot.ResponseMessageID,
+		UpstreamOutputTokens: snapshot.AccumulatedTokenUsage,
+		StopReason:           stopReason,
 	}
-	turn.Usage = BuildUsage(opts.Model, opts.Prompt, thinking, text, opts.RefFileTokens)
+	turn.Usage = BuildUsage(opts.Model, opts.Prompt, thinking, text, calls, opts.RefFileTokens, snapshot.AccumulatedTokenUsage)
 	if !snapshot.AlreadyEmittedCalls && !snapshot.AlreadyEmittedToolRaw {
 		turn.Error = ValidateTurn(turn, opts.ToolChoice)
 	}
@@ -180,16 +185,42 @@ func BuildTurnFromStreamSnapshot(snapshot StreamSnapshot, opts BuildOptions) Tur
 	return turn
 }
 
-func BuildUsage(model, prompt, thinking, text string, refFileTokens int) Usage {
+func BuildUsage(model, prompt, thinking, text string, toolCalls []toolcall.ParsedToolCall, refFileTokens, upstreamOutputTokens int) Usage {
 	inputTokens := util.CountPromptTokens(prompt, model) + refFileTokens
 	reasoningTokens := util.CountOutputTokens(thinking, model)
-	outputTokens := reasoningTokens + util.CountOutputTokens(text, model)
+	visibleTokens := util.CountOutputTokens(text, model)
+	toolCallTokens := util.CountOutputTokens(renderToolCallsForUsage(toolCalls), model)
+	localOutputTokens := reasoningTokens + visibleTokens + toolCallTokens
+	outputTokens := localOutputTokens
+	if upstreamOutputTokens > outputTokens {
+		outputTokens = upstreamOutputTokens
+	}
+	if reasoningTokens > outputTokens {
+		reasoningTokens = outputTokens
+	}
 	return Usage{
 		InputTokens:     inputTokens,
 		OutputTokens:    outputTokens,
 		ReasoningTokens: reasoningTokens,
 		TotalTokens:     inputTokens + outputTokens,
 	}
+}
+
+// renderToolCallsForUsage turns parsed tool calls back into the canonical XML
+// form so tool-call turns are not reported with zero completion tokens when the
+// upstream omits its cumulative usage counter.
+func renderToolCallsForUsage(calls []toolcall.ParsedToolCall) string {
+	if len(calls) == 0 {
+		return ""
+	}
+	raw := make([]any, 0, len(calls))
+	for _, call := range calls {
+		raw = append(raw, map[string]any{
+			"name":  call.Name,
+			"input": call.Input,
+		})
+	}
+	return prompt.FormatToolCallsForPrompt(raw)
 }
 
 func ValidateTurn(turn Turn, policy promptcompat.ToolChoicePolicy) *OutputError {

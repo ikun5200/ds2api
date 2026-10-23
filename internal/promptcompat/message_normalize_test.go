@@ -299,6 +299,65 @@ func TestNormalizeOpenAIMessagesForPrompt_CanonicalizesStandaloneAssistantToolMa
 	}
 }
 
+func TestNormalizeOpenAIMessagesForPrompt_InfersToolNameAndKeepsCallID(t *testing.T) {
+	raw := []any{
+		map[string]any{
+			"role": "assistant",
+			"tool_calls": []any{
+				map[string]any{
+					"id": "call_weather",
+					"function": map[string]any{
+						"name":      "get_weather",
+						"arguments": `{"city":"北京"}`,
+					},
+				},
+			},
+		},
+		map[string]any{
+			"role":         "tool",
+			"tool_call_id": "call_weather",
+			"content":      `{"temperature_c":18}`,
+		},
+	}
+
+	normalized := NormalizeOpenAIMessagesForPrompt(raw, "")
+	if len(normalized) != 2 {
+		t.Fatalf("expected assistant and tool messages, got %#v", normalized)
+	}
+	toolMsg := normalized[1]
+	if toolMsg["name"] != "get_weather" {
+		t.Fatalf("expected tool name inferred from call id, got %#v", toolMsg)
+	}
+	if toolMsg["tool_call_id"] != "call_weather" {
+		t.Fatalf("expected tool_call_id preserved, got %#v", toolMsg)
+	}
+	prompt := util.MessagesPrepare(normalized)
+	if !strings.Contains(prompt, "[name=get_weather tool_call_id=call_weather]") {
+		t.Fatalf("expected tool metadata header in prompt, got %q", prompt)
+	}
+}
+
+func TestNormalizeOpenAIMessagesForPrompt_LegacyFunctionCallHistory(t *testing.T) {
+	raw := []any{
+		map[string]any{
+			"role": "assistant",
+			"function_call": map[string]any{
+				"name":      "search",
+				"arguments": `{"query":"docs"}`,
+			},
+		},
+	}
+
+	normalized := NormalizeOpenAIMessagesForPrompt(raw, "")
+	if len(normalized) != 1 {
+		t.Fatalf("expected legacy function_call history preserved, got %#v", normalized)
+	}
+	content, _ := normalized[0]["content"].(string)
+	if !strings.Contains(content, `<invoke name="search">`) {
+		t.Fatalf("expected legacy function_call rendered as tool XML, got %q", content)
+	}
+}
+
 func TestNormalizeOpenAIMessagesForPrompt_DeveloperRoleMapsToSystem(t *testing.T) {
 	raw := []any{
 		map[string]any{"role": "developer", "content": "必须先走工具调用"},

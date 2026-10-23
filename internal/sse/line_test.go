@@ -43,17 +43,23 @@ func TestParseDeepSeekContentLineContentFilterStatus(t *testing.T) {
 	}
 }
 
-func TestParseDeepSeekContentLineIgnoresAccumulatedTokenUsage(t *testing.T) {
+func TestParseDeepSeekContentLineCapturesAccumulatedTokenUsage(t *testing.T) {
 	res := ParseDeepSeekContentLine([]byte(`data: {"p":"response","o":"BATCH","v":[{"p":"accumulated_token_usage","v":1383},{"p":"quasi_status","v":"FINISHED"}]}`), false, "text")
 	if !res.Parsed {
 		t.Fatalf("expected parsed result")
 	}
+	if res.AccumulatedTokenUsage != 1383 {
+		t.Fatalf("expected accumulated token usage 1383, got %d", res.AccumulatedTokenUsage)
+	}
 }
 
-func TestParseDeepSeekContentLineIgnoresAccumulatedTokenUsageString(t *testing.T) {
+func TestParseDeepSeekContentLineCapturesStringAccumulatedTokenUsage(t *testing.T) {
 	res := ParseDeepSeekContentLine([]byte(`data: {"p":"response","o":"BATCH","v":[{"p":"accumulated_token_usage","v":"190"},{"p":"quasi_status","v":"FINISHED"}]}`), false, "text")
 	if !res.Parsed {
 		t.Fatalf("expected parsed result")
+	}
+	if res.AccumulatedTokenUsage != 190 {
+		t.Fatalf("expected accumulated token usage 190, got %d", res.AccumulatedTokenUsage)
 	}
 }
 

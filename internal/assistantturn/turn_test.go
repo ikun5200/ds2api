@@ -2,6 +2,7 @@ package assistantturn
 
 import (
 	"net/http"
+	"strings"
 	"testing"
 
 	"ds2api/internal/promptcompat"
@@ -118,6 +119,56 @@ func TestBuildTurnFromStreamSnapshotAlreadyEmittedToolAvoidsEmptyError(t *testin
 	}
 	if turn.StopReason != StopReasonToolCalls {
 		t.Fatalf("stop reason mismatch: %q", turn.StopReason)
+	}
+}
+
+func TestBuildUsageCountsToolCallTokensWhenUpstreamUsageMissing(t *testing.T) {
+	turn := BuildTurnFromCollected(sse.CollectResult{
+		Text: `<tool_calls><invoke name="Write"><parameter name="content">` + strings.Repeat("x", 400) + `</parameter></invoke></tool_calls>`,
+	}, BuildOptions{
+		Model:     "deepseek-v4-flash",
+		ToolNames: []string{"Write"},
+	})
+	if len(turn.ToolCalls) != 1 {
+		t.Fatalf("expected one tool call, got %d", len(turn.ToolCalls))
+	}
+	if turn.Usage.OutputTokens == 0 {
+		t.Fatalf("expected tool call output tokens to be counted, got %#v", turn.Usage)
+	}
+	if turn.Usage.TotalTokens != turn.Usage.InputTokens+turn.Usage.OutputTokens {
+		t.Fatalf("total tokens mismatch: %#v", turn.Usage)
+	}
+}
+
+func TestBuildUsagePrefersUpstreamAccumulatedUsage(t *testing.T) {
+	turn := BuildTurnFromCollected(sse.CollectResult{
+		Text:                  `<tool_calls><invoke name="Write"><parameter name="content">x</parameter></invoke></tool_calls>`,
+		AccumulatedTokenUsage: 5000,
+	}, BuildOptions{
+		Model:     "deepseek-v4-flash",
+		ToolNames: []string{"Write"},
+	})
+	if turn.Usage.OutputTokens != 5000 {
+		t.Fatalf("expected upstream output token usage to win, got %#v", turn.Usage)
+	}
+	if turn.Usage.TotalTokens != turn.Usage.InputTokens+5000 {
+		t.Fatalf("total tokens mismatch: %#v", turn.Usage)
+	}
+}
+
+func TestBuildUsageCountsToolCallTokensForStreamSnapshot(t *testing.T) {
+	turn := BuildTurnFromStreamSnapshot(StreamSnapshot{
+		RawText:     `<tool_calls><invoke name="Write"><parameter name="content">` + strings.Repeat("x", 400) + `</parameter></invoke></tool_calls>`,
+		VisibleText: "",
+	}, BuildOptions{
+		Model:     "deepseek-v4-flash",
+		ToolNames: []string{"Write"},
+	})
+	if len(turn.ToolCalls) != 1 {
+		t.Fatalf("expected one stream tool call, got %d", len(turn.ToolCalls))
+	}
+	if turn.Usage.OutputTokens == 0 {
+		t.Fatalf("expected stream tool call output tokens to be counted, got %#v", turn.Usage)
 	}
 }
 

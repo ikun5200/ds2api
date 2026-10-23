@@ -171,6 +171,32 @@ func (outputIntegrityDisabledStore) OutputIntegrityGuardPrompt() string {
 	return ""
 }
 
+func TestBuildOpenAIFinalPromptToolPromptIncludesCompletedToolGuard(t *testing.T) {
+	messages := []any{
+		map[string]any{"role": "user", "content": "查天气"},
+	}
+	tools := []any{
+		map[string]any{
+			"type": "function",
+			"function": map[string]any{
+				"name":        "get_weather",
+				"description": "Get weather",
+				"parameters": map[string]any{
+					"type": "object",
+				},
+			},
+		},
+	}
+
+	finalPrompt, _ := BuildOpenAIPromptWithPrepareOptions(messages, tools, "", DefaultToolChoicePolicy(), false, prompt.DefaultPrepareOptions())
+	if !strings.Contains(finalPrompt, "Completed-tool guard") {
+		t.Fatalf("tool prompt missing completed-tool guard: %q", finalPrompt)
+	}
+	if !strings.Contains(finalPrompt, "do not call that tool again") {
+		t.Fatalf("tool prompt missing repeat-call prohibition: %q", finalPrompt)
+	}
+}
+
 func TestBuildOpenAIFinalPromptReadLikeToolIncludesCacheGuard(t *testing.T) {
 	messages := []any{
 		map[string]any{"role": "user", "content": "请读取文件"},

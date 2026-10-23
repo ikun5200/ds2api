@@ -190,6 +190,7 @@ OpenAI 路径实现：
 
 - tools 对下游来说，本质上是 prompt 内规则
 - 不是 native tool schema transport
+- 工具 prompt 会附带 completed-tool guard：调用前先检查历史/附件 notes 中是否已有同一工具、同一参数的 tool result；已有结果时必须直接使用结果继续回答，不能再次调用。这个约束用于避免无 thinking 模式下多轮工具调用重复执行。
 
 ## 7. assistant 的 tool_calls / reasoning 如何保留
 
@@ -223,6 +224,8 @@ assistant 历史 `tool_calls` 不会保留成 OpenAI 原生 JSON，而会转成 
 
 如果客户端历史里没有结构化 `tool_calls` 字段、却把一个可独立解析的 assistant 工具块放进了普通 `content`，兼容层会在写入后续 prompt 前先按工具调用解析它，再重渲染为规范 XML 历史外壳。这样可以避免一次 malformed 工具块未被结构化保存后，作为普通 assistant 文本回灌，继续污染后续模型的 few-shot 工具格式。
 
+旧版 `function_call` 历史也会按同一 XML 外壳回放：assistant message 顶层的 `function_call`（`name` + `arguments`）会被当成单次工具调用处理，后续 `function` role 结果按 tool result 处理。
+
 解析层同时兼容旧式纯 XML 形态：`<tool_calls>` / `<invoke>` / `<parameter>`。两者都会先归一到现有 XML 解析语义；其他旧格式都会作为普通文本保留，不会作为可执行调用语法。
 例外是 parser 会对一个非常窄的模型失误做修复：如果 assistant 输出了 `<invoke ...>` ... `</tool_calls>`（或 DSML 对应标签），但漏掉最前面的 opening wrapper，解析阶段会在 wrapper-confidence 足够高时补回 wrapper 后再尝试识别。这里的 wrapper-confidence 指 scanner 已经识别出白名单工具壳结构，剩余失败只像壳层结构漂移，而不是语义上接近但不在白名单内的 near-miss 标签名。修复成功时，wrapper 后面的 suffix prose 会继续保留在可见文本里；修复失败时，该块仍按普通文本处理。
 
@@ -239,6 +242,16 @@ assistant 历史 `tool_calls` 不会保留成 OpenAI 原生 JSON，而会转成 
 tool / function role 的结果会作为 `Tool result:` block 进入 prompt。
 
 如果 tool content 为空，当前会补成字符串 `"null"`，避免整个 tool turn 丢失。
+
+tool result 会带一行调用身份头，帮助模型把结果与上一轮 assistant 调用对应起来：
+
+```text
+Tool result:
+[name=get_weather tool_call_id=call_xxx]
+{"temperature_c":18}
+```
+
+`name` 优先使用客户端显式传入的值；缺失时会从历史里同一 `tool_call_id` 的 assistant `tool_calls` 反推。`HISTORY.txt` 的 TOOL 段使用同样的 `[name=... tool_call_id=...]` 形式。没有 `name` / `tool_call_id` 的旧请求仍保持原来的裸 `Tool result:` 形状。
 
 ## 8. files、附件、systemprompt 文件的实际语义
 
@@ -295,7 +308,7 @@ WebUI 在内存中按附件对象保存上传凭据归属，凭据不写入可�
 
 兼容层现在只保留 `current_input_file` 这一种拆分方式；旧的 `history_split` 配置字段已移除，读取旧配置时会忽略它且不会再写回。
 
-- `current_input_file` 默认开启；它在统一 completion runtime 入口全局生效，用于把“完整上下文”合并进 `HISTORY.txt` 上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，runtime 会上传一个文件名为 `HISTORY.txt` 的上下文文件。文件内容会先经过各协议入口的标准化，再序列化成按轮次编号的 `HISTORY.txt` 风格 transcript，带有 `# HISTORY.txt` 标题和 `=== N. ROLE ===` 分段；如果当前请求声明了可用工具，还会把工具名称、描述和参数 schema 单独上传成 `TOOLS.txt`，带有 `# TOOLS.txt` 标题。live prompt 中则会给出一个自然的 continuation 语气 user 消息，要求模型使用附件里的对话笔记作为当前上下文并直接回答最新请求；如果有工具文件，会说明工具细节在单独附件中，同时保留本轮工具选择策略，避免把任务拉回起点。
+- `current_input_file` 默认开启；它在统一 completion runtime 入口全局生效，用于把“完整上下文”合并进 `HISTORY.txt` 上下文文件。当最新 user turn 的纯文本长度达到 `current_input_file.min_chars`（默认 `0`）时，runtime 会上传一个文件名为 `HISTORY.txt` 的上下文文件。文件内容会先经过各协议入口的标准化，再序列化成按轮次编号的 `HISTORY.txt` 风格 transcript，带有 `# HISTORY.txt` 标题和 `=== N. ROLE ===` 分段；如果当前请求声明了可用工具，还会把工具名称、描述和参数 schema 单独上传成 `TOOLS.txt`，带有 `# TOOLS.txt` 标题。live prompt 中则会给出一个自然的 continuation 语气 user 消息，要求模型使用附件里的对话笔记作为当前上下文并直接回答最新请求；如果历史里已有 tool result，会明确说明这些调用已经执行、不得重复，避免模型把任务拉回起点；如果有工具文件，会说明工具细节在单独附件中，同时保留本轮工具选择策略。
 - 自动 `HISTORY.txt` / `TOOLS.txt` 也计入 `ref_file_ids` 的 50 个上限。追加自动文件将超额时，本次跳过整个自动拆分，保留完整内联 prompt、工具上下文和所有用户附件；例如 49 个已有附件且需要两份自动文件时不会上传自动文件。
 - 如果 `current_input_file.enabled=false`，请求会直接透传，不上传任何拆分上下文文件。
 - 即使触发 `current_input_file` 后 live prompt 被缩短，对客户端回包里的上下文 token 统计，仍会沿用**拆分前的完整 prompt 语义**做计数，而不是按缩短后的占位 prompt 计算；否则会把真实上下文显著算小。

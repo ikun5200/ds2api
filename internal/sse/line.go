@@ -14,6 +14,7 @@ type LineResult struct {
 	ToolDetectionThinkingParts []ContentPart
 	NextType                   string
 	ResponseMessageID          int
+	AccumulatedTokenUsage      int
 }
 
 // ParseDeepSeekContentLine centralizes one-line DeepSeek SSE parsing for both
@@ -59,6 +60,8 @@ func parseDeepSeekContentChunk(chunk map[string]any, thinkingEnabled bool, curre
 	detectionThinkingParts = filterLeakedContentFilterParts(detectionThinkingParts)
 	var respMsgID int
 	observeResponseMessageID(chunk, &respMsgID)
+	var accumulatedTokenUsage int
+	observeAccumulatedTokenUsage(chunk, &accumulatedTokenUsage)
 	return LineResult{
 		Parsed:                     true,
 		Stop:                       finished,
@@ -66,5 +69,6 @@ func parseDeepSeekContentChunk(chunk map[string]any, thinkingEnabled bool, curre
 		ToolDetectionThinkingParts: detectionThinkingParts,
 		NextType:                   nextType,
 		ResponseMessageID:          respMsgID,
+		AccumulatedTokenUsage:      accumulatedTokenUsage,
 	}
 }

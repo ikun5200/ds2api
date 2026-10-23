@@ -216,6 +216,89 @@ func TestApplyCurrentInputFileDisabledPassThrough(t *testing.T) {
 	}
 }
 
+func TestApplyCurrentInputFilePromptMentionsCompletedToolCalls(t *testing.T) {
+	ds := &inlineUploadDSStub{}
+	h := &openAITestSurface{
+		Store: mockOpenAIConfig{
+			currentInputEnabled: true,
+			currentInputMin:     0,
+			thinkingInjection:   boolPtr(true),
+		},
+		DS: ds,
+	}
+	req := map[string]any{
+		"model": "deepseek-v4-flash",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "查北京天气"},
+			map[string]any{
+				"role":    "assistant",
+				"content": "",
+				"tool_calls": []any{
+					map[string]any{
+						"id":   "call_weather",
+						"type": "function",
+						"function": map[string]any{
+							"name":      "get_weather",
+							"arguments": `{"city":"北京"}`,
+						},
+					},
+				},
+			},
+			map[string]any{
+				"role":         "tool",
+				"tool_call_id": "call_weather",
+				"content":      `{"temperature_c":18}`,
+			},
+			map[string]any{"role": "user", "content": "继续"},
+		},
+	}
+	stdReq, err := promptcompat.NormalizeOpenAIChatRequest(h.Store, req, "")
+	if err != nil {
+		t.Fatalf("normalize failed: %v", err)
+	}
+
+	out, err := h.applyCurrentInputFile(context.Background(), &auth.RequestAuth{DeepSeekToken: "token"}, stdReq)
+	if err != nil {
+		t.Fatalf("apply current input file failed: %v", err)
+	}
+	if !strings.Contains(out.FinalPrompt, "Do not repeat a completed tool call") {
+		t.Fatalf("expected anti-repeat guidance in live prompt, got %q", out.FinalPrompt)
+	}
+	if !strings.Contains(out.HistoryText, "[name=get_weather tool_call_id=call_weather]") {
+		t.Fatalf("expected inferred tool name in history transcript, got %q", out.HistoryText)
+	}
+}
+
+func TestApplyCurrentInputFilePromptOmitsCompletedToolGuidanceWithoutToolResults(t *testing.T) {
+	ds := &inlineUploadDSStub{}
+	h := &openAITestSurface{
+		Store: mockOpenAIConfig{
+			currentInputEnabled: true,
+			currentInputMin:     0,
+			thinkingInjection:   boolPtr(true),
+		},
+		DS: ds,
+	}
+	req := map[string]any{
+		"model": "deepseek-v4-flash",
+		"messages": []any{
+			map[string]any{"role": "user", "content": "普通问题"},
+		},
+	}
+	stdReq, err := promptcompat.NormalizeOpenAIChatRequest(h.Store, req, "")
+	if err != nil {
+		t.Fatalf("normalize failed: %v", err)
+	}
+
+	out, err := h.applyCurrentInputFile(context.Background(), &auth.RequestAuth{DeepSeekToken: "token"}, stdReq)
+	if err != nil {
+		t.Fatalf("apply current input file failed: %v", err)
+	}
+	if strings.Contains(out.FinalPrompt, "Do not repeat a completed tool call") {
+		t.Fatalf("did not expect anti-repeat guidance without tool results, got %q", out.FinalPrompt)
+	}
+}
+
 func TestApplyCurrentInputFileUploadsFirstTurnWithNumberedHistoryTranscript(t *testing.T) {
 	ds := &inlineUploadDSStub{}
 	h := &openAITestSurface{

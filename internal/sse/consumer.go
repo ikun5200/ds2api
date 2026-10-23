@@ -18,6 +18,7 @@ type CollectResult struct {
 	ContentFilter         bool
 	CitationLinks         map[int]string
 	ResponseMessageID     int
+	AccumulatedTokenUsage int
 }
 
 // CollectStream fully consumes a DeepSeek SSE response and separates
@@ -40,6 +41,7 @@ func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) Co
 	stopped := false
 	collector := newCitationLinkCollector()
 	responseMessageID := 0
+	accumulatedTokenUsage := 0
 	parser := contentLineParser{}
 	currentType := "text"
 	if thinkingEnabled {
@@ -59,6 +61,9 @@ func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) Co
 		}
 		result := parser.parse(line, thinkingEnabled, currentType)
 		currentType = result.NextType
+		if result.AccumulatedTokenUsage > accumulatedTokenUsage {
+			accumulatedTokenUsage = result.AccumulatedTokenUsage
+		}
 		if !result.Parsed {
 			return true
 		}
@@ -89,6 +94,7 @@ func CollectStream(resp *http.Response, thinkingEnabled bool, closeBody bool) Co
 		ContentFilter:         contentFilter,
 		CitationLinks:         collector.build(),
 		ResponseMessageID:     responseMessageID,
+		AccumulatedTokenUsage: accumulatedTokenUsage,
 	}
 }
 

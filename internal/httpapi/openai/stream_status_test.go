@@ -159,6 +159,9 @@ func TestChatCompletionsStreamStatusCapturedAs200(t *testing.T) {
 	if statuses[0] != http.StatusOK {
 		t.Fatalf("expected captured status 200 (not 000), got %d", statuses[0])
 	}
+	if ct := rec.Header().Get("Content-Type"); ct != "text/event-stream; charset=utf-8" {
+		t.Fatalf("expected UTF-8 SSE content type, got %q", ct)
+	}
 }
 
 func TestResponsesStreamStatusCapturedAs200(t *testing.T) {
@@ -187,6 +190,9 @@ func TestResponsesStreamStatusCapturedAs200(t *testing.T) {
 	}
 	if statuses[0] != http.StatusOK {
 		t.Fatalf("expected captured status 200 (not 000), got %d", statuses[0])
+	}
+	if ct := rec.Header().Get("Content-Type"); ct != "text/event-stream; charset=utf-8" {
+		t.Fatalf("expected UTF-8 SSE content type, got %q", ct)
 	}
 }
 
