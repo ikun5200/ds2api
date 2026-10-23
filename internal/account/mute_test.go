@@ -1,6 +1,7 @@
 package account
 
 import (
+	"context"
 	"path/filepath"
 	"testing"
 	"time"
@@ -75,6 +76,23 @@ func TestPoolMuteStatePersistsAcrossRestart(t *testing.T) {
 	}
 	if !state.MutedUntil.Equal(until) || state.Reason != "user is muted" {
 		t.Fatalf("unexpected reloaded state: %#v", state)
+	}
+}
+
+func TestPoolAcquireWaitAllMutedReturnsImmediately(t *testing.T) {
+	pool := newPoolForTest(t, "2")
+	until := time.Now().Add(30 * time.Minute)
+	pool.MarkMuted("acc1@example.com", until, "user is muted")
+	pool.MarkMuted("acc2@example.com", until, "user is muted")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	if _, ok := pool.AcquireWait(ctx, "", nil); ok {
+		t.Fatal("expected no account while all are muted")
+	}
+	if elapsed := time.Since(start); elapsed > 200*time.Millisecond {
+		t.Fatalf("all-muted acquire should return immediately, took %v", elapsed)
 	}
 }
 

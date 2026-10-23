@@ -27,6 +27,10 @@ func (p *Pool) AcquireWait(ctx context.Context, target string, exclude map[strin
 			p.mu.Unlock()
 			return acc, true
 		}
+		if p.noAvailableAccountLocked(target, exclude) {
+			p.mu.Unlock()
+			return config.Account{}, false
+		}
 		if !p.canQueueLocked(target, exclude) {
 			p.mu.Unlock()
 			return config.Account{}, false
@@ -44,6 +48,25 @@ func (p *Pool) AcquireWait(ctx context.Context, target string, exclude map[strin
 		case <-waiter:
 		}
 	}
+}
+
+// noAvailableAccountLocked reports whether waiting cannot help because every
+// candidate account is muted (or already excluded from this request).
+func (p *Pool) noAvailableAccountLocked(target string, exclude map[string]bool) bool {
+	if target != "" {
+		state, ok := p.mute[target]
+		return ok && state.Muted
+	}
+	for _, id := range p.queue {
+		if exclude[id] {
+			continue
+		}
+		state, ok := p.mute[id]
+		if !ok || !state.Muted {
+			return false
+		}
+	}
+	return true
 }
 
 func (p *Pool) acquireLocked(target string, exclude map[string]bool) (config.Account, bool) {
