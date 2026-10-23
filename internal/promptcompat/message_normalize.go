@@ -12,12 +12,16 @@ const assistantReasoningLabel = "reasoning_content"
 func NormalizeOpenAIMessagesForPrompt(raw []any, traceID string) []map[string]any {
 	_ = traceID
 	out := make([]map[string]any, 0, len(raw))
+	callNameByID := map[string]string{}
 	for _, item := range raw {
 		msg, ok := item.(map[string]any)
 		if !ok {
 			continue
 		}
 		role := strings.ToLower(strings.TrimSpace(asString(msg["role"])))
+		if role == "assistant" {
+			registerAssistantToolCallNames(msg, callNameByID)
+		}
 		switch role {
 		case "assistant":
 			content := buildAssistantContentForPrompt(msg)
@@ -30,10 +34,22 @@ func NormalizeOpenAIMessagesForPrompt(raw []any, traceID string) []map[string]an
 			})
 		case "tool", "function":
 			content := buildToolContentForPrompt(msg)
-			out = append(out, map[string]any{
+			outMsg := map[string]any{
 				"role":    "tool",
 				"content": content,
-			})
+			}
+			callID := strings.TrimSpace(asString(msg["tool_call_id"]))
+			name := strings.TrimSpace(asString(msg["name"]))
+			if name == "" && callID != "" {
+				name = strings.TrimSpace(callNameByID[callID])
+			}
+			if name != "" {
+				outMsg["name"] = name
+			}
+			if callID != "" {
+				outMsg["tool_call_id"] = callID
+			}
+			out = append(out, outMsg)
 		case "user", "system", "developer":
 			out = append(out, map[string]any{
 				"role":    normalizeOpenAIRoleForPrompt(role),
@@ -62,7 +78,7 @@ func buildAssistantContentForPrompt(msg map[string]any) string {
 	if reasoning == "" {
 		reasoning = strings.TrimSpace(extractOpenAIReasoningContentFromMessage(msg["content"]))
 	}
-	toolHistory := prompt.FormatToolCallsForPrompt(msg["tool_calls"])
+	toolHistory := prompt.FormatToolCallsForPrompt(assistantToolCallsFromMessage(msg))
 	if toolHistory == "" {
 		content = normalizeAssistantToolMarkupContentForPrompt(content)
 	}
@@ -84,6 +100,16 @@ func buildAssistantContentForPrompt(msg map[string]any) string {
 	default:
 		return strings.Join(parts, "\n\n")
 	}
+}
+
+func assistantToolCallsFromMessage(msg map[string]any) []any {
+	if calls, ok := msg["tool_calls"].([]any); ok && len(calls) > 0 {
+		return calls
+	}
+	if legacy, ok := msg["function_call"].(map[string]any); ok && len(legacy) > 0 {
+		return []any{legacy}
+	}
+	return nil
 }
 
 func normalizeAssistantToolMarkupContentForPrompt(content string) string {

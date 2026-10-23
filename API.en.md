@@ -312,7 +312,7 @@ data: [DONE]
 - When thinking is enabled, the stream may emit `delta.reasoning_content`
 - Text emits `delta.content`
 - Last chunk includes `finish_reason` and `usage`
-- Token counting prefers pass-through from upstream DeepSeek SSE (`accumulated_token_usage` / `token_usage`), and only falls back to local estimation when upstream usage is absent. Failed/interrupted endings (for example `response.failed`) may not include `usage`
+- Token counting prefers the upstream DeepSeek SSE `accumulated_token_usage` value. When it is absent or smaller than the local estimate, usage falls back to a local estimate that includes thinking, visible text, and this turn's tool-call arguments. Failed/interrupted endings (for example `response.failed`) may not include `usage`
 
 #### Tool Calls
 

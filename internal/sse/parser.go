@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"regexp"
+	"strconv"
 	"strings"
 
 	dsprotocol "ds2api/internal/deepseek/protocol"
@@ -28,6 +29,69 @@ func ParseDeepSeekSSELine(raw []byte) (map[string]any, bool, bool) {
 		return nil, false, false
 	}
 	return chunk, false, true
+}
+
+// observeAccumulatedTokenUsage extracts DeepSeek's cumulative completion-token
+// counter from both direct fields and BATCH items such as
+// {"p":"accumulated_token_usage","v":190}. The largest value wins.
+func observeAccumulatedTokenUsage(chunk map[string]any, out *int) {
+	if chunk == nil || out == nil {
+		return
+	}
+	observeUsageMap(chunk, out)
+}
+
+func observeUsageMap(m map[string]any, out *int) {
+	if m == nil {
+		return
+	}
+	if p, _ := m["p"].(string); p == "accumulated_token_usage" {
+		if n := positiveIntFromAny(m["v"]); n > *out {
+			*out = n
+		}
+	}
+	if n := positiveIntFromAny(m["accumulated_token_usage"]); n > *out {
+		*out = n
+	}
+	for _, key := range []string{"v", "response", "message"} {
+		observeUsageValue(m[key], out)
+	}
+}
+
+func observeUsageValue(v any, out *int) {
+	switch x := v.(type) {
+	case []any:
+		for _, item := range x {
+			if m, ok := item.(map[string]any); ok {
+				observeUsageMap(m, out)
+			}
+		}
+	case map[string]any:
+		observeUsageMap(x, out)
+	}
+}
+
+func positiveIntFromAny(v any) int {
+	switch x := v.(type) {
+	case float64:
+		if x > 0 {
+			return int(x)
+		}
+	case int:
+		if x > 0 {
+			return x
+		}
+	case int64:
+		if x > 0 {
+			return int(x)
+		}
+	case string:
+		n, err := strconv.Atoi(strings.TrimSpace(x))
+		if err == nil && n > 0 {
+			return n
+		}
+	}
+	return 0
 }
 
 func shouldSkipPath(path string) bool {

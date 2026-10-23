@@ -56,6 +56,7 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 		var thinkingPendingType string
 		var anyFlushed bool
 		var pendingResponseMessageID int
+		var pendingAccumulatedTokenUsage int
 
 		scanCh := make(chan []byte, parsedLineBufferSize)
 		scanDone := make(chan error, 1)
@@ -173,6 +174,7 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 					ToolDetectionThinkingParts: detectionParts,
 					NextType:                   currentType,
 					ResponseMessageID:          pendingResponseMessageID,
+					AccumulatedTokenUsage:      pendingAccumulatedTokenUsage,
 				}
 				pendingResponseMessageID = 0
 				select {
@@ -194,6 +196,9 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 			currentType = result.NextType
 			if result.ResponseMessageID > 0 {
 				pendingResponseMessageID = result.ResponseMessageID
+			}
+			if result.AccumulatedTokenUsage > pendingAccumulatedTokenUsage {
+				pendingAccumulatedTokenUsage = result.AccumulatedTokenUsage
 			}
 
 			if result.Stop {
@@ -232,10 +237,11 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 					}
 				} else {
 					stopResult := LineResult{
-						Parsed:            true,
-						Stop:              true,
-						NextType:          currentType,
-						ResponseMessageID: pendingResponseMessageID,
+						Parsed:                true,
+						Stop:                  true,
+						NextType:              currentType,
+						ResponseMessageID:     pendingResponseMessageID,
+						AccumulatedTokenUsage: pendingAccumulatedTokenUsage,
 					}
 					pendingResponseMessageID = 0
 					select {
@@ -292,6 +298,7 @@ func startParsedLinePumpWithConfig(ctx context.Context, body io.Reader, thinking
 						Parts:                      parts,
 						ToolDetectionThinkingParts: result.ToolDetectionThinkingParts,
 						NextType:                   currentType,
+						AccumulatedTokenUsage:      pendingAccumulatedTokenUsage,
 					}
 					select {
 					case out <- filteredResult:

@@ -19,6 +19,31 @@ func makeLargeContentSSEBody(t *testing.T, payload string) string {
 	return "data: " + string(line) + "\n" + "data: [DONE]\n"
 }
 
+func TestStartParsedLinePumpCarriesAccumulatedTokenUsageToStop(t *testing.T) {
+	body := strings.NewReader("data: {\"p\":\"response/content\",\"v\":\"hi\"}\n\ndata: {\"p\":\"response\",\"o\":\"BATCH\",\"v\":[{\"p\":\"accumulated_token_usage\",\"v\":432},{\"p\":\"quasi_status\",\"v\":\"FINISHED\"}]}\n\ndata: [DONE]\n")
+	results, done := StartParsedLinePump(context.Background(), body, false, "text")
+
+	var sawStop bool
+	var sawUsage bool
+	for r := range results {
+		if r.AccumulatedTokenUsage == 432 {
+			sawUsage = true
+		}
+		if r.Stop {
+			sawStop = true
+		}
+	}
+	if err := <-done; err != nil {
+		t.Fatalf("unexpected scanner error: %v", err)
+	}
+	if !sawStop {
+		t.Fatal("expected stop result")
+	}
+	if !sawUsage {
+		t.Fatal("expected accumulated token usage to be forwarded to the stream runtime")
+	}
+}
+
 func TestStartParsedLinePumpParsesAndStops(t *testing.T) {
 	body := strings.NewReader("data: {\"p\":\"response/content\",\"v\":\"hi\"}\n\ndata: [DONE]\n")
 	results, done := StartParsedLinePump(context.Background(), body, false, "text")

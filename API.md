@@ -314,7 +314,7 @@ data: [DONE]
 - 开启 thinking 时会输出 `delta.reasoning_content`
 - 普通文本输出 `delta.content`
 - 最后一段包含 `finish_reason` 和 `usage`
-- token 计数优先透传上游 DeepSeek SSE（如 `accumulated_token_usage` / `token_usage`）；仅在上游缺失时回退本地估算。失败/中断型结束（例如 `response.failed`）可能不会携带 `usage`
+- token 计数优先使用上游 DeepSeek SSE 的 `accumulated_token_usage`；上游缺失或偏小时回退/补齐到本地估算，本地估算包含 thinking、可见正文和本轮工具调用参数。失败/中断型结束（例如 `response.failed`）可能不会携带 `usage`
 
 #### Tool Calls
 

@@ -5,6 +5,32 @@ import (
 	"testing"
 )
 
+func TestMessagesPrepareRendersToolResultMetadata(t *testing.T) {
+	messages := []map[string]any{
+		{
+			"role":         "tool",
+			"name":         "get_weather",
+			"tool_call_id": "call_1",
+			"content":      `{"temperature_c":18}`,
+		},
+	}
+	got := MessagesPrepare(messages)
+	want := "Tool result:\n[name=get_weather tool_call_id=call_1]\n{\"temperature_c\":18}"
+	if !strings.Contains(got, want) {
+		t.Fatalf("expected tool metadata header before result, got %q", got)
+	}
+}
+
+func TestMessagesPrepareToolResultWithoutMetadataKeepsLegacyShape(t *testing.T) {
+	messages := []map[string]any{
+		{"role": "tool", "content": "Search results"},
+	}
+	got := MessagesPrepare(messages)
+	if !strings.Contains(got, "Tool result:\nSearch results") {
+		t.Fatalf("expected legacy tool result shape, got %q", got)
+	}
+}
+
 func TestNormalizeContentNilReturnsEmpty(t *testing.T) {
 	if got := NormalizeContent(nil); got != "" {
 		t.Fatalf("expected empty string for nil content, got %q", got)

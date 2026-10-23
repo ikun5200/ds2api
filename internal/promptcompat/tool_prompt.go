@@ -90,6 +90,7 @@ func buildToolPromptParts(tools []any, policy ToolChoicePolicy) toolPromptParts 
 	}
 	descriptions := "You have access to these tools:\n\n" + strings.Join(toolSchemas, "\n\n")
 	instructions := toolcall.BuildToolCallInstructions(names)
+	instructions += "\n\nCompleted-tool guard: Before calling a tool, check the conversation history and any attached notes for an existing tool result for the same call (same tool name and arguments). If a matching result is already present, do not call that tool again unless the user explicitly asks to run it again; otherwise use the existing result and continue with the answer."
 	if hasReadLikeTool(names) {
 		instructions += "\n\nRead-tool cache guard: If a Read/read_file-style tool result says the file is unchanged, already available in history, should be referenced from previous context, or otherwise provides no file body, treat that result as missing content. Do not repeatedly call the same read request for that missing body. Request a full-content read if the tool supports it, or tell the user that the file contents need to be provided again."
 	}

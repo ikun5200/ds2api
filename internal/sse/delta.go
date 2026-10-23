@@ -84,6 +84,7 @@ func (p *contentLineParser) parse(raw []byte, thinkingEnabled bool, currentType 
 		return result
 	}
 	observeResponseMessageID(chunk, &result.ResponseMessageID)
+	observeAccumulatedTokenUsage(chunk, &result.AccumulatedTokenUsage)
 	switch event {
 	case "ready", "update_file", "update_session", "update_parent_message", "title", "hint", "toast", "debug", "close", "finish":
 		// Named events carry metadata. In particular, close/finish can precede
@@ -98,6 +99,9 @@ func (p *contentLineParser) parse(raw []byte, thinkingEnabled bool, currentType 
 		result.Stop, result.ContentFilter, result.ErrorMessage = part.Stop, part.ContentFilter, part.ErrorMessage
 		if part.ResponseMessageID > 0 {
 			result.ResponseMessageID = part.ResponseMessageID
+		}
+		if part.AccumulatedTokenUsage > result.AccumulatedTokenUsage {
+			result.AccumulatedTokenUsage = part.AccumulatedTokenUsage
 		}
 		if part.Stop {
 			break

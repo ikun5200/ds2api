@@ -43,6 +43,7 @@ type responsesStreamRuntime struct {
 	accumulator       shared.StreamAccumulator
 	visibleText       strings.Builder
 	responseMessageID int
+	upstreamUsage     int
 	streamToolCallIDs map[int]string
 	functionItemIDs   map[int]string
 	functionOutputIDs map[int]int
@@ -176,6 +177,7 @@ func (s *responsesStreamRuntime) finalize(finishReason string, deferEmptyOutput 
 		DetectionThinking:     finalToolDetectionThinking,
 		ContentFilter:         finishReason == "content_filter",
 		ResponseMessageID:     s.responseMessageID,
+		AccumulatedTokenUsage: s.upstreamUsage,
 		AlreadyEmittedCalls:   s.toolCallsEmitted,
 		AlreadyEmittedToolRaw: s.toolCallsDoneEmitted,
 	}, assistantturn.BuildOptions{
@@ -258,6 +260,9 @@ func (s *responsesStreamRuntime) onParsed(parsed sse.LineResult) streamengine.Pa
 	}
 	if parsed.ResponseMessageID > 0 {
 		s.responseMessageID = parsed.ResponseMessageID
+	}
+	if parsed.AccumulatedTokenUsage > s.upstreamUsage {
+		s.upstreamUsage = parsed.AccumulatedTokenUsage
 	}
 	if parsed.ContentFilter || parsed.ErrorMessage != "" {
 		return streamengine.ParsedDecision{Stop: true, StopReason: streamengine.StopReason("content_filter")}

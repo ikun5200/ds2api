@@ -257,7 +257,7 @@ go run ./cmd/ds2api-tests --no-preflight
 说明：
 - 该工具默认重放 `tests/raw_stream_samples/manifest.json` 声明的 canonical 样本，按上游 SSE 顺序做 1:1 仿真解析。
 - 默认校验不出现 `FINISHED` 文本泄露，并要求存在结束信号。
-- 默认**不**把 `raw accumulated_token_usage` 与本地解析 token 做强一致校验（当前实现以内容估算为准）；如需强校验可显式加 `--fail-on-token-mismatch`。
+- 默认**不**把 `raw accumulated_token_usage` 与本地解析 token 做强一致校验；运行时优先采用上游 `accumulated_token_usage`，缺失或偏小时用本地内容估算（含工具调用参数）补齐。如需强校验可显式加 `--fail-on-token-mismatch`。
 - 每次运行都会把本地派生结果写入 `artifacts/raw-stream-sim/<run-id>/<sample-id>/replay.output.txt`，并输出结构化报告。
 - 如果你有历史基线目录，可以通过 `--baseline-root` 让工具直接做文本对比。
 - 更完整的协议级行为结构说明见 [DeepSeekSSE行为结构说明-2026-04-05.md](./DeepSeekSSE行为结构说明-2026-04-05.md)。
