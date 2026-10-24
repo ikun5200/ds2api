@@ -312,6 +312,8 @@ Alternatively, set `DS2API_DEEPSEEK_DEVICE_ID`; this global override takes prece
 
 Go performs subsequent password logins and token refreshes directly. If DeepSeek returns `RISK_DEVICE_DETECTED`, run the helper again, replace the device ID, and retest the account. Errors retain the upstream reason and include renewal guidance. Upstream determines device validity; successful browser login alone does not prove programmatic password login works.
 
+If an account provider supplies a DeepSeek token directly, use **Add account** in the admin UI and enter only the token, then click **Fetch account info**. The email/name are filled automatically; no password or `device_id` is required. Tokens are written to `config.json` so they survive restarts, so keep that volume writable and restrict file permissions. Configuration export still omits tokens. Upstream login now encrypts request bodies and triggers an email verification code for new devices, so token login is the more reliable path.
+
 ### 3.3 Build Artifacts Not Committed
 
 - `static/admin` directory is not in Git

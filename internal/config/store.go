@@ -244,7 +244,6 @@ func (s *Store) Save() error {
 		return nil
 	}
 	persistCfg := s.cfg.Clone()
-	persistCfg.ClearAccountTokens()
 	b, err := json.MarshalIndent(persistCfg, "", "  ")
 	if err != nil {
 		return err
@@ -262,7 +261,6 @@ func (s *Store) saveLocked() error {
 		return nil
 	}
 	persistCfg := s.cfg.Clone()
-	persistCfg.ClearAccountTokens()
 	b, err := json.MarshalIndent(persistCfg, "", "  ")
 	if err != nil {
 		return err

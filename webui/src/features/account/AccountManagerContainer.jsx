@@ -50,6 +50,7 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
         setCopiedKey,
         newAccount,
         setNewAccount,
+        fetchTokenInfo,
         loading,
         testing,
         testingAll,
@@ -165,6 +166,7 @@ export default function AccountManagerContainer({ config, onRefresh, onMessage, 
                 loading={loading}
                 onClose={closeAddAccount}
                 onAdd={addAccount}
+                onFetchTokenInfo={fetchTokenInfo}
             />
 
             <EditAccountModal

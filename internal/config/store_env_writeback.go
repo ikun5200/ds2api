@@ -28,7 +28,6 @@ func (s *Store) ConfigPath() string {
 
 func writeConfigFile(path string, cfg Config) error {
 	persistCfg := cfg.Clone()
-	persistCfg.ClearAccountTokens()
 	b, err := json.MarshalIndent(persistCfg, "", "  ")
 	if err != nil {
 		return err

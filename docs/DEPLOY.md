@@ -380,6 +380,8 @@ scripts/deepseek-device-linux.sh --display :12 --output .tmp/deepseek-device-id
 
 后续登录和 token 刷新由 Go 直接请求 DeepSeek。若服务返回 `RISK_DEVICE_DETECTED`，重新运行助手并替换设备标识后再测试账号；程序会保留具体上游错误并提示更新设备验证。设备有效性由上游决定，不承诺永久有效，也不会把临时浏览器登录成功当成程序密码登录成功。
 
+如果账号供应商直接提供 DeepSeek Token，可以在管理台“添加账号”里只填 Token，点击“获取账号信息”会自动填充邮箱/名称，不需要密码或 `device_id`。Token 会写入 `config.json` 以支持重启后继续使用，请确保配置文件所在卷可写并限制文件权限；配置导出仍会省略 Token。上游登录接口现在要求加密请求体，并会对新设备触发邮箱验证码，Token 登录是更稳妥的接入方式。
+
 ### 3.4 运行时行为配置（通过 Admin API 设置）
 
 部分运行时行为无法通过环境变量直接配置，需要在部署后通过 Admin API 设置，例如：

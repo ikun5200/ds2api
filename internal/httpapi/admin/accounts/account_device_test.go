@@ -92,6 +92,11 @@ func TestAccountTestAcceptsDeviceOverrideWithoutReplacingSavedDevice(t *testing.
 		if strings.Contains(rec.Body.String(), "saved-device") || strings.Contains(rec.Body.String(), "test-device") {
 			t.Fatal("account test response exposed a device ID")
 		}
+		// The test endpoint caches the refreshed token; clear it so the next
+		// iteration still exercises the password/device login path.
+		if err := h.Store.UpdateAccountToken("device@example.com", ""); err != nil {
+			t.Fatal(err)
+		}
 	}
 }
 

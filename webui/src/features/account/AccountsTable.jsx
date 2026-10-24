@@ -223,7 +223,9 @@ export default function AccountsTable({
                                         disabled={testing[id] || isDisabled}
                                         className="px-2 lg:px-3 py-1 lg:py-1.5 text-[10px] lg:text-xs font-medium border border-border rounded-md hover:bg-secondary transition-colors disabled:opacity-50"
                                     >
-                                        {testing[id] ? t('actions.testing') : t('actions.test')}
+                                        {testing[id]
+                                            ? (acc.has_token ? t('accountManager.testingToken') : t('actions.testing'))
+                                            : (acc.has_token ? t('accountManager.testToken') : t('actions.test'))}
                                     </button>
                                     <button
                                         onClick={() => onDeleteAccount(id)}

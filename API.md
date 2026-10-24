@@ -130,8 +130,9 @@ DS2API_CONFIG_JSON="$(base64 < config.json | tr -d '\n')"
 | DELETE | `/admin/proxies/{proxyID}` | Admin | 删除代理（自动解绑引用该代理的账号） |
 | POST | `/admin/proxies/test` | Admin | 测试代理连通性 |
 | GET | `/admin/accounts` | Admin | 分页账号列表 |
-| POST | `/admin/accounts` | Admin | 添加账号 |
-| PUT | `/admin/accounts/{identifier}` | Admin | 更新账号 name/remark |
+| POST | `/admin/accounts` | Admin | 添加账号（密码或 Token） |
+| POST | `/admin/accounts/token-info` | Admin | 校验 Token 并获取账号信息 |
+| PUT | `/admin/accounts/{identifier}` | Admin | 更新账号 name/remark/token |
 | DELETE | `/admin/accounts/{identifier}` | Admin | 删除账号 |
 | PUT | `/admin/accounts/{identifier}/proxy` | Admin | 为账号绑定/解绑代理 |
 | GET | `/admin/queue/status` | Admin | 账号队列状态 |
@@ -777,21 +778,59 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
 
 ### `POST /admin/accounts`
 
+支持密码登录和 Token 登录两种方式：
+
 ```json
 {"email": "user@example.com", "password": "pwd", "device_id": "website-issued-device-id"}
 ```
 
+```json
+{"token": "website-issued-token"}
+```
+
+只传 `token` 时，服务端会调用 DeepSeek 的当前用户接口获取邮箱/名称并自动补全 `identifier`；如果上游只返回脱敏邮箱，就用脱敏邮箱作为稳定标识。Token 账号不需要密码和设备标识。显式提供 `email`/`mobile` 时不会再自动补全。
+
 **响应**：`{"success": true, "total_accounts": 6}`
+
+### `POST /admin/accounts/token-info`
+
+校验 Token 并返回可用的账号信息，供管理台自动填充表单。
+
+```json
+{"token": "website-issued-token"}
+```
+
+**响应**：
+
+```json
+{
+  "success": true,
+  "token_valid": true,
+  "user_id": "2b94224a-7070-4897-9dfc-9166543c4322",
+  "email": "monique***************hbchxcj@outlook.com",
+  "mobile": "",
+  "area_code": "",
+  "name": "",
+  "suggested_identifier": "monique***************hbchxcj@outlook.com",
+  "suggested_name": "monique***************hbchxcj@outlook.com",
+  "muted": false,
+  "mute_until": 0
+}
+```
+
+`email` / `mobile` 可能是上游脱敏后的值；`muted` 和 `mute_until` 来自上游账号的 `chat.is_muted` / `chat.mute_until`。Token 无效或过期时返回 `400`。
 
 ### `PUT /admin/accounts/{identifier}`
 
-更新指定账号的 `name` / `remark` / `disabled` / `device_id`。路径参数中的 `identifier` 可以是 email 或 mobile，且不可修改。
+更新指定账号的 `name` / `remark` / `disabled` / `token` / `device_id`。路径参数中的 `identifier` 可以是 email 或 mobile，且不可修改。
 
 ```json
-{"name": "主账号", "remark": "团队共享"}
+{"name": "主账号", "remark": "团队共享", "token": "new-token"}
 ```
 
 **响应**：`{"success": true, "total_accounts": 6}`
+
+`token` 非空时替换现有 Token；留空或省略时保持不变。通过管理 API 写入的 Token 会持久化到 `config.json`，重启后继续生效；`/admin/config/export` 仍会省略 Token，避免备份泄露。`/admin/config/import` 默认忽略导入文件里的 Token，Token 账号请通过账号接口或管理台添加。
 
 `device_id` 为官网签发的设备标识，用于密码登录。新增、更新和 JSON 批量导入的新账号均支持；批量导入对已存在账号仍按原有规则跳过，不会替换其设备标识。不提供或传 `null` 时保留原值，字符串会去除首尾空白，显式空字符串可清除；非字符串返回 `400`。普通配置/账号列表只返回 `has_device_id`，配置导出保留原值。获取方式见[登录设备验证](docs/DEPLOY.md#33-deepseek-登录设备验证)。管理台编辑输入框留空时不会发送清除操作。
 
@@ -864,6 +903,8 @@ WebUI 会记住附件上传时的凭据归属。更换直通 Token，或在托�
 | `model` | ❌ | 默认 `deepseek-flash` |
 | `message` | ❌ | 空字符串时仅测试会话创建 |
 | `device_id` | ❌ | 仅本次测试使用的设备标识覆盖；持久化需更新账号配置 |
+
+账号配置了 `token` 时优先校验 Token，不会调用密码登录；响应额外包含 `token_source: "token"`、`user_id`、`email`、`muted`、`mute_until`。账号被禁言时测试失败并返回预计解禁时间。
 
 **响应**：
 
