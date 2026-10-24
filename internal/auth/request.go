@@ -367,7 +367,15 @@ func (r *Resolver) ensureManagedToken(ctx context.Context, a *RequestAuth) error
 	}
 	if r.shouldForceRefresh(a.AccountID) {
 		if err := r.loginAndPersist(ctx, a); err != nil {
-			return err
+			// Keep the still-valid website token instead of failing the
+			// request: passwordless (token-only) accounts can never satisfy a
+			// forced password login. Backdate the refresh mark so the failed
+			// login is retried on the next interval, not on every request.
+			a.DeepSeekToken = a.Account.Token
+			r.mu.Lock()
+			r.tokenRefreshedAt[a.AccountID] = time.Now().Add(-time.Duration(r.Store.RuntimeTokenRefreshIntervalHours()) * time.Hour / 10)
+			r.mu.Unlock()
+			return nil
 		}
 		return nil
 	}
