@@ -130,8 +130,9 @@ Two header formats accepted:
 | DELETE | `/admin/proxies/{proxyID}` | Admin | Delete proxy (auto-unbind referenced accounts) |
 | POST | `/admin/proxies/test` | Admin | Test proxy connectivity |
 | GET | `/admin/accounts` | Admin | Paginated account list |
-| POST | `/admin/accounts` | Admin | Add account |
-| PUT | `/admin/accounts/{identifier}` | Admin | Update account name/remark |
+| POST | `/admin/accounts` | Admin | Add account (password or token) |
+| POST | `/admin/accounts/token-info` | Admin | Validate a token and fetch account info |
+| PUT | `/admin/accounts/{identifier}` | Admin | Update account name/remark/token |
 | DELETE | `/admin/accounts/{identifier}` | Admin | Delete account |
 | PUT | `/admin/accounts/{identifier}/proxy` | Admin | Bind/unbind proxy for an account |
 | GET | `/admin/queue/status` | Admin | Account queue status |
@@ -774,21 +775,59 @@ Returned items also include `test_status`, usually `ok` or `failed`. `muted` / `
 
 ### `POST /admin/accounts`
 
+Supports password login and token login:
+
 ```json
 {"email": "user@example.com", "password": "pwd", "device_id": "website-issued-device-id"}
 ```
 
+```json
+{"token": "website-issued-token"}
+```
+
+When only `token` is supplied, the server calls DeepSeek's current-user endpoint, fetches the email/name, and fills in the identifier automatically. If upstream only returns a masked email, the masked email is used as the stable identifier. Token accounts do not need a password or device ID. Supplying `email`/`mobile` explicitly skips this auto-fill.
+
 **Response**: `{"success": true, "total_accounts": 6}`
+
+### `POST /admin/accounts/token-info`
+
+Validates a token and returns account information for admin UI auto-fill.
+
+```json
+{"token": "website-issued-token"}
+```
+
+**Response**:
+
+```json
+{
+  "success": true,
+  "token_valid": true,
+  "user_id": "2b94224a-7070-4897-9dfc-9166543c4322",
+  "email": "monique***************hbchxcj@outlook.com",
+  "mobile": "",
+  "area_code": "",
+  "name": "",
+  "suggested_identifier": "monique***************hbchxcj@outlook.com",
+  "suggested_name": "monique***************hbchxcj@outlook.com",
+  "muted": false,
+  "mute_until": 0
+}
+```
+
+`email` / `mobile` may be masked upstream. `muted` and `mute_until` come from the upstream `chat.is_muted` / `chat.mute_until` fields. An invalid or expired token returns `400`.
 
 ### `PUT /admin/accounts/{identifier}`
 
-Updates the `name` / `remark` / `disabled` / `device_id` of the specified account. The path `identifier` can be email or mobile and cannot be changed.
+Updates the `name` / `remark` / `disabled` / `token` / `device_id` of the specified account. The path `identifier` can be email or mobile and cannot be changed.
 
 ```json
-{"name": "Primary account", "remark": "Shared with the team"}
+{"name": "Primary account", "remark": "Shared with the team", "token": "new-token"}
 ```
 
 **Response**: `{"success": true, "total_accounts": 6}`
+
+A non-empty `token` replaces the existing token; omitted or empty keeps it unchanged. Tokens written through the admin API are persisted to `config.json` and survive restarts. `/admin/config/export` still omits tokens so backups do not leak them. `/admin/config/import` ignores tokens in the imported file by default; add token accounts through the account API or admin UI.
 
 `device_id` is a website-issued device ID used for password login. Create, update, and new accounts in JSON batch import accept it. Batch import continues to skip existing accounts and does not replace their device IDs. Omitted or `null` preserves the saved value; strings are trimmed, an explicit empty string clears it, and non-strings return `400`. Normal configuration/account lists expose only `has_device_id`; configuration export preserves the value. See [login device verification](docs/DEPLOY.en.md#32-deepseek-login-device-verification). An empty admin edit field does not submit a clear operation.
 
@@ -861,6 +900,8 @@ Updates proxy binding for a specific account.
 | `model` | ❌ | default `deepseek-flash` |
 | `message` | ❌ | if empty, only session creation is tested |
 | `device_id` | ❌ | Device ID override for this test only; update account configuration to persist it |
+
+When the account has a `token`, the test validates that token instead of calling password login. The response additionally includes `token_source: "token"`, `user_id`, `email`, `muted`, and `mute_until`. A muted account fails the test and reports its expected unmute time.
 
 **Response**:
 

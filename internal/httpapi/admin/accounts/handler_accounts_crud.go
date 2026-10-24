@@ -112,8 +112,28 @@ func (h *Handler) addAccount(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	acc := toAccount(req)
+	if acc.Token != "" {
+		profile, err := h.fetchTokenProfile(r.Context(), acc.Token)
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Token 校验失败: " + err.Error()})
+			return
+		}
+		if acc.Email == "" && acc.Mobile == "" {
+			if acc.Name == "" {
+				acc.Name = profile.DisplayName()
+			}
+			switch {
+			case strings.TrimSpace(profile.Email) != "":
+				acc.Email = strings.TrimSpace(profile.Email)
+			case strings.TrimSpace(profile.Mobile) != "":
+				acc.Mobile = config.NormalizeMobileForStorage(profile.Mobile)
+			case strings.TrimSpace(profile.UserID) != "":
+				acc.Email = "token-" + strings.TrimSpace(profile.UserID) + "@local"
+			}
+		}
+	}
 	if acc.Identifier() == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "需要 email 或 mobile"})
+		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "需要 email、mobile 或有效 token"})
 		return
 	}
 	err := h.Store.Update(func(c *config.Config) error {
@@ -156,10 +176,20 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 	name, nameOK := fieldStringOptional(req, "name")
 	remark, remarkOK := fieldStringOptional(req, "remark")
 	disabled, disabledOK := fieldBoolOptional(req, "disabled")
+	token, tokenOK := fieldStringOptional(req, "token")
+	token = strings.TrimSpace(token)
 	deviceID, deviceIDOK, err := accountDeviceIDOptional(req)
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]any{"detail": err.Error()})
 		return
+	}
+	if tokenOK && token != "" {
+		if fetcher, ok := h.DS.(tokenProfileFetcher); ok {
+			if _, err := fetcher.GetCurrentUserForToken(r.Context(), token); err != nil {
+				writeJSON(w, http.StatusBadRequest, map[string]any{"detail": "Token 校验失败: " + err.Error()})
+				return
+			}
+		}
 	}
 
 	err = h.Store.Update(func(c *config.Config) error {
@@ -178,6 +208,9 @@ func (h *Handler) updateAccount(w http.ResponseWriter, r *http.Request) {
 			}
 			if deviceIDOK {
 				c.Accounts[i].DeviceID = deviceID
+			}
+			if tokenOK && token != "" {
+				c.Accounts[i].Token = token
 			}
 			return nil
 		}

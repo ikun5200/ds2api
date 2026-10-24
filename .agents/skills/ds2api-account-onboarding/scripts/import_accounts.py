@@ -44,20 +44,31 @@ def read_accounts(path):
         line = raw.strip()
         if not line or line.startswith("#"):
             continue
-        for sep in ("----", ":", ",", "\t"):
-            if sep in line:
-                email, _, password = line.partition(sep)
-                break
+        email = password = token = ""
+        if "----" in line:
+            parts = [part.strip() for part in line.split("----")]
+            email = parts[0] if parts else ""
+            password = parts[1] if len(parts) > 1 else ""
+            token = parts[2] if len(parts) > 2 else ""
         else:
-            parts = line.split()
-            if len(parts) >= 2:
-                email, password = parts[0], parts[1]
+            for sep in (":", ",", "\t"):
+                if sep in line:
+                    parts = [part.strip() for part in line.split(sep, 2)]
+                    email = parts[0] if parts else ""
+                    password = parts[1] if len(parts) > 1 else ""
+                    token = parts[2] if len(parts) > 2 else ""
+                    break
             else:
-                log(f"  ! 无法解析行，跳过: {line[:40]}")
-                continue
-        email, password = email.strip(), password.strip()
-        if email and password:
-            accounts.append({"email": email, "password": password})
+                parts = line.split()
+                if len(parts) >= 2:
+                    email = parts[0]
+                    password = parts[1]
+                    token = parts[2] if len(parts) > 2 else ""
+        email, password, token = email.strip(), password.strip(), token.strip()
+        if email and (password or token):
+            accounts.append({"email": email, "password": password, "token": token})
+        else:
+            log(f"  ! 无法解析行，跳过: {line[:40]}")
     return accounts
 
 
@@ -93,6 +104,8 @@ def classify_failure(message):
         return "muted"
     if "rate limit reached" in message or "biz_code 7" in message:
         return "rate_limited"
+    if "Token 校验失败" in message or "token validation failed" in message.lower():
+        return "token_invalid"
     if "邮箱已存在" in message:
         return "exists"
     return "other"
@@ -125,13 +138,16 @@ def load_devices(json_path):
     return {item["email"]: item["device_id"] for item in data}
 
 
-def process_account(base, token, email, password, device, index):
+def process_account(base, token, email, password, device, index, account_token=""):
     entry = {"email": email, "device_id": device[:12] + "..." if device else "",
+             "token": "yes" if account_token else "",
              "added": False, "login": None, "note": ""}
     enc = urllib.parse.quote(email, safe="")
-    status, resp = api(base, token, "POST", "/admin/accounts",
-                       {"name": email.split("@")[0][:30], "email": email,
-                        "password": password, "device_id": device})
+    payload = {"name": email.split("@")[0][:30], "email": email,
+               "password": password, "device_id": device}
+    if account_token:
+        payload["token"] = account_token
+    status, resp = api(base, token, "POST", "/admin/accounts", payload)
     if status == 200:
         entry["added"] = True
     elif classify_failure(json.dumps(resp, ensure_ascii=False)) == "exists":
@@ -149,7 +165,7 @@ def process_account(base, token, email, password, device, index):
             entry["note"] = message[:40]
             return entry
         kind = classify_failure(message)
-        if kind == "risk_device" and attempt == 0:
+        if kind == "risk_device" and attempt == 0 and not account_token:
             log(f"    {email[:28]} RISK_DEVICE_DETECTED，换全新设备标识重试...")
             entry["device_id"] = ""
             device = generate_device(f"{index}-r", Path(arg_device_dir), arg_browser_path)
@@ -170,7 +186,8 @@ def process_account(base, token, email, password, device, index):
 def main():
     global arg_device_dir, arg_browser_path
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--accounts", required=True, help="账号文件 (email----password 每行一个)")
+    parser.add_argument("--accounts", required=True,
+                        help="账号文件 (email----password 或 email----password----token 每行一个)")
     parser.add_argument("--base", required=True, help="ds2api 地址，如 http://192.168.31.88:6011")
     parser.add_argument("--admin-key", required=True, help="管理密码或 DS2API_ADMIN_KEY")
     parser.add_argument("--device-dir", default=".tmp/devices")
@@ -193,16 +210,19 @@ def main():
     results = []
     for index, acc in enumerate(accounts, 1):
         email = acc["email"]
-        log(f"[{index}/{len(accounts)}] {email[:32]}")
+        account_token = acc.get("token", "")
+        log(f"[{index}/{len(accounts)}] {email[:32]}" + (" [token]" if account_token else ""))
         try:
-            device = preloaded.get(email) or ("" if args.skip_device_gen
-                                              else generate_device(index, Path(args.device_dir),
-                                                                   args.browser_path))
+            device = ""
+            if not account_token:
+                device = preloaded.get(email) or ("" if args.skip_device_gen
+                                                  else generate_device(index, Path(args.device_dir),
+                                                                       args.browser_path))
         except Exception as e:
-            results.append({"email": email, "device_id": "", "added": False,
-                            "login": None, "note": f"设备生成失败: {e}"})
+            results.append({"email": email, "device_id": "", "token": "",
+                            "added": False, "login": None, "note": f"设备生成失败: {e}"})
             continue
-        entry = process_account(base, token, email, acc["password"], device, index)
+        entry = process_account(base, token, email, acc["password"], device, index, account_token)
         mark = "✓" if entry["login"] == "ok" else "✗"
         log(f"  {mark} added={entry['added']} login={entry['login']} {entry['note']}")
         results.append(entry)
@@ -211,10 +231,13 @@ def main():
     ok = [r for r in results if r["login"] == "ok"]
     manual = [r for r in results if r["login"] == "risk_device"]
     muted = [r for r in results if r["login"] == "muted"]
+    invalid_tokens = [r for r in results if r["login"] == "token_invalid"]
     for r in results:
         mark = "✓" if r["login"] == "ok" else "✗"
-        log(f" {mark} {r['email'][:36]:38} device={r['device_id'] or '-':16} {r['login'] or '-':14} {r['note']}")
+        log(f" {mark} {r['email'][:36]:38} auth={'token' if r['token'] else 'password':8} "
+            f"device={r['device_id'] or '-':16} {r['login'] or '-':14} {r['note']}")
     log(f"\n成功 {len(ok)} / {len(results)}"
+        + (f" | Token 无效 {len(invalid_tokens)}（更换 token 后重试）" if invalid_tokens else "")
         + (f" | 需手动网页登录 {len(manual)}（账号级风控，浏览器登录 chat.deepseek.com 一次）" if manual else "")
         + (f" | 被禁言 {len(muted)}（建议后台停用）" if muted else ""))
 

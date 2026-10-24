@@ -135,18 +135,56 @@ func (h *Handler) testAccount(ctx context.Context, acc config.Account, model, me
 		}
 		_ = h.Store.UpdateAccountTestStatus(identifier, status)
 	}()
-	token, err := h.DS.Login(ctx, acc)
-	if err != nil {
-		result["message"] = "登录失败: " + err.Error()
-		return result
+	token := strings.TrimSpace(acc.Token)
+	tokenSource := "login"
+	if token != "" {
+		tokenSource = "token"
+		if fetcher, ok := h.DS.(tokenProfileFetcher); ok {
+			profile, err := fetcher.GetCurrentUserForToken(ctx, token)
+			if err != nil {
+				result["message"] = "Token 校验失败: " + err.Error()
+				return result
+			}
+			if profile.Token != "" && profile.Token != token {
+				token = profile.Token
+				if err := h.Store.UpdateAccountToken(acc.Identifier(), token); err != nil {
+					result["config_warning"] = "Token 已刷新，但持久化失败（仅保存在内存）: " + err.Error()
+				}
+			}
+			result["user_id"] = profile.UserID
+			result["email"] = profile.Email
+			result["muted"] = profile.Muted
+			if !profile.MuteUntil.IsZero() {
+				result["mute_until"] = profile.MuteUntil.Unix()
+			}
+			if profile.Muted {
+				result["message"] = "账号当前被禁言"
+				if !profile.MuteUntil.IsZero() {
+					result["message"] = fmt.Sprintf("账号当前被禁言，预计解禁时间 %s", profile.MuteUntil.Format(time.RFC3339))
+				}
+				return result
+			}
+		}
+	} else {
+		var err error
+		token, err = h.DS.Login(ctx, acc)
+		if err != nil {
+			result["message"] = "登录失败: " + err.Error()
+			return result
+		}
+		if err := h.Store.UpdateAccountToken(acc.Identifier(), token); err != nil {
+			result["config_warning"] = "登录成功，但 token 持久化失败（仅保存在内存，重启后会丢失）: " + err.Error()
+		}
 	}
-	if err := h.Store.UpdateAccountToken(acc.Identifier(), token); err != nil {
-		result["config_warning"] = "登录成功，但 token 持久化失败（仅保存在内存，重启后会丢失）: " + err.Error()
-	}
+	result["token_source"] = tokenSource
 	authCtx := &authn.RequestAuth{UseConfigToken: false, DeepSeekToken: token, AccountID: identifier, Account: acc}
 	proxyCtx := authn.WithAuth(ctx, authCtx)
 	sessionID, err := h.DS.CreateSession(proxyCtx, authCtx, 1)
 	if err != nil {
+		if tokenSource == "token" {
+			result["message"] = "创建会话失败: " + err.Error()
+			return result
+		}
 		newToken, loginErr := h.DS.Login(proxyCtx, acc)
 		if loginErr != nil {
 			result["message"] = "创建会话失败: " + err.Error()
@@ -172,7 +210,11 @@ func (h *Handler) testAccount(ctx context.Context, acc config.Account, model, me
 
 	if strings.TrimSpace(message) == "" {
 		result["success"] = true
-		result["message"] = "Token 刷新成功（登录与会话创建成功）"
+		if tokenSource == "token" {
+			result["message"] = "Token 验证成功（会话创建成功）"
+		} else {
+			result["message"] = "Token 刷新成功（登录与会话创建成功）"
+		}
 		if warning, _ := result["config_warning"].(string); strings.TrimSpace(warning) != "" {
 			result["message"] = result["message"].(string) + "；" + warning
 		}

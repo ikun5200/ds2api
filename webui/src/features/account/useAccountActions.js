@@ -9,8 +9,8 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const [editingAccount, setEditingAccount] = useState(null)
     const [newKey, setNewKey] = useState({ key: '', name: '', remark: '' })
     const [copiedKey, setCopiedKey] = useState(null)
-    const [newAccount, setNewAccount] = useState({ name: '', remark: '', email: '', mobile: '', password: '', device_id: '', disabled: false })
-    const [editAccount, setEditAccount] = useState({ name: '', remark: '', device_id: '', disabled: false })
+    const [newAccount, setNewAccount] = useState({ name: '', remark: '', email: '', mobile: '', password: '', token: '', device_id: '', disabled: false })
+    const [editAccount, setEditAccount] = useState({ name: '', remark: '', token: '', device_id: '', disabled: false })
     const [loading, setLoading] = useState(false)
     const [testing, setTesting] = useState({})
     const [testingAll, setTestingAll] = useState(false)
@@ -49,14 +49,14 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const openAddAccount = () => {
         setShowEditAccount(false)
         setEditingAccount(null)
-        setEditAccount({ name: '', remark: '', device_id: '', disabled: false })
-        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', device_id: '', disabled: false })
+        setEditAccount({ name: '', remark: '', token: '', device_id: '', disabled: false })
+        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', token: '', device_id: '', disabled: false })
         setShowAddAccount(true)
     }
 
     const closeAddAccount = () => {
         setShowAddAccount(false)
-        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', device_id: '', disabled: false })
+        setNewAccount({ name: '', remark: '', email: '', mobile: '', password: '', token: '', device_id: '', disabled: false })
     }
 
     const openEditAccount = (account) => {
@@ -69,10 +69,12 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         setEditingAccount({
             identifier,
             has_device_id: Boolean(account?.has_device_id),
+            has_token: Boolean(account?.has_token),
         })
         setEditAccount({
             name: account?.name || '',
             remark: account?.remark || '',
+            token: '',
             device_id: '',
             disabled: Boolean(account?.disabled),
         })
@@ -82,7 +84,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
     const closeEditAccount = () => {
         setShowEditAccount(false)
         setEditingAccount(null)
-        setEditAccount({ name: '', remark: '', device_id: '', disabled: false })
+        setEditAccount({ name: '', remark: '', token: '', device_id: '', disabled: false })
     }
 
     const addKey = async () => {
@@ -139,8 +141,30 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         }
     }
 
+    const fetchTokenInfo = async (token) => {
+        const value = String(token || '').trim()
+        if (!value) {
+            throw new Error(t('accountManager.tokenRequired'))
+        }
+        const res = await apiFetch('/admin/accounts/token-info', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ token: value }),
+        })
+        const data = await readMutationResponse(res)
+        if (!res.ok) {
+            throw new Error(data.detail || t('accountManager.tokenInfoFailed'))
+        }
+        return data
+    }
+
     const addAccount = async () => {
-        if (!newAccount.password || (!newAccount.email && !newAccount.mobile)) {
+        const hasToken = Boolean(String(newAccount.token || '').trim())
+        if (!hasToken && !newAccount.password) {
+            onMessage('error', t('accountManager.requiredFields'))
+            return
+        }
+        if (!hasToken && !newAccount.email && !newAccount.mobile) {
             onMessage('error', t('accountManager.requiredFields'))
             return
         }
@@ -178,7 +202,11 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
             const res = await apiFetch(`/admin/accounts/${encodeURIComponent(identifier)}`, {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...editAccount, device_id: editAccount.device_id?.trim() || undefined }),
+                body: JSON.stringify({
+                    ...editAccount,
+                    token: editAccount.token?.trim() || undefined,
+                    device_id: editAccount.device_id?.trim() || undefined,
+                }),
             })
             const data = await readMutationResponse(res)
             if (res.ok) {
@@ -266,7 +294,9 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
             }
             
             const statusMessage = data.success
-                ? t('apiTester.testSuccess', { account: accountID, time: data.response_time })
+                ? (data.token_source === 'token'
+                    ? `${accountID}: ${data.message}`
+                    : t('apiTester.testSuccess', { account: accountID, time: data.response_time }))
                 : `${accountID}: ${data.message}`
             onMessage(data.success ? 'success' : 'error', statusMessage)
             fetchAccounts()
@@ -407,6 +437,7 @@ export function useAccountActions({ apiFetch, t, onMessage, onRefresh, config, f
         setCopiedKey,
         newAccount,
         setNewAccount,
+        fetchTokenInfo,
         loading,
         testing,
         testingAll,

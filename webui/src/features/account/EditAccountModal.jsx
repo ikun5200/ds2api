@@ -53,6 +53,18 @@ export default function EditAccountModal({
                         />
                     </div>
                     <div>
+                        <label className="block text-sm font-medium mb-1.5">{t('accountManager.tokenLabel')}</label>
+                        <input
+                            type="password"
+                            autoComplete="off"
+                            className="input-field"
+                            placeholder={editingAccount.has_token ? t('accountManager.editTokenKeep') : t('accountManager.tokenPlaceholder')}
+                            value={editAccount.token || ''}
+                            onChange={e => setEditAccount({ ...editAccount, token: e.target.value })}
+                        />
+                        <p className="mt-1.5 text-xs text-muted-foreground">{t('accountManager.editTokenHint')}</p>
+                    </div>
+                    <div>
                         <label htmlFor="edit-account-device" className="block text-sm font-medium mb-1.5">{t('accountManager.deviceIdLabel')}</label>
                         <input
                             id="edit-account-device"

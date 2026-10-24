@@ -33,7 +33,9 @@ func extractMuteInfo(parsed map[string]any) MuteInfo {
 	if reason == "" {
 		reason = strings.TrimSpace(asString(bizData["msg"]))
 	}
-	muted := intFrom(bizData["is_muted"]) == 1 || intFrom(data["biz_code"]) == 14
+	chat, _ := bizData["chat"].(map[string]any)
+	muted := intFrom(bizData["is_muted"]) == 1 || intFrom(data["biz_code"]) == 14 ||
+		(chat != nil && intFrom(chat["is_muted"]) == 1)
 	if !muted {
 		lower := strings.ToLower(reason)
 		muted = strings.Contains(lower, "user is muted")
@@ -44,6 +46,10 @@ func extractMuteInfo(parsed map[string]any) MuteInfo {
 	var until time.Time
 	if seconds := intFrom(bizData["mute_until"]); seconds > 0 {
 		until = time.Unix(int64(seconds), 0)
+	} else if chat != nil {
+		if seconds := intFrom(chat["mute_until"]); seconds > 0 {
+			until = time.Unix(int64(seconds), 0)
+		}
 	}
 	if reason == "" {
 		reason = "user is muted"

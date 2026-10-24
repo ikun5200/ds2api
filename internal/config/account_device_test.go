@@ -40,7 +40,7 @@ func TestAccountDeviceIDSurvivesSaveReloadAndExport(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, raw := range [][]byte{[]byte(jsonText), persisted} {
+	for i, raw := range [][]byte{[]byte(jsonText), persisted} {
 		var cfg Config
 		if err := json.Unmarshal(raw, &cfg); err != nil {
 			t.Fatal(err)
@@ -52,8 +52,12 @@ func TestAccountDeviceIDSurvivesSaveReloadAndExport(t *testing.T) {
 		if acc.DeviceID != "website-issued-device" || acc.Name != "Device account" || acc.Remark != "updated remark" || acc.Password != "password" {
 			t.Fatal("serialized account lost device ID or existing fields")
 		}
-		if acc.Token != "" {
-			t.Fatal("runtime token must still be excluded from persistent config")
+		wantToken := ""
+		if i == 1 {
+			wantToken = "runtime-token"
+		}
+		if acc.Token != wantToken {
+			t.Fatalf("unexpected token in serialized config: got %q want %q", acc.Token, wantToken)
 		}
 	}
 

@@ -13,6 +13,7 @@ const (
 	DeepSeekOrigin               = "https://chat.deepseek.com"
 	DeepSeekBaseReferer          = "https://chat.deepseek.com/"
 	DeepSeekLoginURL             = "https://chat.deepseek.com/api/v0/users/login"
+	DeepSeekCurrentUserURL       = "https://chat.deepseek.com/api/v0/users/current"
 	DeepSeekCreateSessionURL     = "https://chat.deepseek.com/api/v0/chat_session/create"
 	DeepSeekCreatePowURL         = "https://chat.deepseek.com/api/v0/chat/create_pow_challenge"
 	DeepSeekCompletionURL        = "https://chat.deepseek.com/api/v0/chat/completion"
