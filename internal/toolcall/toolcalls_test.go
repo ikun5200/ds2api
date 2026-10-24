@@ -1306,3 +1306,25 @@ func TestFindMatchingToolMarkupCloseBoundaryConditionsSupportsConfusableDelimite
 		})
 	}
 }
+
+func TestParseToolCallsSupportsDoublePipeDSMLCallsAlias(t *testing.T) {
+	text := "<｜｜DSML｜｜ calls> <｜｜DSML｜｜ invoke name=\"Bash\"> <｜｜DSML｜｜ parameter name=\"command\" string=\"true\">curl -sL \"https://example.com\" | head -6</｜｜DSML｜｜ parameter> <｜｜DSML｜｜ parameter name=\"description\" string=\"true\">Check latest release version</｜｜DSML｜｜ parameter> </｜｜DSML｜｜ invoke> </｜｜DSML｜｜ calls>"
+	res := ParseToolCallsDetailed(text, []string{"Bash"})
+	if len(res.Calls) != 1 {
+		t.Fatalf("expected 1 call, got %#v (saw=%v)", res.Calls, res.SawToolCallSyntax)
+	}
+	if res.Calls[0].Name != "Bash" {
+		t.Fatalf("unexpected name: %#v", res.Calls[0])
+	}
+	if got, _ := res.Calls[0].Input["description"].(string); got != "Check latest release version" {
+		t.Fatalf("unexpected description: %#v", res.Calls[0].Input)
+	}
+}
+
+func TestParseToolCallsSupportsDoubleASCIIPipeDSML(t *testing.T) {
+	text := `<||DSML||calls><||DSML||invoke name="Read"><||DSML||parameter name="path">README.md</||DSML||parameter></||DSML||invoke></||DSML||calls>`
+	calls := ParseToolCalls(text, []string{"Read"})
+	if len(calls) != 1 || calls[0].Name != "Read" || calls[0].Input["path"] != "README.md" {
+		t.Fatalf("unexpected parse result: %#v", calls)
+	}
+}
