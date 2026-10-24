@@ -16,6 +16,7 @@ var toolMarkupNames = []toolMarkupNameAlias{
 	{raw: "tool_calls", canonical: "tool_calls"},
 	{raw: "tool-calls", canonical: "tool_calls", dsmlOnly: true},
 	{raw: "toolcalls", canonical: "tool_calls", dsmlOnly: true},
+	{raw: "calls", canonical: "tool_calls", dsmlOnly: true},
 	{raw: "invoke", canonical: "invoke"},
 	{raw: "parameter", canonical: "parameter"},
 }
@@ -316,10 +317,28 @@ func consumeArbitraryToolMarkupNamePrefix(text string, idx int) (int, bool) {
 	for next < len(text) && (text[next] == ' ' || text[next] == '\t' || text[next] == '\r' || text[next] == '\n') {
 		next++
 	}
+	// The underscore/dash branch above makes "tool-calls" / "vendor_tool_calls"
+	// look like prefix + local name. Only allow that path when the local name is
+	// a non-dsmlOnly keyword, so hyphenated lookalikes keep being rejected.
+	if hasASCIIPrefixFoldAt(text, next, "tool_calls") || hasPartialPrefixOfToolCallsName(text, next) {
+		return idx, false
+	}
 	if !hasToolMarkupNamePrefix(text, next) {
 		return idx, false
 	}
 	return next, true
+}
+
+func hasPartialPrefixOfToolCallsName(text string, start int) bool {
+	for _, name := range toolMarkupNames {
+		if !name.dsmlOnly {
+			continue
+		}
+		if hasASCIIPrefixFoldAt(text, start, name.raw) || hasASCIIPartialPrefixFoldAt(text, start, name.raw) {
+			return true
+		}
+	}
+	return false
 }
 
 func consumeToolMarkupPrefixSegment(text string, idx int) (int, bool) {
@@ -387,6 +406,13 @@ func matchToolMarkupNameAfterArbitraryPrefix(text string, start int) (string, in
 			if !toolMarkupPrefixAllowsLocalNameAt(text, start, idx) {
 				continue
 			}
+			// A prefix that merely glues onto a dsml-only keyword with a
+			// dash/underscore (e.g. "tool-calls") stays a lookalike unless
+			// the prefix carries DSML markers or camelCase glues the prefix
+			// directly onto the keyword (e.g. "DSmart" + "ToolCalls").
+			if name.dsmlOnly && !dsmlMarkerInPrefix(text[start:idx]) && !camelGluedPrefixAt(text, start, idx) {
+				continue
+			}
 			return name.canonical, idx, next - idx, true
 		}
 		_, size := utf8.DecodeRuneInString(text[idx:])
@@ -396,6 +422,27 @@ func matchToolMarkupNameAfterArbitraryPrefix(text string, start int) (string, in
 		idx += size
 	}
 	return "", 0, 0, false
+}
+
+func dsmlMarkerInPrefix(prefix string) bool {
+	return strings.Contains(normalizedASCIILowerString(prefix), "dsml")
+}
+
+// camelGluedPrefixAt reports whether the prefix ends right where a capitalized
+// local name begins (no dash/underscore/separator between them), the PascalCase
+// drift documented for vendor shells like <DSmartToolCalls>.
+func camelGluedPrefixAt(text string, start, localStart int) bool {
+	if localStart <= start || localStart > len(text) {
+		return false
+	}
+	prev, prevSize := utf8.DecodeLastRuneInString(text[start:localStart])
+	next, nextSize := utf8.DecodeRuneInString(text[localStart:])
+	if prevSize <= 0 || nextSize <= 0 || next == utf8.RuneError {
+		return false
+	}
+	prev = normalizeFullwidthASCII(prev)
+	next = normalizeFullwidthASCII(next)
+	return isASCIIAlphaNumeric(prev) && isASCIIUpper(next)
 }
 
 func hasPartialToolMarkupNameAfterArbitraryPrefix(text string, start int) bool {
