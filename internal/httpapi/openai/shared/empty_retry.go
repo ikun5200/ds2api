@@ -20,6 +20,13 @@ func ClonePayloadWithEmptyOutputRetryPrompt(payload map[string]any) map[string]a
 // appended and, if parentMessageID > 0, sets parent_message_id so the
 // retry is submitted as a proper follow-up turn in the same DeepSeek
 // session rather than a disconnected root message.
+//
+// Thinking is disabled for the retry: a thinking-only reply means the model
+// consumed the whole turn in the reasoning channel and produced no visible
+// answer. Retrying with thinking on tends to reproduce the same empty turn
+// (and can burn the account's rate limit), while a direct answer pass reliably
+// emits visible content. The first attempt's reasoning is preserved by the
+// caller.
 func ClonePayloadForEmptyOutputRetry(payload map[string]any, parentMessageID int) map[string]any {
 	clone := make(map[string]any, len(payload))
 	for k, v := range payload {
@@ -27,6 +34,7 @@ func ClonePayloadForEmptyOutputRetry(payload map[string]any, parentMessageID int
 	}
 	original, _ := payload["prompt"].(string)
 	clone["prompt"] = AppendEmptyOutputRetrySuffix(original)
+	clone["thinking_enabled"] = false
 	if parentMessageID > 0 {
 		clone["parent_message_id"] = parentMessageID
 	}
