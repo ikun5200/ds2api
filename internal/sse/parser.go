@@ -208,9 +208,18 @@ func collectDirectFragments(path string, chunk map[string]any, v any, newType *s
 		return
 	}
 	op, _ := chunk["o"].(string)
-	if !strings.EqualFold(op, "APPEND") {
+	// DeepSeek can finish a thinking-only stream with a full fragments
+	// snapshot that has no "o" (or "SET") and contains both the complete
+	// THINK fragment and the RESPONSE fragment. The THINK content was already
+	// streamed incrementally, so only recover the RESPONSE content here;
+	// appending the snapshot's THINK text would duplicate the whole reasoning.
+	switch {
+	case strings.EqualFold(op, "APPEND"):
+	case op == "" || strings.EqualFold(op, "SET"):
+	default:
 		return
 	}
+	snapshot := !strings.EqualFold(op, "APPEND")
 	frags, ok := v.([]any)
 	if !ok {
 		return
@@ -230,12 +239,25 @@ func collectDirectFragments(path string, chunk map[string]any, v any, newType *s
 		}
 		switch typeName {
 		case "THINK", "THINKING":
+			if snapshot {
+				continue
+			}
 			*newType = "thinking"
 			appendContentPart(parts, content, "thinking")
 		case "RESPONSE":
+			// Thinking-off responses already carry the RESPONSE fragment in
+			// the initial response object; when text has started flowing, the
+			// final snapshot is a duplicate. Thinking-only responses reach
+			// here with newType still "thinking" and need the recovery.
+			if snapshot && *newType == "text" {
+				continue
+			}
 			*newType = "text"
 			appendContentPart(parts, content, "text")
 		default:
+			if snapshot {
+				continue
+			}
 			appendContentPart(parts, content, "text")
 		}
 	}

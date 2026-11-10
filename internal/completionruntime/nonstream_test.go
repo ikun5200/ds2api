@@ -160,7 +160,7 @@ func TestExecuteNonStreamWithRetrySwitchesManagedAccountBeforeFinal429(t *testin
 	if got := ds.payloads[2]["chat_session_id"]; got != "session-acc2@test.com" {
 		t.Fatalf("switched payload session mismatch: %#v", got)
 	}
-	if prompt, _ := ds.payloads[2]["prompt"].(string); strings.Contains(prompt, "Previous reply had no visible output") {
+	if prompt, _ := ds.payloads[2]["prompt"].(string); strings.Contains(prompt, "Do not redo the task") {
 		t.Fatalf("expected fresh switched-account prompt without empty-output suffix, got %q", prompt)
 	}
 }

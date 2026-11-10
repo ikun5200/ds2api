@@ -2,7 +2,7 @@ package shared
 
 import "strings"
 
-const EmptyOutputRetrySuffix = "Previous reply had no visible output. Please regenerate the visible final answer or tool call now."
+const EmptyOutputRetrySuffix = "Previous reply had no visible output. Do not redo the task or make a new choice; if the previous thinking already decided the answer, output that answer now in the visible final answer or tool call. Otherwise answer the user's request directly."
 
 func EmptyOutputRetryEnabled() bool {
 	return true
